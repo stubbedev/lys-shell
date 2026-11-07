@@ -46,6 +46,7 @@ var Capabilities = []string{
 	"icon-static",
 	"persistence",
 	"inline-reply",
+	"sound",
 }
 
 // ClosedReason is the spec's closed reason codes.
@@ -93,6 +94,12 @@ type Notification struct {
 	// ReplyPlaceholder is x-kde-reply-placeholder-text, the reply field's
 	// hint text.
 	ReplyPlaceholder string
+	// SoundFile and SoundName are the sound-file and sound-name hints:
+	// a file to play, or a sound theme name.
+	SoundFile string
+	SoundName string
+	// SuppressSound is the suppress-sound hint.
+	SuppressSound bool
 }
 
 // InlineReply is the inline-reply action, when the sender offered one.
@@ -130,6 +137,9 @@ type Event struct {
 	// not named, so it can be empty.
 	IDs    []uint32
 	Reason ClosedReason
+	// Replaced is an EventAdd that took the place of a notification the
+	// app already had (replaces_id or a stack tag).
+	Replaced bool
 }
 
 // Event kinds.
@@ -435,7 +445,8 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 	if !inMemory && onDisk {
 		owner = stored
 	}
-	if id == 0 || owner != appName {
+	reused := id != 0 && owner == appName
+	if !reused {
 		s.next++
 		id = s.next
 		onDisk = false
@@ -465,6 +476,9 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 		Progress:         h.progress,
 		StackTag:         h.stackTag,
 		ReplyPlaceholder: h.replyPlaceholder,
+		SoundFile:        h.soundFile,
+		SoundName:        h.soundName,
+		SuppressSound:    h.suppressSound,
 	}
 	if expireTimeout > 0 {
 		n.Expires = n.Added.Add(time.Duration(expireTimeout) * time.Millisecond)
@@ -498,7 +512,7 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 			storeErr("remove", err)
 		}
 	})
-	s.notify(Event{Kind: EventAdd, Notif: n})
+	s.notify(Event{Kind: EventAdd, Notif: n, Replaced: reused})
 	return n.ID
 }
 

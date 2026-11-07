@@ -1070,6 +1070,16 @@ Number in `[1000, 1000000]`.
 
 Serialises as `uint32`.
 
+## NotificationSounds {#notification-sounds}
+
+Notification sound mode.
+
+| Value | Meaning |
+|---|---|
+| `"off"` | No notification plays a sound. |
+| `"critical"` | Critical notifications play a sound. |
+| `"all"` | Every notification plays a sound. |
+
 ## Numbering {#numbering}
 
 How workspace numbers are displayed.

@@ -6473,6 +6473,9 @@
             "right-click": "lys-shell notify dnd",
             "scroll-down": "",
             "scroll-up": "",
+            "sound-default": "message-new-instant",
+            "sound-mute-apps": [],
+            "sounds": "critical",
             "thresholds": []
           },
           "description": "Notification center module."
@@ -7706,6 +7709,21 @@
           "default": "",
           "description": "Action on scroll up."
         },
+        "sound-default": {
+          "$ref": "#/$defs/string",
+          "default": "message-new-instant",
+          "description": "Sound theme name a notification without its own sound plays, and\nwhat a sound the theme lacks falls back to."
+        },
+        "sound-mute-apps": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "App-name or desktop-entry globs whose notifications never play a\nsound."
+        },
+        "sounds": {
+          "$ref": "#/$defs/NotificationSounds",
+          "default": "critical",
+          "description": "Which notifications play a sound: `off`, `critical` (urgent ones\nonly), or `all`. Sounds stay silent in do-not-disturb, while the\nscreen is shared or recorded, and while the default output is muted."
+        },
         "thresholds": {
           "$ref": "#/$defs/Array_of_ThresholdEntry",
           "default": [],
@@ -7758,6 +7776,26 @@
       "maximum": 1000000,
       "minimum": 1000,
       "type": "integer"
+    },
+    "NotificationSounds": {
+      "description": "Notification sound mode.",
+      "oneOf": [
+        {
+          "const": "off",
+          "description": "No notification plays a sound.",
+          "type": "string"
+        },
+        {
+          "const": "critical",
+          "description": "Critical notifications play a sound.",
+          "type": "string"
+        },
+        {
+          "const": "all",
+          "description": "Every notification plays a sound.",
+          "type": "string"
+        }
+      ]
     },
     "Nullable_AnimationType": {
       "anyOf": [
@@ -12249,6 +12287,9 @@
           "right-click": "lys-shell notify dnd",
           "scroll-down": "",
           "scroll-up": "",
+          "sound-default": "message-new-instant",
+          "sound-mute-apps": [],
+          "sounds": "critical",
           "thresholds": []
         },
         "power": {

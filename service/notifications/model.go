@@ -1,6 +1,12 @@
 package notifications
 
-import dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+import (
+	"path/filepath"
+
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/fileuri"
+)
 
 // Urgency is the spec's urgency hint (types/notification.rs's Urgency).
 type Urgency uint8
@@ -57,6 +63,9 @@ type hints struct {
 	progress         Progress
 	stackTag         string
 	replyPlaceholder string
+	soundFile        string
+	soundName        string
+	suppressSound    bool
 }
 
 // decodeHints reads the spec hints; a missing or mistyped hint keeps
@@ -75,6 +84,9 @@ func decodeHints(raw map[string]dbus.Variant, cache func(imageData) (string, boo
 	h.progress = progressHint(raw["value"])
 	h.stackTag = stackTagHint(raw)
 	h.replyPlaceholder, _ = raw["x-kde-reply-placeholder-text"].Value().(string)
+	h.soundFile = soundFileHint(raw["sound-file"])
+	h.soundName, _ = raw["sound-name"].Value().(string)
+	h.suppressSound, _ = raw["suppress-sound"].Value().(bool)
 	for _, key := range []string{"image-data", "image_data", "icon_data"} {
 		v, ok := raw[key]
 		if !ok {
@@ -181,3 +193,16 @@ func stackTagHint(raw map[string]dbus.Variant) string {
 // InlineReplyActionID is KDE's inline-reply action key: the card shows a
 // reply field for it, and the reply comes back as NotificationReplied.
 const InlineReplyActionID = "inline-reply"
+
+// soundFileHint is the sound-file hint as a path: an absolute path, or a
+// file URI of one; anything else names no file.
+func soundFileHint(v dbus.Variant) string {
+	raw, _ := v.Value().(string)
+	if path, ok := fileuri.Path(raw); ok {
+		raw = path
+	}
+	if !filepath.IsAbs(raw) {
+		return ""
+	}
+	return filepath.Clean(raw)
+}

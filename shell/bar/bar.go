@@ -36,9 +36,10 @@ import (
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/recorder"
-	"github.com/stubbedev/lys-shell/service/screenshare"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 	"github.com/stubbedev/lys-shell/service/sni"
+	"github.com/stubbedev/lys-shell/service/screenshare"
+	"github.com/stubbedev/lys-shell/service/sounds"
 	"github.com/stubbedev/lys-shell/service/treeman"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/service/upower"
@@ -230,6 +231,7 @@ type shellStart struct {
 	idle         *idlePolicy
 	weatherSvc   *weather.Service
 	notifSvc     *notifications.Service
+	sounds       *sounds.Announcer
 	customUpd    *customUpdates
 	wall         *wallpapershell.Shell
 	releaseHold  func()
@@ -371,6 +373,9 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 	s.ctx.Notifications = s.notifSvc
 	if svc := s.notifSvc; svc != nil {
 		s.down.add(func() { svc.FlushWrites(configFlushTimeout) })
+		announcer, stopSounds := startSounds(svc, audio, s.cfg.Notification)
+		s.sounds = announcer
+		s.down.add(stopSounds)
 	}
 	sniStore := sni.NewStore()
 	s.ctx.SNI = sniStore
@@ -685,6 +690,9 @@ func (s *shellStart) mount() {
 				s.idle.configure(next.Idle)
 			}
 			applyNotificationConfig(s.notifSvc, next.Notification)
+			if s.sounds != nil {
+				s.sounds.SetPolicy(next.Notification.SoundPolicy())
+			}
 			s.weatherSvc.Configure(weatherSettings(next.Weather))
 			if s.wall != nil {
 				s.wall.SetConfig(next)

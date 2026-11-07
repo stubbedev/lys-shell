@@ -63,3 +63,12 @@ notification-popup-time-hours-ago = il y a { $hours } h
 
 settings-modules-notifications-popup-layer = Couche des fenêtres contextuelles
     .description = Couche layer-shell sur laquelle les notifications contextuelles sont placées. Le mode de déchirement rétrograde la superposition en haut.
+
+settings-modules-notifications-sounds = Sons
+    .description = Quelles notifications jouent un son ; muettes en mode ne pas déranger, pendant un partage d'écran et quand le son est coupé
+
+settings-modules-notifications-sound-default = Son par défaut
+    .description = Nom du son du thème joué par une notification sans son propre son
+
+settings-modules-notifications-sound-mute-apps = Applications muettes
+    .description = Motifs de noms d'applications dont les notifications ne jouent jamais de son

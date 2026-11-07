@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/sounds"
 )
 
 // NotificationConfig is ported from crates/wayle-config/src/schemas/modules/notification/mod.rs.
@@ -54,6 +55,16 @@ type NotificationConfig struct {
 	// Do-not-disturb rules: critical and allowed apps through, a schedule,
 	// and turning it on while sharing the screen or in fullscreen.
 	Dnd NotificationDndConfig `cfg:"dnd"`
+	// Which notifications play a sound: `off`, `critical` (urgent ones
+	// only), or `all`. Sounds stay silent in do-not-disturb, while the
+	// screen is shared or recorded, and while the default output is muted.
+	Sounds NotificationSounds `cfg:"sounds"`
+	// Sound theme name a notification without its own sound plays, and
+	// what a sound the theme lacks falls back to.
+	SoundDefault string `cfg:"sound-default"`
+	// App-name or desktop-entry globs whose notifications never play a
+	// sound.
+	SoundMuteApps []string `cfg:"sound-mute-apps"`
 	// How notification icons are resolved.
 	//
 	// | Mode | Per-notification image | No image provided |
@@ -155,6 +166,9 @@ func DefaultsNotification() NotificationConfig {
 		ScrollDown:         ClickAction{},
 		Blocklist:          []string{},
 		Dnd:                DefaultsNotificationDnd(),
+		Sounds:             NotificationSoundsCritical,
+		SoundDefault:       "message-new-instant",
+		SoundMuteApps:      []string{},
 		IconSource:         IconSourceAutomatic,
 		HistoryMemory:      NotificationHistoryMemory{limit: notifications.DefaultMemoryLimit()},
 		HistoryStored:      NotificationHistoryStored{limit: notifications.DefaultStoredLimit()},
@@ -356,4 +370,31 @@ func (m NotificationHistoryStored) MarshalConfig() any { return int64(m.limit.Co
 
 func (NotificationHistoryStored) configSchema(*schemaGen) Schema {
 	return uint32RangeSchema(typeOf[NotificationHistoryStored](), notifications.MinHistoryStored, notifications.MaxHistoryStored)
+}
+
+// NotificationSounds is which notifications play a sound.
+//
+// Notification sound mode.
+type NotificationSounds string
+
+// NotificationSounds values.
+const (
+	// No notification plays a sound.
+	NotificationSoundsOff NotificationSounds = "off"
+	// Critical notifications play a sound.
+	NotificationSoundsCritical NotificationSounds = "critical"
+	// Every notification plays a sound.
+	NotificationSoundsAll NotificationSounds = "all"
+)
+
+var _ = registerEnum(NotificationSoundsOff, NotificationSoundsCritical, NotificationSoundsAll)
+
+// SoundPolicy is the sound keys as the announcer applies them.
+func (c NotificationConfig) SoundPolicy() sounds.Policy {
+	modes := map[NotificationSounds]sounds.Mode{
+		NotificationSoundsOff:      sounds.Off,
+		NotificationSoundsCritical: sounds.Critical,
+		NotificationSoundsAll:      sounds.All,
+	}
+	return sounds.Policy{Mode: modes[c.Sounds], Default: c.SoundDefault, MuteApps: c.SoundMuteApps}
 }

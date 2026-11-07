@@ -39,6 +39,10 @@ type Server struct {
 	failures      map[uint32]native.Error
 	conns         map[*conn]struct{}
 	records       []*Record
+	uploads       map[uint32]*upload
+	samples       map[string]native.Sample
+	uploaded      int
+	plays         []Play
 	calls         []uint32
 	nextChannel   uint32
 	nextIndex     uint32
@@ -430,7 +434,8 @@ func (c *conn) serve() {
 			return
 		}
 		if f.Channel != native.ControlChannel {
-			continue // playback data: this fake records only
+			c.s.uploadData(f)
+			continue
 		}
 		pkt, err := native.DecodePacket(f.Payload)
 		if err != nil {
@@ -505,6 +510,9 @@ func init() {
 		native.CmdSetDefaultSource:      setDefaultHandler(false),
 		native.CmdCreateRecordStream:    (*conn).createRecord,
 		native.CmdDeleteRecordStream:    (*conn).deleteRecord,
+		native.CmdCreateUploadStream:    (*conn).createUpload,
+		native.CmdFinishUploadStream:    (*conn).finishUpload,
+		native.CmdPlaySample:            (*conn).playSample,
 	}
 }
 

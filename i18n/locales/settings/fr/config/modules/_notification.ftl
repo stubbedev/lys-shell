@@ -96,3 +96,8 @@ enum-urgency-bar-threshold-none = Aucune
 enum-icon-source-automatic = Automatique
 enum-icon-source-mapped = Associé
 enum-icon-source-application = Application
+
+## NotificationSounds variants
+enum-notification-sounds-off = Désactivés
+enum-notification-sounds-critical = Critiques uniquement
+enum-notification-sounds-all = Toutes

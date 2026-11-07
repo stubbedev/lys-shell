@@ -9,6 +9,10 @@ const (
 	CmdReply                 = 2
 	CmdCreateRecordStream    = 5
 	CmdDeleteRecordStream    = 6
+	CmdCreateUploadStream    = 15
+	CmdDeleteUploadStream    = 16
+	CmdFinishUploadStream    = 17
+	CmdPlaySample            = 18
 	CmdAuth                  = 8
 	CmdSetClientName         = 9
 	CmdGetServerInfo         = 20
@@ -42,6 +46,8 @@ const (
 var commandNames = map[uint32]string{
 	CmdError: "ERROR", CmdReply: "REPLY",
 	CmdCreateRecordStream: "CREATE_RECORD_STREAM", CmdDeleteRecordStream: "DELETE_RECORD_STREAM",
+	CmdCreateUploadStream: "CREATE_UPLOAD_STREAM", CmdDeleteUploadStream: "DELETE_UPLOAD_STREAM",
+	CmdFinishUploadStream: "FINISH_UPLOAD_STREAM", CmdPlaySample: "PLAY_SAMPLE",
 	CmdAuth: "AUTH", CmdSetClientName: "SET_CLIENT_NAME", CmdGetServerInfo: "GET_SERVER_INFO",
 	CmdGetSinkInfo: "GET_SINK_INFO", CmdGetSinkInfoList: "GET_SINK_INFO_LIST",
 	CmdGetSourceInfo: "GET_SOURCE_INFO", CmdGetSourceInfoList: "GET_SOURCE_INFO_LIST",

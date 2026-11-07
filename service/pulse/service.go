@@ -73,6 +73,10 @@ type session struct {
 	conn  *native.Conn
 	ready chan struct{}
 	abort chan struct{}
+	// samplesMu serializes sample plays; samples are the names uploaded
+	// to this connection's server.
+	samplesMu sync.Mutex
+	samples   map[string]bool
 }
 
 type snapshot struct {

@@ -155,3 +155,12 @@ func (s *Service) refocusUnlock(always bool) {
 		s.notify(Event{Kind: EventDnd})
 	}
 }
+
+// Audible reports whether n may make a sound now: do-not-disturb lets it
+// pop up and the screen is not shared or recorded, whatever the rules
+// say about popups while sharing.
+func (s *Service) Audible(n *Notification) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.verdictLocked(n) == Popup && !s.focus.sharing
+}
