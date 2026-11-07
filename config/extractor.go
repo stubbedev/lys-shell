@@ -8,17 +8,17 @@ import "reflect"
 // tool parameters. It is an inline group: its keys sit directly in
 // [styling].
 type ColorExtractorConfig struct {
-	// Theme provider (lys-shell, matugen, pywal, wallust).
+	// Theme provider (lys-shell, wallpaper, matugen, pywal, wallust).
 	ThemeProvider ThemeProvider `cfg:"theme-provider"`
 	// Monitor whose wallpaper drives color extraction. Empty uses the first available.
 	ThemingMonitor string `cfg:"theming-monitor,type=Monitor"`
-	// Matugen color scheme type.
+	// Color scheme type for matugen and the wallpaper provider.
 	MatugenScheme MatugenScheme `cfg:"matugen-scheme"`
-	// Matugen contrast level (-1.0 to 1.0).
+	// Contrast level for matugen and the wallpaper provider (-1.0 to 1.0).
 	MatugenContrast SignedNormalizedF64 `cfg:"matugen-contrast"`
-	// Matugen source color index (0-3).
+	// Source color index for matugen and the wallpaper provider (0-3).
 	MatugenSourceColor uint8 `cfg:"matugen-source-color"`
-	// Matugen light mode.
+	// Light mode for matugen and the wallpaper provider.
 	MatugenLight bool `cfg:"matugen-light"`
 	// Wallust palette mode.
 	WallustPalette WallustPalette `cfg:"wallust-palette"`

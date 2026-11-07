@@ -15,6 +15,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
 // rig is a backend serving on a private bus, with a client connection
@@ -227,22 +228,78 @@ func TestSettingsContrastHasItsOwnSource(t *testing.T) {
 }
 
 func TestColorScheme(t *testing.T) {
-	s := config.DefaultsStyling()
-	if colorScheme(s) != 1 {
+	cfg := config.Defaults()
+	d := desktop{cfg: cfg, palette: cfg.Styling.ActivePalette()}
+	if colorScheme(d) != 1 {
 		t.Error("auto over a dark background is not dark")
 	}
-	s.Palette.Bg, _ = config.ParseHexColor("#f0f0f0")
-	if colorScheme(s) != 2 {
+	d.palette.Bg = "#f0f0f0"
+	if colorScheme(d) != 2 {
 		t.Error("auto over a light background is not light")
 	}
-	s.Appearance = config.AppearanceDark
-	if colorScheme(s) != 1 {
+	cfg.Styling.Appearance = config.AppearanceDark
+	if colorScheme(d) != 1 {
 		t.Error("forced dark is not dark")
 	}
-	s.Appearance = config.AppearanceLight
-	s.Palette.Bg, _ = config.ParseHexColor("#000")
-	if colorScheme(s) != 2 {
+	cfg.Styling.Appearance = config.AppearanceLight
+	d.palette.Bg = "#000000"
+	if colorScheme(d) != 2 {
 		t.Error("forced light is not light")
+	}
+}
+
+// With the wallpaper provider the accent and scheme are the wallpaper
+// palette's, and a finished extraction re-reads it and announces what
+// moved.
+func TestSettingsFollowTheWallpaperPalette(t *testing.T) {
+	r := settingsRig(t, gtksettings.Settings{}, nil)
+	palette := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "lys-shell", "wallpaper-colors.json")
+	write := func(primary string) {
+		t.Helper()
+		data := `{"colors": {` +
+			`"background": {"dark": "#101418", "light": "#f8f9ff"},` +
+			`"on_background": {"dark": "#e0e2e8", "light": "#191c20"},` +
+			`"on_surface_variant": {"dark": "#c2c7cf", "light": "#42474e"},` +
+			`"primary": {"dark": "` + primary + `", "light": "#2060cc"},` +
+			`"secondary": {"dark": "#b9c8da", "light": "#526070"},` +
+			`"tertiary": {"dark": "#d3bfe6", "light": "#6a5778"},` +
+			`"error": {"dark": "#ffb4ab", "light": "#ba1a1a"}}}`
+		if err := os.MkdirAll(filepath.Dir(palette), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(palette, []byte(data), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("#4090ff")
+	if err := r.cfg.SetByPath("styling.theme-provider", "wallpaper"); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.changed(t); !slices.Contains(got, AppearanceNS+" "+keyAccentColor) {
+		t.Fatalf("switching to the wallpaper provider emitted %v, want the accent", got)
+	}
+	if v, _ := r.read(AppearanceNS, keyAccentColor); !slices.Equal(v.([]any), []any{0x40 / 255.0, 0x90 / 255.0, 0xff / 255.0}) {
+		t.Errorf("accent = %v, want the wallpaper primary", v)
+	}
+	write("#ff9040")
+	if got := r.changed(t); len(got) != 0 {
+		t.Fatalf("a palette file change alone emitted %v; the extraction signal announces it", got)
+	}
+	shell := r.bus.Conn(t)
+	if err := shell.Emit(wallpaper.ServicePath, wallpaper.Interface+".ColorsExtracted"); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyAccentColor}) {
+		t.Errorf("an extraction emitted %v, want the accent alone", got)
+	}
+	if v, _ := r.read(AppearanceNS, keyAccentColor); !slices.Equal(v.([]any), []any{1.0, 0x90 / 255.0, 0x40 / 255.0}) {
+		t.Errorf("accent after the extraction = %v, want the new primary", v)
+	}
+	if err := shell.Emit(wallpaper.ServicePath, wallpaper.Interface+".ColorsExtracted"); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.changed(t); len(got) != 0 {
+		t.Errorf("an extraction that moved nothing emitted %v", got)
 	}
 }
 

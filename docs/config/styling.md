@@ -24,16 +24,16 @@ Theme, palette, and rounding tokens applied shell-wide. Changes recompile the st
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `theme-provider` | [`ThemeProvider`](/config/types#theme-provider) | `"lys-shell"` | Theme provider (lys-shell, matugen, pywal, wallust). |
+| `theme-provider` | [`ThemeProvider`](/config/types#theme-provider) | `"lys-shell"` | Theme provider (lys-shell, wallpaper, matugen, pywal, wallust). |
 
 ## Matugen
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `matugen-scheme` | [`MatugenScheme`](/config/types#matugen-scheme) | `"tonal-spot"` | Matugen color scheme type. |
-| `matugen-contrast` | [`SignedNormalizedF64`](/config/types#signed-normalized-f64) | `0` | Matugen contrast level (-1.0 to 1.0). |
-| `matugen-source-color` | u8 | `0` | Matugen source color index (0-3). |
-| `matugen-light` | bool | `false` | Matugen light mode. |
+| `matugen-scheme` | [`MatugenScheme`](/config/types#matugen-scheme) | `"tonal-spot"` | Color scheme type for matugen and the wallpaper provider. |
+| `matugen-contrast` | [`SignedNormalizedF64`](/config/types#signed-normalized-f64) | `0` | Contrast level for matugen and the wallpaper provider (-1.0 to 1.0). |
+| `matugen-source-color` | u8 | `0` | Source color index for matugen and the wallpaper provider (0-3). |
+| `matugen-light` | bool | `false` | Light mode for matugen and the wallpaper provider. |
 
 ## Wallust
 

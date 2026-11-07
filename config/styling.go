@@ -129,7 +129,7 @@ func (a Appearance) ForcedLight() (light, ok bool) {
 //
 // Source of color palette values.
 //
-// Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.
+// Dynamic providers (Matugen, Pywal, Wallust, Wallpaper) inject palette tokens at runtime.
 type ThemeProvider string
 
 // Theme providers; lys-shell is the default.
@@ -142,6 +142,8 @@ const (
 	ThemeProviderPywal ThemeProvider = "pywal"
 	// Dynamic theming via Wallust.
 	ThemeProviderWallust ThemeProvider = "wallust"
+	// Dynamic Material You theming computed from the wallpaper by lys-shell itself, no external tool.
+	ThemeProviderWallpaper ThemeProvider = "wallpaper"
 )
 
-var _ = registerEnum(ThemeProviderLysShell, ThemeProviderMatugen, ThemeProviderPywal, ThemeProviderWallust)
+var _ = registerEnum(ThemeProviderLysShell, ThemeProviderMatugen, ThemeProviderPywal, ThemeProviderWallust, ThemeProviderWallpaper)

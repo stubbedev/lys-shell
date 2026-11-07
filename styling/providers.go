@@ -199,7 +199,8 @@ func LoadWallust(path string, isLight bool) (config.Palette, error) {
 // the forced appearance overriding the tool's own light setting. A
 // provider that fails yields fallback and the failure, which the caller
 // logs — the palette is always usable, as in Rust, which logs and falls
-// back.
+// back. The wallpaper provider without a palette (no wallpaper is set)
+// is fallback, as that is no failure.
 func ResolvePalette(fallback config.Palette, s config.StylingConfig) (config.Palette, error) {
 	ce := s.ColorExtractor
 	forcedLight, forced := s.Appearance.ForcedLight()
@@ -214,7 +215,7 @@ func ResolvePalette(fallback config.Palette, s config.StylingConfig) (config.Pal
 		light bool
 	)
 	switch ce.ThemeProvider {
-	case config.ThemeProviderMatugen:
+	case config.ThemeProviderMatugen, config.ThemeProviderWallpaper:
 		load, light = LoadMatugen, isLight(ce.MatugenLight)
 	case config.ThemeProviderWallust:
 		load, light = LoadWallust, isLight(ce.WallustPalette.IsLight())
@@ -228,6 +229,9 @@ func ResolvePalette(fallback config.Palette, s config.StylingConfig) (config.Pal
 		return fallback, fmt.Errorf("styling: %s palette load failed: %w", ce.ThemeProvider, err)
 	}
 	p, err := load(path, light)
+	if ce.ThemeProvider == config.ThemeProviderWallpaper && errors.Is(err, ErrPaletteNotFound) {
+		return fallback, nil
+	}
 	if err != nil {
 		return fallback, fmt.Errorf("styling: %s palette load failed: %w", ce.ThemeProvider, err)
 	}

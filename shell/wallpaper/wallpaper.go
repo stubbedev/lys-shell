@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/outputsize"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/styling/material"
 )
 
 // frameInterval paces transition steps.
@@ -90,16 +91,18 @@ func newShell(ui loop, svc *wallpaper.Service, cfg *config.Config, d rasterDeps)
 // stop function ends the loops, releases the name, and lets go of the
 // wallpapers once the loop has ended.
 func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, firstFrame func()) (*Shell, func(), error) {
+	var s *Shell
 	svc := wallpaper.New(wallpaper.Options{
 		Extractor:      extract.FromConfig(cfg.Styling.ColorExtractor),
 		ThemingMonitor: cfg.Styling.ColorExtractor.ThemingMonitor,
 		SharedCycle:    cfg.Wallpaper.CyclingSameImage,
+		Sample:         func(ctx context.Context, monitor string) ([]material.ARGB, error) { return s.sample(ctx, monitor) },
 	})
 	release, err := wallpaper.Export(conn, svc)
 	if err != nil {
 		return nil, nil, err
 	}
-	s := newShell(appLoop(application), svc, cfg, rasterDeps{
+	s = newShell(appLoop(application), svc, cfg, rasterDeps{
 		decode: imagedecode.OpenOffHeap,
 		spawn:  func(fn func()) { go fn() },
 		invoke: application.Invoke,

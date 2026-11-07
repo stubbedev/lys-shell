@@ -15,7 +15,7 @@ settings-styling-high-contrast = High Contrast
     .description = Ask apps for higher contrast through the desktop portal
 
 settings-styling-theme-provider = Theme Provider
-    .description = Source for color palette (lys-shell, matugen, pywal, wallust)
+    .description = Source for color palette (lys-shell, wallpaper, matugen, pywal, wallust)
 
 settings-styling-theming-monitor = Theming Monitor
     .description = Monitor whose wallpaper drives color extraction
@@ -23,16 +23,16 @@ settings-styling-theming-monitor = Theming Monitor
 ## Matugen Configuration
 
 settings-styling-matugen-scheme = Matugen Scheme
-    .description = Color scheme type for matugen palette generation
+    .description = Color scheme type for matugen and the wallpaper provider
 
 settings-styling-matugen-contrast = Matugen Contrast
-    .description = Contrast level for matugen (-1.0 to 1.0)
+    .description = Contrast level for matugen and the wallpaper provider (-1.0 to 1.0)
 
 settings-styling-matugen-source-color = Matugen Source Color
-    .description = Source color index for matugen palette generation
+    .description = Source color index for matugen and the wallpaper provider
 
 settings-styling-matugen-light = Matugen Light Mode
-    .description = Generate a light color scheme with matugen
+    .description = Generate a light color scheme with matugen or the wallpaper provider
 
 ## Wallust Configuration
 
@@ -111,6 +111,7 @@ enum-theme-provider-lys-shell = lys-shell
 enum-theme-provider-matugen = Matugen
 enum-theme-provider-pywal = Pywal
 enum-theme-provider-wallust = Wallust
+enum-theme-provider-wallpaper = Wallpaper
 
 ## MatugenScheme variants
 enum-matugen-scheme-content = Content

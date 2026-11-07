@@ -12,6 +12,8 @@ package wallpaper
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"maps"
 	"math/rand/v2"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/styling/material"
 )
 
 // Options configure a Service (WallpaperServiceBuilder).
@@ -32,10 +35,17 @@ type Options struct {
 	ThemingMonitor string
 	// SharedCycle shows the same image on every monitor in shuffle mode.
 	SharedCycle bool
+	// Sample reads a monitor's decoded wallpaper for the material
+	// extraction; the shell holds the rasters.
+	Sample Sampler
 	// Rand seeds shuffles and random starting indices; nil picks a
 	// random seed. Tests pass a fixed one.
 	Rand *rand.Rand
 }
+
+// Sampler reads the wallpaper a monitor shows, already decoded, as at
+// most extract.SampleSide colors along its longer edge.
+type Sampler func(ctx context.Context, monitor string) ([]material.ARGB, error)
 
 // Service is the wallpaper state manager (WallpaperService). All
 // methods are safe for concurrent use; Run drives the cycling timer,
@@ -47,13 +57,16 @@ type Service struct {
 	sharedCycle    bool
 	themingMonitor string
 	extractor      extract.Config
+	sample         Sampler
 	rng            *rand.Rand
 
 	// extractMu serializes extractions (the Rust extractor task and the
 	// D-Bus ExtractColors method both reach extract_colors); it also
-	// guards lastExtracted.
+	// guards lastExtracted, extractedAny and native.
 	extractMu     sync.Mutex
 	lastExtracted string
+	extractedAny  bool
+	native        extract.Native
 
 	changes   feed.Tick // monitors
 	extracted feed.Tick // an extraction finished (or had nothing to do)
@@ -73,6 +86,7 @@ func New(opts Options) *Service {
 		sharedCycle:    opts.SharedCycle,
 		themingMonitor: opts.ThemingMonitor,
 		extractor:      opts.Extractor,
+		sample:         opts.Sample,
 		rng:            rng,
 		cycleKick:      make(chan struct{}, 1),
 		extractKick:    make(chan bool, 1),
@@ -409,23 +423,24 @@ func (s *Service) UnregisterMonitor(monitor string) {
 	s.updateMonitors(func(m map[string]MonitorState) { delete(m, monitor) })
 }
 
-// themingPath resolves the wallpaper extraction reads: the configured
-// theming monitor's, or the lowest-named monitor's (theming_fallback).
-// skip is true while a configured theming monitor is unplugged: theming
-// must not hop to another monitor for the length of a dock cycle.
-func themingPath(monitors map[string]MonitorState, theming string) (path string, skip bool) {
+// themingPath resolves the monitor and wallpaper extraction reads: the
+// configured theming monitor's, or the lowest-named monitor's
+// (theming_fallback). skip is true while a configured theming monitor is
+// unplugged: theming must not hop to another monitor for the length of a
+// dock cycle.
+func themingPath(monitors map[string]MonitorState, theming string) (monitor, path string, skip bool) {
 	if theming != "" {
 		st, ok := monitors[theming]
 		if !ok {
-			return "", true
+			return "", "", true
 		}
-		return st.Wallpaper, false
+		return theming, st.Wallpaper, false
 	}
 	names := slices.Sorted(maps.Keys(monitors))
 	if len(names) == 0 {
-		return "", false
+		return "", "", false
 	}
-	return monitors[names[0]].Wallpaper, false
+	return names[0], monitors[names[0]].Wallpaper, false
 }
 
 // ExtractColors extracts the palette from the theming wallpaper unless
@@ -440,20 +455,38 @@ func (s *Service) extract(ctx context.Context, reset bool) error {
 	defer s.extractMu.Unlock()
 	defer feed.Notify(&s.extracted)
 	if reset {
-		s.lastExtracted = ""
+		s.extractedAny = false
 	}
 	s.mu.Lock()
-	path, skip := themingPath(s.monitors, s.themingMonitor)
+	monitor, path, skip := themingPath(s.monitors, s.themingMonitor)
 	cfg := s.extractor
 	s.mu.Unlock()
-	if skip || path == s.lastExtracted {
+	if skip || s.extractedAny && path == s.lastExtracted {
 		return nil
 	}
-	s.lastExtracted = path
-	if path == "" {
+	s.lastExtracted, s.extractedAny = path, true
+	switch {
+	case cfg.Tool == extract.Material && path == "":
+		return s.native.Clear()
+	case cfg.Tool == extract.Material:
+		return s.extractNative(ctx, cfg, monitor)
+	case path == "":
 		return nil
 	}
 	return extract.Extract(ctx, cfg, path)
+}
+
+// extractNative themes from the monitor's decoded wallpaper; s.extractMu
+// is held.
+func (s *Service) extractNative(ctx context.Context, cfg extract.Config, monitor string) error {
+	if s.sample == nil {
+		return errors.New("wallpaper: material extraction reads the shell's decoded wallpapers, and this service has none")
+	}
+	sample, err := s.sample(ctx, monitor)
+	if err != nil {
+		return fmt.Errorf("wallpaper: reading the %s wallpaper for theming: %w", monitor, err)
+	}
+	return s.native.Extract(cfg, sample)
 }
 
 // Run drives the service until ctx ends: the cycling timer and

@@ -9,7 +9,7 @@ settings-styling-rounding = Arrondis
     .description = Arrondi des coins pour les menus déroulants, les fenêtres contextuelles et les dialogues
 
 settings-styling-theme-provider = Fournisseur de thème
-    .description = Source de la palette de couleurs (lys-shell, matugen, pywal, wallust)
+    .description = Source de la palette de couleurs (lys-shell, wallpaper, matugen, pywal, wallust)
 
 settings-styling-theming-monitor = Moniteur de thème
     .description = Moniteur dont le fond d'écran pilote l'extraction de couleurs
@@ -17,16 +17,16 @@ settings-styling-theming-monitor = Moniteur de thème
 ## Configuration Matugen
 
 settings-styling-matugen-scheme = Schéma Matugen
-    .description = Type de schéma de couleurs pour la génération de palette Matugen
+    .description = Type de schéma de couleurs pour Matugen et le fournisseur fond d'écran
 
 settings-styling-matugen-contrast = Contraste Matugen
-    .description = Niveau de contraste pour Matugen (-1.0 à 1.0)
+    .description = Niveau de contraste pour Matugen et le fournisseur fond d'écran (-1.0 à 1.0)
 
 settings-styling-matugen-source-color = Couleur source Matugen
-    .description = Indice de couleur source pour la génération de palette Matugen
+    .description = Indice de couleur source pour Matugen et le fournisseur fond d'écran
 
 settings-styling-matugen-light = Mode clair Matugen
-    .description = Générer un schéma de couleurs clair avec Matugen
+    .description = Générer un schéma de couleurs clair avec Matugen ou le fournisseur fond d'écran
 
 ## Configuration Wallust
 
@@ -100,6 +100,7 @@ enum-theme-provider-lys-shell = lys-shell
 enum-theme-provider-matugen = Matugen
 enum-theme-provider-pywal = Pywal
 enum-theme-provider-wallust = Wallust
+enum-theme-provider-wallpaper = Fond d'écran
 
 ## Variantes de MatugenScheme
 enum-matugen-scheme-content = Contenu

@@ -123,6 +123,8 @@ func Extract(ctx context.Context, cfg Config, image string) error {
 		return run(ctx, Pywal, "wal", pywalArgs(cfg, image))
 	case None:
 		return nil
+	case Material:
+		return errors.New("extract: material extraction reads the decoded wallpaper through Native, not a file")
 	}
 	return fmt.Errorf("extract: unknown tool %v", cfg.Tool)
 }

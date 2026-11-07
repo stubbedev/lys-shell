@@ -18,6 +18,9 @@ const (
 	Matugen
 	Pywal
 	None
+	// Material is lys-shell's own Material You extraction, which reads
+	// the decoded wallpaper instead of running a program.
+	Material
 )
 
 // String is the tool's lowercase name, as the Rust Display writes it.
@@ -31,6 +34,8 @@ func (t Tool) String() string {
 		return "pywal"
 	case None:
 		return "none"
+	case Material:
+		return "material"
 	}
 	return fmt.Sprintf("Tool(%d)", uint8(t))
 }
@@ -47,6 +52,8 @@ func ParseTool(s string) (Tool, error) {
 		return Pywal, nil
 	case "none", "disabled":
 		return None, nil
+	case "material":
+		return Material, nil
 	}
 	return 0, fmt.Errorf("Invalid color extractor: %s", s) //nolint:staticcheck // the Rust message, verbatim
 }
@@ -74,6 +81,8 @@ func ToolFor(p config.ThemeProvider) Tool {
 		return Pywal
 	case config.ThemeProviderWallust:
 		return Wallust
+	case config.ThemeProviderWallpaper:
+		return Material
 	}
 	return None
 }

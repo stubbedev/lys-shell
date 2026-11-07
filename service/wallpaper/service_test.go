@@ -3,6 +3,7 @@ package wallpaper
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -11,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
+	"github.com/stubbedev/lys-shell/styling/material"
 )
 
 func seeded() *rand.Rand { return rand.New(rand.NewPCG(1, 2)) }
@@ -263,22 +266,22 @@ func TestThemingPath(t *testing.T) {
 		"DP-1":  {Wallpaper: "first.png"},
 		"eDP-1": {Wallpaper: "laptop.png"},
 	}
-	if p, skip := themingPath(m, ""); p != "first.png" || skip {
+	if _, p, skip := themingPath(m, ""); p != "first.png" || skip {
 		t.Errorf("fallback = %q %v, want the lowest connector", p, skip)
 	}
-	if p, skip := themingPath(m, "eDP-1"); p != "laptop.png" || skip {
+	if _, p, skip := themingPath(m, "eDP-1"); p != "laptop.png" || skip {
 		t.Errorf("configured = %q %v", p, skip)
 	}
 	// An unplugged theming monitor must not hand theming elsewhere.
-	if p, skip := themingPath(m, "HDMI-1"); !skip || p != "" {
+	if _, p, skip := themingPath(m, "HDMI-1"); !skip || p != "" {
 		t.Errorf("unplugged theming monitor = %q %v, want a skip", p, skip)
 	}
 	// The lowest name wins even with nothing to show.
 	m["DP-1"] = MonitorState{}
-	if p, _ := themingPath(m, ""); p != "" {
+	if _, p, _ := themingPath(m, ""); p != "" {
 		t.Errorf("fallback skipped to %q", p)
 	}
-	if p, skip := themingPath(map[string]MonitorState{}, ""); p != "" || skip {
+	if _, p, skip := themingPath(map[string]MonitorState{}, ""); p != "" || skip {
 		t.Error("no monitors resolved a path")
 	}
 }
@@ -479,4 +482,77 @@ func TestRunReExtractsOnExtractorChange(t *testing.T) {
 	waitCalls(2)
 	s.SetThemingMonitor("DP-1")
 	waitCalls(3)
+}
+
+func TestMaterialExtractionSamplesTheThemingMonitor(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	t.Setenv("PATH", "")
+	dir := imageDir(t, "a.png")
+	var sampled []string
+	s := New(Options{
+		Extractor: extract.Config{Tool: extract.Material, MatugenScheme: config.MatugenSchemeTonalSpot},
+		Rand:      seeded(),
+		Sample: func(_ context.Context, monitor string) ([]material.ARGB, error) {
+			sampled = append(sampled, monitor)
+			return []material.ARGB{material.RGB(0x20, 0x60, 0xd0)}, nil
+		},
+	})
+	s.RegisterMonitor("DP-2")
+	s.RegisterMonitor("DP-1")
+	ctx := context.Background()
+	palette := filepath.Join(cache, "lys-shell", "wallpaper-colors.json")
+	if err := s.ExtractColors(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(palette); !errors.Is(err, fs.ErrNotExist) || len(sampled) != 0 {
+		t.Fatalf("without a wallpaper: sampled %v, palette %v; want neither", sampled, err)
+	}
+	if err := s.SetWallpaper(filepath.Join(dir, "a.png"), ""); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := s.ExtractColors(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !slices.Equal(sampled, []string{"DP-1"}) {
+		t.Fatalf("sampled %v, want DP-1 once", sampled)
+	}
+	if _, err := os.Stat(palette); err != nil {
+		t.Fatalf("no palette after extraction: %v", err)
+	}
+	s.updateMonitors(func(m map[string]MonitorState) {
+		for name, st := range m {
+			st.Wallpaper = ""
+			m[name] = st
+		}
+	})
+	if err := s.ExtractColors(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(palette); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("the palette outlived the wallpaper: %v", err)
+	}
+}
+
+func TestMaterialExtractionFailsLoudlyWithoutRasters(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	s := New(Options{Extractor: extract.Config{Tool: extract.Material}, Rand: seeded()})
+	s.RegisterMonitor("DP-1")
+	if err := s.SetWallpaper(filepath.Join(imageDir(t, "a.png"), "a.png"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ExtractColors(context.Background()); err == nil {
+		t.Error("material extraction without a sampler succeeded")
+	}
+	failing := New(Options{
+		Extractor: extract.Config{Tool: extract.Material}, Rand: seeded(),
+		Sample: func(context.Context, string) ([]material.ARGB, error) { return nil, errors.New("no raster") },
+	})
+	failing.RegisterMonitor("DP-1")
+	_ = failing.SetWallpaper(filepath.Join(imageDir(t, "b.png"), "b.png"), "")
+	if err := failing.ExtractColors(context.Background()); err == nil || !strings.Contains(err.Error(), "DP-1") {
+		t.Errorf("a failed sample = %v, want an error naming the monitor", err)
+	}
 }

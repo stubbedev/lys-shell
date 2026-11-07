@@ -1,10 +1,12 @@
 package portal
 
 import (
+	"fmt"
 	"log"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
@@ -13,6 +15,8 @@ import (
 	"github.com/stubbedev/lys-ui/gtksettings"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/wallpaper"
+	"github.com/stubbedev/lys-shell/styling"
 )
 
 // SettingsIface serves org.freedesktop.appearance from the live styling
@@ -40,11 +44,13 @@ const (
 )
 
 // desktop is what a setting is read from: the effective config, the
-// host's GTK settings.ini, and the session's environment.
+// palette its theme provider resolves to, the host's GTK settings.ini,
+// and the session's environment.
 type desktop struct {
-	cfg    *config.Config
-	gtk    gtksettings.Settings
-	getenv func(string) string
+	cfg     *config.Config
+	palette config.Palette
+	gtk     gtksettings.Settings
+	getenv  func(string) string
 }
 
 // setting is one served key; read reports false when there is nothing
@@ -60,11 +66,11 @@ func always(read func(desktop) any) func(desktop) (any, bool) {
 
 // servedSettings is every key in ReadAll's order.
 var servedSettings = []setting{
-	{AppearanceNS, keyColorScheme, always(func(d desktop) any { return colorScheme(d.cfg.Styling) })},
-	{AppearanceNS, keyAccentColor, always(func(d desktop) any { return accentColor(d.cfg.Styling.Palette.Primary) })},
+	{AppearanceNS, keyColorScheme, always(func(d desktop) any { return colorScheme(d) })},
+	{AppearanceNS, keyAccentColor, always(func(d desktop) any { return accentColor(d.palette) })},
 	{AppearanceNS, keyContrast, always(func(d desktop) any { return boolU32(d.cfg.Styling.HighContrast) })},
 	{AppearanceNS, keyReducedMotion, always(func(d desktop) any { return boolU32(reducedMotion(d)) })},
-	{GnomeInterfaceNS, "color-scheme", always(func(d desktop) any { return gnomeColorScheme(colorScheme(d.cfg.Styling)) })},
+	{GnomeInterfaceNS, "color-scheme", always(func(d desktop) any { return gnomeColorScheme(colorScheme(d)) })},
 	{GnomeInterfaceNS, "enable-animations", always(func(d desktop) any { return !reducedMotion(d) })},
 	{GnomeInterfaceNS, "gtk-theme", always(gtkTheme)},
 	{GnomeInterfaceNS, "icon-theme", nonEmpty(func(d desktop) string { return d.gtk.IconThemeName })},
@@ -107,7 +113,7 @@ func gtkTheme(d desktop) any {
 	if d.gtk.ThemeName != "" {
 		return d.gtk.ThemeName
 	}
-	if colorScheme(d.cfg.Styling) == 1 {
+	if colorScheme(d) == 1 {
 		return "Adwaita-dark"
 	}
 	return "Adwaita"
@@ -151,20 +157,16 @@ func textScale(s gtksettings.Settings) float64 {
 }
 
 // colorScheme is 0 no preference, 1 dark, 2 light. Auto states no
-// preference, so the effective scheme is read off the active palette's
+// preference, so the effective scheme is read off the resolved palette's
 // background luminance, or apps would stay light under a dark palette.
-func colorScheme(s config.StylingConfig) uint32 {
-	switch s.Appearance {
+func colorScheme(d desktop) uint32 {
+	switch d.cfg.Styling.Appearance {
 	case config.AppearanceDark:
 		return 1
 	case config.AppearanceLight:
 		return 2
 	}
-	bg, err := config.ParseHexColor(s.ActivePalette().Bg)
-	if err != nil {
-		return 0
-	}
-	r, g, b := rgb(bg)
+	r, g, b := rgb(mustHex(d.palette.Bg))
 	if float64(0.2126*r)+float64(0.7152*g)+float64(0.0722*b) < 0.5 {
 		return 1
 	}
@@ -172,8 +174,8 @@ func colorScheme(s config.StylingConfig) uint32 {
 }
 
 // accentColor is the palette primary as a (ddd) sRGB tuple in [0, 1].
-func accentColor(primary config.HexColor) colorTuple {
-	r, g, b := rgb(primary)
+func accentColor(p config.Palette) colorTuple {
+	r, g, b := rgb(mustHex(p.Primary))
 	return colorTuple{r, g, b}
 }
 
@@ -219,7 +221,33 @@ func (s *settings) iface() dbusx.Interface {
 }
 
 func (s *settings) desktop(cfg *config.Config) desktop {
-	return desktop{cfg: cfg, gtk: s.gtk(), getenv: s.getenv}
+	return desktop{cfg: cfg, palette: resolvedPalette(cfg.Styling), gtk: s.gtk(), getenv: s.getenv}
+}
+
+// resolvedPalette is the palette the shell draws with: its theme
+// provider's, so apps follow the wallpaper too. A provider palette that
+// cannot be read or holds a color that does not parse is logged and the
+// configured palette is served, as the shell draws it then.
+func resolvedPalette(s config.StylingConfig) config.Palette {
+	configured := s.ActivePalette()
+	p, err := styling.ResolvePalette(configured, s)
+	if err != nil {
+		log.Printf("settings: %v", err)
+	}
+	if _, err := styling.PaletteFromHex(p); err != nil {
+		log.Printf("settings: %v", err)
+		return configured
+	}
+	return p
+}
+
+// mustHex parses a color resolvedPalette already validated.
+func mustHex(s string) config.HexColor {
+	c, err := config.ParseHexColor(s)
+	if err != nil {
+		panic("settings: an unvalidated palette color " + s)
+	}
+	return c
 }
 
 // ReadAll returns every served namespace one of namespaces selects:
@@ -259,20 +287,74 @@ func (s *settings) Read(namespace, key string) (dbus.Variant, *dbus.Error) {
 }
 
 // watch emits SettingChanged for every served key whose value a config
-// change moves, and nothing for keys that kept theirs. The returned
-// func stops.
+// change or a finished wallpaper color extraction (the shell's
+// ColorsExtracted) moves, and nothing for keys that kept theirs. The
+// returned func stops.
 func (s *settings) watch(conn *dbus.Conn) (stop func()) {
-	return s.cfg.Subscribe(func(old, new *config.Config) {
-		before, after := s.desktop(old), s.desktop(new)
+	var mu sync.Mutex
+	last := s.desktop(s.cfg.Config())
+	update := func(cfg *config.Config) {
+		mu.Lock()
+		defer mu.Unlock()
+		next := s.desktop(cfg)
 		for _, st := range servedSettings {
-			was, wasOK := st.read(before)
-			now, ok := st.read(after)
+			was, wasOK := st.read(last)
+			now, ok := st.read(next)
 			if !ok || wasOK && reflect.DeepEqual(was, now) {
 				continue
 			}
 			_ = conn.Emit(ObjectPath, SettingsIface+".SettingChanged", st.ns, st.key, dbus.MakeVariant(now))
 		}
-	})
+		last = next
+	}
+	unsubscribe := s.cfg.Subscribe(func(_, cfg *config.Config) { update(cfg) })
+	stopExtracted, err := watchColorsExtracted(conn, func() { update(s.cfg.Config()) })
+	if err != nil {
+		warnf("settings: the accent color will not follow the wallpaper: %v", err)
+		stopExtracted = func() {}
+	}
+	return func() {
+		stopExtracted()
+		unsubscribe()
+	}
+}
+
+// watchColorsExtracted runs extracted for every ColorsExtracted the
+// shell's wallpaper service emits; the returned func stops.
+func watchColorsExtracted(conn *dbus.Conn, extracted func()) (stop func(), err error) {
+	match := []dbus.MatchOption{
+		dbus.WithMatchInterface(wallpaper.Interface),
+		dbus.WithMatchMember("ColorsExtracted"),
+		dbus.WithMatchObjectPath(wallpaper.ServicePath),
+	}
+	if err := conn.AddMatchSignal(match...); err != nil {
+		return nil, fmt.Errorf("subscribing to %s.ColorsExtracted: %w", wallpaper.Interface, err)
+	}
+	signals := make(chan *dbus.Signal, 8)
+	conn.Signal(signals)
+	quit, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		for {
+			select {
+			case <-quit:
+				return
+			case sig := <-signals:
+				if sig == nil {
+					return
+				}
+				if sig.Name == wallpaper.Interface+".ColorsExtracted" && sig.Path == wallpaper.ServicePath {
+					extracted()
+				}
+			}
+		}
+	}()
+	return func() {
+		close(quit)
+		<-done
+		_ = conn.RemoveMatchSignal(match...)
+		conn.RemoveSignal(signals)
+	}, nil
 }
 
 // namespaceMatches reports whether ns is selected by the requested

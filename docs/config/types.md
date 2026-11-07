@@ -1407,7 +1407,7 @@ Temperature unit for display.
 
 Source of color palette values.
 
-Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.
+Dynamic providers (Matugen, Pywal, Wallust, Wallpaper) inject palette tokens at runtime.
 
 | Value | Meaning |
 |---|---|
@@ -1415,6 +1415,7 @@ Dynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.
 | `"matugen"` | Dynamic theming via Matugen. |
 | `"pywal"` | Dynamic theming via Pywal. |
 | `"wallust"` | Dynamic theming via Wallust. |
+| `"wallpaper"` | Dynamic Material You theming computed from the wallpaper by lys-shell itself, no external tool. |
 
 ## ThresholdEntry {#threshold-entry}
 

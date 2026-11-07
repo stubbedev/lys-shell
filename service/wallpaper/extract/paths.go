@@ -78,6 +78,8 @@ func ColorsPath(t Tool) (string, bool, error) {
 		path, err = WallustColorsPath()
 	case Pywal:
 		path, err = PywalColorsPath()
+	case Material:
+		path, err = WallpaperColorsPath()
 	default:
 		return "", false, nil
 	}

@@ -220,3 +220,26 @@ func TestResolvePaletteWithoutCacheHome(t *testing.T) {
 		t.Errorf("no cache home = %+v, %v; want the fallback and an error", got, err)
 	}
 }
+
+func TestResolvePaletteFromTheWallpaperProvider(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	fallback := config.DefaultsStyling().ActivePalette()
+	s := config.DefaultsStyling()
+	s.ColorExtractor.ThemeProvider = config.ThemeProviderWallpaper
+	if got, err := ResolvePalette(fallback, s); err != nil || got != fallback {
+		t.Errorf("no wallpaper palette = %+v, %v; want the fallback and no error", got, err)
+	}
+	writeJSON(t, filepath.Join(cache, "lys-shell", "wallpaper-colors.json"), matugenOld)
+	if got, err := ResolvePalette(fallback, s); err != nil || got.Primary != "#4090ff" {
+		t.Errorf("wallpaper palette = %+v, %v; want its dark primary", got, err)
+	}
+	s.ColorExtractor.MatugenLight = true
+	if got, _ := ResolvePalette(fallback, s); got.Primary != "#2060cc" {
+		t.Errorf("wallpaper palette, light = %s, want its light primary", got.Primary)
+	}
+	writeJSON(t, filepath.Join(cache, "lys-shell", "wallpaper-colors.json"), `{"colors": 3}`)
+	if got, err := ResolvePalette(fallback, s); err == nil || got != fallback {
+		t.Errorf("a broken wallpaper palette = %+v, %v; want the fallback and the error", got, err)
+	}
+}

@@ -9369,22 +9369,22 @@
         "matugen-contrast": {
           "$ref": "#/$defs/SignedNormalizedF64",
           "default": 0.0,
-          "description": "Matugen contrast level (-1.0 to 1.0)."
+          "description": "Contrast level for matugen and the wallpaper provider (-1.0 to 1.0)."
         },
         "matugen-light": {
           "$ref": "#/$defs/boolean",
           "default": false,
-          "description": "Matugen light mode."
+          "description": "Light mode for matugen and the wallpaper provider."
         },
         "matugen-scheme": {
           "$ref": "#/$defs/MatugenScheme",
           "default": "tonal-spot",
-          "description": "Matugen color scheme type."
+          "description": "Color scheme type for matugen and the wallpaper provider."
         },
         "matugen-source-color": {
           "$ref": "#/$defs/uint8",
           "default": 0,
-          "description": "Matugen source color index (0-3)."
+          "description": "Source color index for matugen and the wallpaper provider (0-3)."
         },
         "palette": {
           "$ref": "#/$defs/PaletteConfig",
@@ -9440,7 +9440,7 @@
         "theme-provider": {
           "$ref": "#/$defs/ThemeProvider",
           "default": "lys-shell",
-          "description": "Theme provider (lys-shell, matugen, pywal, wallust)."
+          "description": "Theme provider (lys-shell, wallpaper, matugen, pywal, wallust)."
         },
         "theming-monitor": {
           "$ref": "#/$defs/Monitor",
@@ -9755,7 +9755,7 @@
       ]
     },
     "ThemeProvider": {
-      "description": "Source of color palette values.\n\nDynamic providers (Matugen, Pywal, Wallust) inject palette tokens at runtime.",
+      "description": "Source of color palette values.\n\nDynamic providers (Matugen, Pywal, Wallust, Wallpaper) inject palette tokens at runtime.",
       "oneOf": [
         {
           "const": "lys-shell",
@@ -9775,6 +9775,11 @@
         {
           "const": "wallust",
           "description": "Dynamic theming via Wallust.",
+          "type": "string"
+        },
+        {
+          "const": "wallpaper",
+          "description": "Dynamic Material You theming computed from the wallpaper by lys-shell itself, no external tool.",
           "type": "string"
         }
       ]
