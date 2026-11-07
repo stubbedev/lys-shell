@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/desktopentry"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/answer"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/settingspage"
 )
@@ -35,6 +36,9 @@ type Deps struct {
 	// Toggles, Media and Capture read the rows of the shell's services; a
 	// nil one offers none.
 	Toggles, Media, Capture func(ctx context.Context) []Control
+	// Rates are the currency reference rates, kept across sessions; nil
+	// answers no currencies.
+	Rates *answer.Rates
 	// Sources keeps the stable sources' rows between sessions; nil loads
 	// every source in every session.
 	Sources *Sources
@@ -77,7 +81,9 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 			root.Providers = append(root.Providers, make())
 		}
 	}
-	add(config.SearchCalculator, func() Provider { return Calculator{} })
+	add(config.SearchCalculator, func() Provider {
+		return NewCalculator(d.Rates, answer.NewCurrencyParser(sessionLanguage()), answer.NewZones(time.LoadLocation), time.Now)
+	})
 	add(config.SearchShell, func() Provider { return NewShell(d.Env) })
 	var keys []string
 	keep := func(key string, p Provider, spec keepSpec) Provider {
@@ -183,4 +189,11 @@ func filesConfig(cfg config.LauncherSearchConfig, home string) FilesConfig {
 		Roots: roots, Exclude: cfg.FileExclude, CachePath: cache, RecentPath: recent, Home: home,
 		Previews: cfg.Previews, Now: time.Now,
 	}
+}
+
+func sessionLanguage() string {
+	if langs := i18n.RequestedLanguages(); len(langs) > 0 {
+		return langs[0].Language()
+	}
+	return ""
 }

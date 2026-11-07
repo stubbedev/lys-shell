@@ -343,7 +343,7 @@ func TestSectionsDoNotSwapOnASmallLead(t *testing.T) {
 func TestAnswerLeadsAndWebClosesTheList(t *testing.T) {
 	s := &sink{}
 	web := NewWeb(Env{}, "E", "https://e/?q={query}")
-	e := start(t, s, nil, web, Calculator{}, &fakeProvider{spec: Spec{Section: SectionApps}, entries: []Entry{entry("2+2 app")}})
+	e := start(t, s, nil, web, testCalculator(nil), &fakeProvider{spec: Spec{Section: SectionApps}, entries: []Entry{entry("2+2 app")}})
 	e.SetQuery("2+2", 1)
 	waitFor(t, "rows", func() bool { return len(s.last().Rows) >= 5 })
 	got := titles(s.last())
@@ -495,7 +495,7 @@ func TestConvert(t *testing.T) {
 }
 
 func TestCalculatorAnswersOnlyWhatLooksLikeASum(t *testing.T) {
-	c := Calculator{}
+	c := testCalculator(nil)
 	for _, q := range []string{"2+2", "sqrt(16)", "5 km to mi", "10 % 3"} {
 		if len(c.Answer(q)) != 1 {
 			t.Errorf("%q: no answer", q)

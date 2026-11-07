@@ -243,6 +243,9 @@ settings-launcher-search-file-exclude = Exclusions de l'index de fichiers
 settings-launcher-search-commands-dir = Dossier des commandes de script
     .description = Vide utilise launcher/commands dans le dossier de configuration
 
+settings-launcher-search-currency-rates = Taux de change
+    .description = Télécharger les taux de référence quotidiens de la Banque centrale européenne, une fois par jour au plus, pour les conversions de devises
+
 settings-launcher-search-previews = Aperçus
     .description = Afficher le volet latéral pour les fichiers, les extraits, les fenêtres et les entrées du presse-papiers, dans le panneau de recherche et les modes fenêtre et presse-papiers
 

@@ -3,20 +3,42 @@ package search
 import (
 	"context"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-shell/service/launcher/answer"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )
 
-// Calculator answers arithmetic and unit conversions inline.
-type Calculator struct{}
+// Calculator answers arithmetic, unit and currency conversions, times
+// across zones and date arithmetic inline.
+type Calculator struct {
+	rates    *answer.Rates
+	currency answer.CurrencyParser
+	zones    *answer.Zones
+	now      func() time.Time
+}
+
+// NewCalculator answers currencies over rates (nil answers none), reading
+// "kr" and symbols with currency, placing times through zones, on now's
+// calendar.
+func NewCalculator(rates *answer.Rates, currency answer.CurrencyParser, zones *answer.Zones, now func() time.Time) *Calculator {
+	return &Calculator{rates: rates, currency: currency, zones: zones, now: now}
+}
 
 // Spec implements Provider.
-func (Calculator) Spec() Spec { return Spec{Section: SectionAnswer} }
+func (*Calculator) Spec() Spec { return Spec{Section: SectionAnswer} }
 
-// Load implements Provider: it has nothing to search through.
-func (Calculator) Load(context.Context, func([]Entry)) {}
+// Load implements Provider: it reads or fetches the currency rates when
+// due, and has the list answered again once they changed. Answer never
+// waits for them.
+func (c *Calculator) Load(ctx context.Context, publish func([]Entry)) {
+	if c.rates != nil && c.rates.Refresh(ctx) {
+		publish(nil)
+	}
+}
 
 // looksCalculable is what makes a query look like something to calculate: a
 // lone number is not a question, and neither is a word that happens to
@@ -31,26 +53,99 @@ func looksCalculable(q string) bool {
 }
 
 // Answer implements Answerer.
-func (Calculator) Answer(query string) []Entry {
+func (c *Calculator) Answer(query string) []Entry {
 	q := strings.TrimSpace(query)
+	if e, ok := c.answerCurrency(q); ok {
+		return []Entry{e}
+	}
+	if tq, ok := answer.ParseTime(q); ok {
+		if t, ok := c.zones.Eval(tq, c.now()); ok {
+			return []Entry{timeEntry(q, t)}
+		}
+	}
+	if d, ok := answer.EvalDate(q, c.now()); ok {
+		return []Entry{dateEntry(q, d)}
+	}
 	if !looksCalculable(q) {
 		return nil
 	}
-	if c, ok := modes.Convert(q); ok {
-		return []Entry{{ID: "calc", Title: c.String(), Subtitle: q, Icon: iconCalc, Data: calcData{value: c.Value, shown: c.String(), expr: q}}}
+	if conv, ok := modes.Convert(q); ok {
+		return []Entry{calcEntry(q, conv.Value, conv.String(), q)}
 	}
 	v, ok := modes.Eval(q)
 	if !ok {
 		return nil
 	}
 	s := modes.FormatResult(v)
-	return []Entry{{ID: "calc", Title: s, Subtitle: q, Icon: iconCalc, Data: calcData{value: s, shown: s, expr: q}}}
+	return []Entry{calcEntry(q, s, s, q)}
+}
+
+func calcEntry(q, value, shown, subtitle string) Entry {
+	return Entry{ID: "calc", Title: shown, Subtitle: subtitle, Icon: iconCalc, Data: calcData{value: value, shown: shown, expr: q}}
+}
+
+func (c *Calculator) answerCurrency(q string) (Entry, bool) {
+	if c.rates == nil {
+		return Entry{}, false
+	}
+	cq, ok := c.currency.Parse(q)
+	if !ok {
+		return Entry{}, false
+	}
+	snap, ok := c.rates.Snapshot()
+	if !ok {
+		return Entry{}, false
+	}
+	v, ok := snap.Table.Convert(cq.Amount, cq.From, cq.To)
+	if !ok {
+		return Entry{}, false
+	}
+	value := answer.FormatAmount(v)
+	now := c.now()
+	source := i18n.T("launcher-answer-currency-source",
+		i18n.Str("amount", cq.Amount), i18n.Str("from", cq.From.String()), i18n.Str("to", cq.To.String()),
+		i18n.Str("date", snap.Table.Date.Format(time.DateOnly)))
+	if !snap.Fresh(now) {
+		source = i18n.T("launcher-answer-currency-stale", i18n.Str("source", source), i18n.Int("days", int64(snap.AgeDays(now))))
+	}
+	return calcEntry(q, value, value+" "+cq.To.String(), source), true
+}
+
+func weekdayName(d time.Weekday) string {
+	return i18n.T("cal-day-" + strings.ToLower(d.String()))
+}
+
+func timeEntry(q string, t answer.TimeAnswer) Entry {
+	clock := t.At.Format("15:04")
+	shown := clock + " " + t.At.Format("MST")
+	if t.DayOffset != 0 {
+		sign, days := "+", t.DayOffset
+		if days < 0 {
+			sign, days = "−", -days
+		}
+		shown = i18n.T("launcher-answer-day-offset", i18n.Str("time", shown), i18n.Str("sign", sign), i18n.Int("days", int64(days)))
+	}
+	day := weekdayName(t.At.Weekday()) + " " + t.At.Format(time.DateOnly)
+	subtitle := day
+	if t.Place != "" {
+		subtitle = i18n.T("launcher-answer-time-place", i18n.Str("day", day), i18n.Str("place", t.Place))
+	}
+	return calcEntry(q, clock, shown, subtitle)
+}
+
+func dateEntry(q string, d answer.DateAnswer) Entry {
+	if d.Kind == answer.DateIsSpan {
+		days := strconv.Itoa(d.Days)
+		return calcEntry(q, days, i18n.T("launcher-answer-days", i18n.Int("days", int64(d.Days))), q)
+	}
+	iso := d.Day.Format(time.DateOnly)
+	return calcEntry(q, iso, weekdayName(d.Day.Weekday())+" "+iso, q)
 }
 
 type calcData struct{ value, shown, expr string }
 
 // Actions implements Provider.
-func (Calculator) Actions(e Entry) []Action {
+func (*Calculator) Actions(e Entry) []Action {
 	d, ok := e.Data.(calcData)
 	if !ok {
 		return nil

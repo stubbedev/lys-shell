@@ -211,6 +211,8 @@ type LauncherSearchConfig struct {
 	// Directory of script commands. Empty uses `launcher/commands` in the
 	// config directory.
 	CommandsDir string `cfg:"commands-dir,type=Directory"`
+	// Fetch the European Central Bank's daily reference rates (at most once a day, cached) for currency answers such as `100 usd in eur`.
+	CurrencyRates bool `cfg:"currency-rates"`
 	// Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes.
 	Previews bool `cfg:"previews"`
 	// Links to open by name or keyword.
@@ -258,7 +260,7 @@ const (
 	SearchWindows LauncherSearchProvider = "windows"
 	// Recent files and the file index.
 	SearchFiles LauncherSearchProvider = "files"
-	// Inline arithmetic and unit conversion.
+	// Inline arithmetic, unit and currency conversion, times across time zones and date arithmetic.
 	SearchCalculator LauncherSearchProvider = "calculator"
 	// Lock, suspend, log out, reboot, shut down.
 	SearchSystem LauncherSearchProvider = "system"
@@ -508,13 +510,14 @@ func DefaultsLauncher() LauncherConfig {
 				SearchApps, SearchWindows, SearchFiles, SearchCalculator, SearchSystem, SearchSettings,
 				SearchClipboard, SearchEmoji, SearchVault, SearchLinks, SearchBookmarks, SearchVisited, SearchToggles, SearchMedia, SearchCapture, SearchProcesses, SearchScripts, SearchShell, SearchWeb,
 			},
-			WebEngine:   "DuckDuckGo",
-			WebURL:      "https://duckduckgo.com/?q={query}",
-			Previews:    true,
-			FileRoots:   []string{},
-			FileExclude: []string{},
-			Quicklinks:  []LauncherQuicklink{},
-			Snippets:    []LauncherSnippet{},
+			WebEngine:     "DuckDuckGo",
+			WebURL:        "https://duckduckgo.com/?q={query}",
+			Previews:      true,
+			CurrencyRates: true,
+			FileRoots:     []string{},
+			FileExclude:   []string{},
+			Quicklinks:    []LauncherQuicklink{},
+			Snippets:      []LauncherSnippet{},
 		},
 	}
 }

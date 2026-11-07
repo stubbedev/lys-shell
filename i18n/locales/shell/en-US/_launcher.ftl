@@ -44,6 +44,20 @@ launcher-preview-type = Type
 launcher-preview-size = Size
 launcher-web-search = Search { $engine } for “{ $query }”
 launcher-shell-subtitle = Shell command
+launcher-answer-currency-source = { $amount } { $from } in { $to } · ECB, { $date }
+launcher-answer-day-offset = { $time } ({ $sign }{ $days ->
+    [one] { $days } day
+   *[other] { $days } days
+})
+launcher-answer-currency-stale = { $source } ({ $days ->
+    [one] { $days } day old
+   *[other] { $days } days old
+})
+launcher-answer-time-place = { $day } in { $place }
+launcher-answer-days = { $days ->
+    [one] { $days } day
+   *[other] { $days } days
+}
 launcher-system-lock = Lock Screen
 launcher-system-suspend = Sleep
 launcher-system-logout = Log Out

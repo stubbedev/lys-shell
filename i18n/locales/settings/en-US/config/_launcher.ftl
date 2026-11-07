@@ -255,6 +255,9 @@ settings-launcher-search-file-exclude = File Index Exclusions
 settings-launcher-search-commands-dir = Script Commands Folder
     .description = Empty uses launcher/commands in the config folder
 
+settings-launcher-search-currency-rates = Currency Rates
+    .description = Fetch the European Central Bank's daily reference rates, at most once a day, for currency answers
+
 settings-launcher-search-previews = Previews
     .description = Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes
 

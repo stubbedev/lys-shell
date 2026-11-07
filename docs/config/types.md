@@ -758,6 +758,7 @@ The search panel: one ranked list over apps, windows, files and more.
 | `file-roots` | Directories the file index walks (`~` allowed). Empty indexes the home |
 | `file-exclude` | Directory names the file index skips, on top of hidden ones and the |
 | `commands-dir` | Directory of script commands. Empty uses `launcher/commands` in the |
+| `currency-rates` | Fetch the European Central Bank's daily reference rates (at most once a day, cached) for currency answers such as `100 usd in eur`. |
 | `previews` | Show the side pane for files, snippets, windows and clipboard entries, in the search panel and the window and clipboard modes. |
 | `quicklinks` | Links to open by name or keyword. |
 | `snippets` | Text to copy by name or keyword. |
@@ -771,7 +772,7 @@ A source of rows in the search panel.
 | `"apps"` | Desktop entries, with their actions. |
 | `"windows"` | Open windows to jump to. |
 | `"files"` | Recent files and the file index. |
-| `"calculator"` | Inline arithmetic and unit conversion. |
+| `"calculator"` | Inline arithmetic, unit and currency conversion, times across time zones and date arithmetic. |
 | `"system"` | Lock, suspend, log out, reboot, shut down. |
 | `"settings"` | Pages of lys-settings. |
 | `"clipboard"` | The clipboard history. |

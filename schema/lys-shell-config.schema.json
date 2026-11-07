@@ -3858,6 +3858,7 @@
           "$ref": "#/$defs/LauncherSearchConfig",
           "default": {
             "commands-dir": "",
+            "currency-rates": true,
             "file-exclude": [],
             "file-roots": [],
             "previews": true,
@@ -4271,6 +4272,11 @@
           "default": "",
           "description": "Directory of script commands. Empty uses `launcher/commands` in the\nconfig directory."
         },
+        "currency-rates": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Fetch the European Central Bank's daily reference rates (at most once a day, cached) for currency answers such as `100 usd in eur`."
+        },
         "file-exclude": {
           "$ref": "#/$defs/Array_of_string",
           "default": [],
@@ -4354,7 +4360,7 @@
         },
         {
           "const": "calculator",
-          "description": "Inline arithmetic and unit conversion.",
+          "description": "Inline arithmetic, unit and currency conversion, times across time zones and date arithmetic.",
           "type": "string"
         },
         {
@@ -11588,6 +11594,7 @@
         "scripts": {},
         "search": {
           "commands-dir": "",
+          "currency-rates": true,
           "file-exclude": [],
           "file-roots": [],
           "previews": true,

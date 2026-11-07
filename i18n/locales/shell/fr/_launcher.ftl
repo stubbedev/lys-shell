@@ -44,6 +44,20 @@ launcher-preview-type = Type
 launcher-preview-size = Taille
 launcher-web-search = Rechercher « { $query } » sur { $engine }
 launcher-shell-subtitle = Commande shell
+launcher-answer-currency-source = { $amount } { $from } en { $to } · BCE, { $date }
+launcher-answer-day-offset = { $time } ({ $sign }{ $days ->
+    [one] { $days } jour
+   *[other] { $days } jours
+})
+launcher-answer-currency-stale = { $source } (il y a { $days ->
+    [one] { $days } jour
+   *[other] { $days } jours
+})
+launcher-answer-time-place = { $day } à { $place }
+launcher-answer-days = { $days ->
+    [one] { $days } jour
+   *[other] { $days } jours
+}
 launcher-system-lock = Verrouiller l'écran
 launcher-system-suspend = Mettre en veille
 launcher-system-logout = Se déconnecter

@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	"github.com/stubbedev/lys-shell/internal/version"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
+	"github.com/stubbedev/lys-shell/service/launcher/answer"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/service/launcher/typetext"
@@ -130,6 +131,7 @@ func newBrowserIndex() *search.BrowserIndex {
 // shell did is in the context by then.
 func panelDeps(current func() *config.Config, live func() ModuleContext, browser *search.BrowserIndex, deps *launcher.Deps, openPicker func()) func() search.Deps {
 	settingsPages := settingspage.NewLister()
+	rates := newCurrencyRates()
 	return func() search.Deps {
 		cfg := current()
 		controls := controlSourcesOf(live())
@@ -145,6 +147,9 @@ func panelDeps(current func() *config.Config, live func() ModuleContext, browser
 			Capture:       controls.captureControls,
 			SettingsPages: settingsPages,
 		}
+		if cfg.Launcher.Search.CurrencyRates && rates != nil {
+			d.Rates = rates
+		}
 		if deps.Clipboard != nil {
 			d.Clipboard = deps.Clipboard
 		}
@@ -153,4 +158,15 @@ func panelDeps(current func() *config.Config, live func() ModuleContext, browser
 		}
 		return d
 	}
+}
+
+// newCurrencyRates keeps the ECB rates in the cache directory; without one
+// the panel answers no currencies.
+func newCurrencyRates() *answer.Rates {
+	cacheDir, ok := xdg.OS.CacheDir(version.Name)
+	if !ok {
+		log.Print("launcher: XDG_CACHE_HOME is not an absolute path: currency answers are unavailable")
+		return nil
+	}
+	return answer.NewRates(answer.FeedURL, filepath.Join(cacheDir, "fx.xml"), time.Now)
 }

@@ -33,7 +33,7 @@ be running, as it hosts the panel.
 | Applications | Desktop entries; their desktop actions are in the actions panel |
 | Open windows | lys-wm, Hyprland, sway, niri and mango |
 | Files | Recent files and an index, see below; a query starting with `/` or `~` lists that folder |
-| Calculator | `6*7`, `sqrt(16)`, and conversions: `5 km to mi`, `100 f in c`, `1 GiB to MB`. No currencies |
+| Calculator | `6*7`, `sqrt(16)`, conversions (`5 km to mi`, `100 f in c`, `1 GiB to MB`), currencies, times and dates, see below |
 | System | Lock, sleep, log out, restart, shut down, through the [`power`](/config/modules/power) commands. Those that end the session ask for a second Enter |
 | Settings | Each page of [`lys-settings`](https://github.com/stubbedev/lys-settings), when it is installed |
 | Clipboard | The history, in the list from three typed letters; `Clipboard History` lists it all |
@@ -58,6 +58,31 @@ overall and for what you typed to find it, so `f` comes to mean Firefox if you
 keep choosing it. Uses count half as much every two weeks. What it learned is in
 `$XDG_STATE_HOME/lys-shell/launcher-frecency.json`; `launcher.history.enable: false`
 turns learning off.
+
+## Currencies, times and dates
+
+The calculator row also answers:
+
+| Query | Answer |
+| --- | --- |
+| `100 usd in eur`, `$100 to €`, `12.5 dollars in euros` | The amount at the European Central Bank's reference rate, with the rate's date |
+| `15:00 PST in Copenhagen`, `3pm london to tokyo`, `9:30 am in Europe/Paris` | That time in the other zone, and the day if it changes |
+| `time in Tokyo`, `now in new york` | The time there now |
+| `today + 90 days`, `2026-12-24 + 2 weeks`, `3 weeks from tomorrow`, `10 days ago` | The date |
+| `days until 2027-01-01`, `days since 2026-01-01`, `2026-12-24 - today` | The number of days |
+
+Currencies are the 30 or so the ECB publishes, by code, symbol (`$`, `€`, `£`, `¥`)
+or name (`dollars`, `euros`, `yen`); `kr` names the krone or krona of your language
+and nothing elsewhere. The rates are fetched at most once a day, never while you
+type, and kept in `$XDG_CACHE_HOME/lys-shell/fx.xml`. Offline, the cached rates are
+used and the row says how old they are; with no rates at all there is no currency
+row. `launcher.search.currency-rates: false` stops the fetch.
+
+Time zones are abbreviations, which are fixed offsets (`PST` is UTC−8 even in July,
+`PDT` is UTC−7), the generic `PT`, `MT`, `CT` and `ET`, which follow daylight saving,
+major cities, and IANA names such as `America/Los_Angeles`. A time with no zone is
+local. Month and year steps keep to the end of the month: January 31 plus one month
+is the last day of February.
 
 ## Keys
 

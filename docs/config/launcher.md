@@ -161,6 +161,7 @@ launcher:
     file-roots: []
     file-exclude: []
     commands-dir: ""
+    currency-rates: true
     previews: true
     quicklinks: []
     snippets: []
