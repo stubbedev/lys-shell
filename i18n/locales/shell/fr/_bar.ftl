@@ -53,3 +53,9 @@ bar-media-stopped = Arrêté
 shortcut-launcher = Ouvrir ou fermer le lanceur
 
 shortcut-dashboard = Ouvrir ou fermer le tableau de bord
+
+shortcut-bar-hide = Masquer toutes les barres
+
+shortcut-bar-show = Afficher toutes les barres
+
+shortcut-bar-toggle = Masquer ou afficher toutes les barres

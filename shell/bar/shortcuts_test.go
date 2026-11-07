@@ -30,9 +30,12 @@ func (f *fakeShortcuts) register(id, appID, _, trigger string, on func(bool, uin
 func TestAPressedShortcutOpensItsPanelInProcess(t *testing.T) {
 	f := &fakeShortcuts{presses: map[string]func(bool, uint64){}}
 	opened, toggled := 0, 0
-	stop := registerShellShortcuts(f.register, shellShortcuts(func() { opened++ }, func() { toggled++ }))
+	stop := registerShellShortcuts(f.register, shellShortcuts(func() { opened++ }, func() { toggled++ }, shellipc.NewState(nil)))
 	defer stop()
-	want := []string{shellipc.AppID + ":launcher@SUPER+Space", shellipc.AppID + ":dashboard@SUPER+A"}
+	want := []string{
+		shellipc.AppID + ":launcher@SUPER+Space", shellipc.AppID + ":dashboard@SUPER+A",
+		shellipc.AppID + ":bar-hide@", shellipc.AppID + ":bar-show@", shellipc.AppID + ":bar-toggle@",
+	}
 	if !slices.Equal(f.registered, want) {
 		t.Fatalf("registered %v, want %v", f.registered, want)
 	}
@@ -53,7 +56,7 @@ func TestAPressedShortcutOpensItsPanelInProcess(t *testing.T) {
 func TestARefusedShortcutLeavesTheOthersBound(t *testing.T) {
 	f := &fakeShortcuts{presses: map[string]func(bool, uint64){}, refuse: "launcher"}
 	toggled := 0
-	stop := registerShellShortcuts(f.register, shellShortcuts(func() { t.Error("a refused shortcut fired") }, func() { toggled++ }))
+	stop := registerShellShortcuts(f.register, shellShortcuts(func() { t.Error("a refused shortcut fired") }, func() { toggled++ }, shellipc.NewState(nil)))
 	defer stop()
 	if _, ok := f.presses["launcher"]; ok {
 		t.Error("the refused shortcut is live")
@@ -71,5 +74,49 @@ func TestTheShortcutSessionIsTheSearchPanelApartFromCLISessions(t *testing.T) {
 	}
 	if a.ID>>63 != 1 || b.ID == a.ID {
 		t.Errorf("session ids %d %d, want distinct ids outside the socket's counter", a.ID, b.ID)
+	}
+}
+
+func TestTheBarShortcutsHideAndShowEveryBar(t *testing.T) {
+	f := &fakeShortcuts{presses: map[string]func(bool, uint64){}}
+	var applied []map[string]bool
+	state := shellipc.NewState(func(hidden map[string]bool) { applied = append(applied, hidden) })
+	state.SetConnectors([]string{"DP-1", "HDMI-A-1"})
+	applied = nil
+	stop := registerShellShortcuts(f.register, shellShortcuts(func() {}, func() {}, state))
+	defer stop()
+	f.presses["bar-hide"](true, 1)
+	if !state.Hidden("DP-1") || !state.Hidden("HDMI-A-1") {
+		t.Fatal("bar-hide left a bar shown")
+	}
+	f.presses["bar-hide"](false, 1)
+	f.presses["bar-toggle"](true, 2)
+	if state.Hidden("DP-1") || state.Hidden("HDMI-A-1") {
+		t.Fatal("bar-toggle with every bar hidden left one hidden")
+	}
+	f.presses["bar-toggle"](true, 3)
+	if !state.Hidden("DP-1") || !state.Hidden("HDMI-A-1") {
+		t.Fatal("bar-toggle with every bar shown left one shown")
+	}
+	f.presses["bar-show"](true, 4)
+	if state.Hidden("DP-1") || state.Hidden("HDMI-A-1") {
+		t.Fatal("bar-show left a bar hidden")
+	}
+	if len(applied) != 4 {
+		t.Errorf("the bars were applied %d times, want once per press and none per release", len(applied))
+	}
+}
+
+func TestAShortcutPressReachesItsPanelWithoutAllocating(t *testing.T) {
+	f := &fakeShortcuts{presses: map[string]func(bool, uint64){}}
+	opened := 0
+	stop := registerShellShortcuts(f.register, shellShortcuts(func() { opened++ }, func() {}, shellipc.NewState(nil)))
+	defer stop()
+	press := f.presses["launcher"]
+	if allocs := testing.AllocsPerRun(100, func() { press(true, 1) }); allocs != 0 {
+		t.Errorf("a launcher press allocates %v on its way to the launcher", allocs)
+	}
+	if opened != 101 {
+		t.Errorf("the launcher opened %d times for 101 presses", opened)
 	}
 }

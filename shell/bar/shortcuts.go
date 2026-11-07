@@ -38,9 +38,18 @@ func registerShellShortcuts(register shortcutRegistrar, shortcuts []shellShortcu
 	}
 }
 
-func shellShortcuts(openLauncher, toggleDashboard func()) []shellShortcut {
+type barVisibility interface {
+	Hide(monitor string)
+	Show(monitor string)
+	Toggle(monitor string)
+}
+
+func shellShortcuts(openLauncher, toggleDashboard func(), bars barVisibility) []shellShortcut {
 	return []shellShortcut{
 		{id: "launcher", description: i18n.T("shortcut-launcher"), trigger: "SUPER+Space", press: openLauncher},
 		{id: "dashboard", description: i18n.T("shortcut-dashboard"), trigger: "SUPER+A", press: toggleDashboard},
+		{id: "bar-hide", description: i18n.T("shortcut-bar-hide"), press: func() { bars.Hide("") }},
+		{id: "bar-show", description: i18n.T("shortcut-bar-show"), press: func() { bars.Show("") }},
+		{id: "bar-toggle", description: i18n.T("shortcut-bar-toggle"), press: func() { bars.Toggle("") }},
 	}
 }

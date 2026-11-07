@@ -35,6 +35,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/shellipc"
 	"github.com/stubbedev/lys-shell/service/sni"
 	"github.com/stubbedev/lys-shell/service/treeman"
 	"github.com/stubbedev/lys-shell/service/upower"
@@ -688,9 +689,12 @@ func (s *shellStart) mount() {
 		}
 	}, func() { polls.setLocked(false) })
 	s.down.add(stopLock)
-	connectors := bars.connectors()
+	visibility := shellipc.NewState(func(hidden map[string]bool) {
+		application.Invoke(func() { bars.apply(hidden) })
+	})
+	visibility.SetConnectors(bars.connectors())
 	s.down.addAsync(func() func() {
-		return serveShellIPC(s.session, application, bars, connectors, func() bool {
+		return serveShellIPC(s.session, application, visibility, func() bool {
 			locker.Lock()
 			return true
 		}, func(monitor string) error {
@@ -707,7 +711,7 @@ func (s *shellStart) mount() {
 					log.Printf("dashboard: %v", err)
 				}
 			}()
-		})))
+		}, visibility)))
 	}
 	// The widget socket carries out-of-process pushes (`lys-shell toast`).
 	widgetSrv := widgetipc.NewServer()

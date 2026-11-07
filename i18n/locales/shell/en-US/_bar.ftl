@@ -53,3 +53,9 @@ bar-media-stopped = Stopped
 shortcut-launcher = Open or close the launcher
 
 shortcut-dashboard = Open or close the dashboard
+
+shortcut-bar-hide = Hide every bar
+
+shortcut-bar-show = Show every bar
+
+shortcut-bar-toggle = Hide or show every bar

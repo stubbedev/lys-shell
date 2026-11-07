@@ -126,6 +126,10 @@ pkgs.testers.nixosTest {
 
       services.pipewire.enable = true;
 
+      security.auditd.enable = true;
+      security.audit.enable = true;
+      security.audit.rules = [ "-a always,exit -F arch=b64 -S execve,execveat -F uid=${toString uid} -k user-exec" ];
+
       environment.systemPackages = [
         portalClient
         testApp
@@ -232,6 +236,37 @@ pkgs.testers.nixosTest {
     for o in (first, second):
         wait(f"the bar on {o['name']}", lambda o=o: colors(*bar_strip(o)) > 2, tries=120)
     shot("01-bars")
+
+    def shell_execs():
+        records = machine.execute("ausearch --raw -k user-exec")[1]
+        return sum(1 for line in records.splitlines() if line.startswith("type=SYSCALL") and "lys-shell" in line)
+
+    def middle_of(o):
+        r = o["rect"]
+        return (r["x"] + r["width"] // 4, r["y"] + r["height"] // 4, r["width"] // 2, r["height"] // 2)
+
+    def middles():
+        return [region(*middle_of(o)) for o in (first, second)]
+
+    calm = middles()
+    execs = shell_execs()
+    dispatch("global dev.stubbe.lys.shell:launcher")
+    wait("the launcher through its global shortcut", lambda: middles() != calm, tries=30)
+    shot("02-launcher-from-its-shortcut")
+    machine.send_key("esc")
+    wait("the launcher to close", lambda: middles() == calm, tries=30)
+    hidden = False
+    for action in ("bar-toggle", "bar-toggle", "bar-hide", "bar-show"):
+        hidden = action == "bar-hide" or action == "bar-toggle" and not hidden
+        dispatch(f"global dev.stubbe.lys.shell:{action}")
+        for o in (first, second):
+            wait(f"{action} on {o['name']}", lambda o=o: (colors(*bar_strip(o)) <= 2) == hidden, tries=30)
+    if shell_execs() != execs:
+        logs()
+        raise Exception(f"the shortcuts started lys-shell {shell_execs() - execs} times, want none")
+    print("lys-shell execs during the shortcut presses:", shell_execs() - execs)
+    run("lys-shell --version")
+    wait("the exec count to see a CLI run", lambda: shell_execs() > execs, tries=10)
 
     dispatch("exec foot")
     wait("a foot window", lambda: len(windows()) == 1, tries=60)

@@ -104,10 +104,10 @@ func (b *barSet) sync(name string, entry *barEntry) {
 }
 
 // serveShellIPC keeps the application id on conn (its quit action ends
-// the loop) and serves dev.stubbe.lys.Shell1 over bars, with lock as its
+// the loop) and serves dev.stubbe.lys.Shell1 over state, with lock as its
 // Lock hook. The single-instance check claimed the id before RunWith; a
 // shell without a session bus serves neither.
-func serveShellIPC(conn *dbus.Conn, application *app.Application, bars *barSet, connectors []string, lock func() bool, dashboardToggle func(monitor string) error) func() {
+func serveShellIPC(conn *dbus.Conn, application *app.Application, state *shellipc.State, lock func() bool, dashboardToggle func(monitor string) error) func() {
 	if conn == nil {
 		log.Print("shell ipc: no session bus")
 		return func() {}
@@ -122,10 +122,6 @@ func serveShellIPC(conn *dbus.Conn, application *app.Application, bars *barSet, 
 	} else {
 		log.Printf("shell ipc: application id: %v", err)
 	}
-	state := shellipc.NewState(func(hidden map[string]bool) {
-		application.Invoke(func() { bars.apply(hidden) })
-	})
-	state.SetConnectors(connectors)
 	if release, err := shellipc.Serve(conn, state, shellipc.Hooks{
 		Lock: lock,
 		// The VPN callback goes straight to the native sign-in, whose
