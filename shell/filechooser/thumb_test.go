@@ -172,7 +172,7 @@ func TestClosingCancelsThumbnailsInFlight(t *testing.T) {
 		}
 	})
 
-	late, err := th.thumbnail(context.Background(), paths[0], 2*gridIconPx)
+	late, err := th.thumbnail(context.Background(), paths[0], "", 2*gridIconPx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +329,7 @@ func TestThumbnailMatchesTheFullDecode(t *testing.T) {
 	draw.ApproxBiLinear.Scale(want, want.Bounds(), decoded, image.Rect(100, 0, 500, 400), draw.Src, nil)
 
 	th := newThumbnailer()
-	got, err := th.thumbnail(context.Background(), path, 96)
+	got, err := th.thumbnail(context.Background(), path, "", 96)
 	if err != nil {
 		t.Fatal(err)
 	}

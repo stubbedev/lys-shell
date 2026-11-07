@@ -730,13 +730,13 @@ func TestThumbnailFromTheCache(t *testing.T) {
 	}
 	put(info.ModTime().Unix())
 	th := newThumbnailer()
-	if got, err := th.thumbnail(context.Background(), doc, 48); err != nil || got.image.Bounds().Dx() != 48 {
+	if got, err := th.thumbnail(context.Background(), doc, "", 48); err != nil || got.image.Bounds().Dx() != 48 {
 		t.Errorf("a cached thumbnail = %v, %v", got.image.Bounds(), err)
 	} else if err := th.free([]thumbRaster{got}); err != nil {
 		t.Fatal(err)
 	}
 	put(info.ModTime().Unix() - 60)
-	if _, err := th.thumbnail(context.Background(), doc, 48); !errors.Is(err, errNoThumb) {
+	if _, err := th.thumbnail(context.Background(), doc, "", 48); !errors.Is(err, errNoThumb) {
 		t.Errorf("a stale cached thumbnail = %v, want none", err)
 	}
 	if got := pngText([]byte("not a png"), "Thumb::MTime"); got != "" {

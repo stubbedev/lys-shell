@@ -987,7 +987,8 @@ func (c *Chooser) entryIcon(e Entry, px int) widget.Widget {
 	if e.IsDir {
 		return widget.NewThemeIcon("ld-folder-symbolic", px)
 	}
-	return c.thumb(e.Path, px, widget.NewThemeIcon(c.d.MIME.FileIcon(c.d.MIME.TypeByName(e.Name())), px))
+	mimeType := c.d.MIME.TypeByName(e.Name())
+	return c.thumb(e.Path, mimeType, px, widget.NewThemeIcon(c.d.MIME.FileIcon(mimeType), px))
 }
 
 // thumb is a px square showing fallback until one of the bounded
@@ -995,7 +996,7 @@ func (c *Chooser) entryIcon(e Entry, px int) widget.Widget {
 // each file is looked up once per request however often its row is
 // rebuilt, and every row draws the one raster. A lookup that ends
 // after its request did lands nowhere: its raster is freed at once.
-func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widget {
+func (c *Chooser) thumb(path, mimeType string, px int, fallback widget.Widget) widget.Widget {
 	slot := widget.NewBox(widget.Row, 0, 0)
 	slot.SetHAlign(widget.AlignCenter)
 	slot.SetVAlign(widget.AlignCenter)
@@ -1022,7 +1023,7 @@ func (c *Chooser) thumb(path string, px int, fallback widget.Widget) widget.Widg
 	if _, pending := set.waiting[key]; !pending {
 		th := c.thumbnailer
 		th.work.Go(func(fn func()) { go fn() }, func() {
-			done, err := th.thumbnail(set.ctx, path, 2*px)
+			done, err := th.thumbnail(set.ctx, path, mimeType, 2*px)
 			if err != nil {
 				c.d.Invoke(func() { c.landThumb(set, key, thumbRaster{}, err) })
 				return

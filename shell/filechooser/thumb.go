@@ -1,27 +1,21 @@
 package filechooser
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5" //nolint:gosec // the thumbnail spec names files by the URI's MD5
-	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"image"
-	"image/png"
+	"log"
 	"os"
-	"path/filepath"
-	"strconv"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-lib/render"
-	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/memory-go"
 	"golang.org/x/image/draw"
 
 	"github.com/stubbedev/lys-shell/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/handoff"
+	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/offheap"
 )
 
@@ -39,8 +33,8 @@ const (
 // errThumbTooLarge is a source past thumbMaxBytes.
 var errThumbTooLarge = errors.New("filechooser: image too large to thumbnail")
 
-// errNoThumb is a file with no cached thumbnail that is not a raster
-// image to decode.
+// errNoThumb is a file with no cached thumbnail, nothing to make one
+// with, or a fresh record that making one failed.
 var errNoThumb = errors.New("filechooser: no thumbnail")
 
 // thumbRaster is a thumbnail whose pixels mem holds, drawn by its
@@ -53,26 +47,38 @@ type thumbRaster struct {
 // thumbnailer makes thumbnails off the loop for every dialog: at most
 // thumbWorkers at once, their decodes within budget, into rasters mem
 // holds. work is the lookups running and the thumbnails they made that
-// the loop has not taken yet.
+// the loop has not taken yet. decode opens a raster image, store writes
+// a cache file whole, and the installed thumbnailers (loaded on first
+// use) run for at most runTimeout each.
 type thumbnailer struct {
-	mem     memory.Shared
-	work    handoff.Handoffs
-	workers chan struct{}
-	budget  *byteBudget
+	mem        memory.Shared
+	work       handoff.Handoffs
+	workers    chan struct{}
+	budget     *byteBudget
+	decode     func(ctx context.Context, path string) (image.Image, error)
+	store      func(path string, data []byte) error
+	runTimeout time.Duration
+	installed  func() map[string]thumbnailerEntry
 }
 
 func newThumbnailer() *thumbnailer {
-	return &thumbnailer{workers: make(chan struct{}, thumbWorkers), budget: newByteBudget(thumbDecodeBudget)}
+	return &thumbnailer{
+		workers: make(chan struct{}, thumbWorkers), budget: newByteBudget(thumbDecodeBudget),
+		decode: imagedecode.OpenContext, store: storeThumbnail, runTimeout: thumbnailerTimeout,
+		installed: sync.OnceValue(func() map[string]thumbnailerEntry { return loadThumbnailers(mime.DataDirs()) }),
+	}
 }
 
 // thumbnail is the file's thumbnail as an exact px square,
 // centre-cropped to fill (every thumbnail is the same size, so rows
-// align whatever the source's aspect ratio): the one the freedesktop
-// cache holds for it, which file managers and viewers make for PDFs
-// and videos too, else a raster image decoded. It waits its turn among
-// the workers and for its decode's bytes in the budget, and gives up
-// with ctx's error once ctx is done. The caller frees the result.
-func (th *thumbnailer) thumbnail(ctx context.Context, path string, px int) (thumbRaster, error) {
+// align whatever the source's aspect ratio). It is the one the
+// freedesktop cache holds for it; else, unless a fresh fail entry says
+// making one failed before, a raster image decoded or the output of the
+// thumbnailer installed for mimeType, written to the cache for every
+// app and the next dialog. It waits its turn among the workers and for
+// its decode's bytes in the budget, and gives up with ctx's error once
+// ctx is done. The caller frees the result.
+func (th *thumbnailer) thumbnail(ctx context.Context, path, mimeType string, px int) (thumbRaster, error) {
 	select {
 	case th.workers <- struct{}{}:
 	case <-ctx.Done():
@@ -83,29 +89,111 @@ func (th *thumbnailer) thumbnail(ctx context.Context, path string, px int) (thum
 	if err != nil {
 		return thumbRaster{}, err
 	}
-	if src, err := cachedThumbnail(path, info, px); err == nil {
+	tc, err := cacheFor(path, info)
+	if err != nil {
+		return thumbRaster{}, err
+	}
+	if src, err := tc.lookup(px); err == nil {
 		return th.squareCrop(src, px)
 	}
-	if !isRaster(path) {
+	if tc.failed() {
 		return thumbRaster{}, errNoThumb
 	}
+	var src image.Image
+	switch entry, ok := th.installed()[mimeType]; {
+	case isRaster(path):
+		src, err = th.decodeRaster(ctx, path, info)
+	case ok:
+		src, err = entry.run(ctx, path, tc.uri, flavorFor(px).px, th.runTimeout)
+	default:
+		return thumbRaster{}, errNoThumb
+	}
+	if err != nil {
+		if ctx.Err() == nil && !errors.Is(err, errThumbTooLarge) {
+			th.writeFail(tc)
+		}
+		return thumbRaster{}, err
+	}
+	return th.cacheAndCrop(tc, src, px)
+}
+
+// decodeRaster decodes a raster image within the byte budget.
+func (th *thumbnailer) decodeRaster(ctx context.Context, path string, info os.FileInfo) (image.Image, error) {
 	if info.Size() > thumbMaxBytes {
-		return thumbRaster{}, errThumbTooLarge
+		return nil, errThumbTooLarge
 	}
 	need, err := imagedecode.DecodeBytes(path)
 	if err != nil {
-		return thumbRaster{}, err
+		return nil, err
 	}
 	release, err := th.budget.acquire(ctx, need)
 	if err != nil {
-		return thumbRaster{}, err
+		return nil, err
 	}
 	defer release()
-	src, err := imagedecode.OpenContext(ctx, path)
-	if err != nil {
-		return thumbRaster{}, err
+	return th.decode(ctx, path)
+}
+
+// cacheAndCrop writes src, fitted to the cache size px falls in, to
+// the cache, and crops the row's square from src itself. A cache that
+// cannot be written still shows the thumbnail.
+func (th *thumbnailer) cacheAndCrop(tc thumbCache, src image.Image, px int) (thumbRaster, error) {
+	if tc.root != "" {
+		if err := th.cache(tc, src, flavorFor(px)); err != nil {
+			log.Printf("file chooser: caching the thumbnail of %s: %v", tc.uri, err)
+		}
 	}
 	return th.squareCrop(src, px)
+}
+
+// cache writes src, fitted to flavor, as the file's thumbnail there.
+func (th *thumbnailer) cache(tc thumbCache, src image.Image, flavor thumbSize) error {
+	fitted, pix, err := th.fit(src, flavor.px)
+	if err != nil {
+		return err
+	}
+	data, err := tc.encode(fitted, src.Bounds())
+	if ferr := offheap.Free(&th.mem, pix...); ferr != nil {
+		err = errors.Join(err, ferr)
+	}
+	if err != nil {
+		return err
+	}
+	return th.store(tc.path(flavor.dir), data)
+}
+
+// fit is src scaled to fit an edge square, kept as it is when it fits
+// already (the spec never scales up); pix holds a scaled copy's pixels.
+func (th *thumbnailer) fit(src image.Image, edge int) (image.Image, []memory.Slice[byte], error) {
+	b := src.Bounds()
+	if b.Dx() <= edge && b.Dy() <= edge {
+		return src, nil, nil
+	}
+	w, h := edge, max(1, b.Dy()*edge/b.Dx())
+	if b.Dy() > b.Dx() {
+		w, h = max(1, b.Dx()*edge/b.Dy()), edge
+	}
+	dst, pix, err := offheap.NewRGBA(&th.mem, w, h)
+	if err != nil {
+		return nil, nil, err
+	}
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, b, draw.Src, nil)
+	return dst, []memory.Slice[byte]{pix}, nil
+}
+
+// writeFail records that no thumbnail could be made for the file as
+// it is now, so no dialog tries again until it changes.
+func (th *thumbnailer) writeFail(tc thumbCache) {
+	if tc.root == "" {
+		return
+	}
+	data, err := tc.encode(image.NewRGBA(image.Rect(0, 0, 1, 1)), image.Rectangle{})
+	if err == nil {
+		err = th.store(tc.failPath(), data)
+	}
+	if err != nil {
+		log.Printf("file chooser: recording the failed thumbnail of %s: %v", tc.uri, err)
+	}
 }
 
 // squareCrop scales the largest centred square of src to px.
@@ -201,81 +289,4 @@ func (b *byteBudget) grant() {
 		b.free -= w.n
 		close(w.ready)
 	}
-}
-
-// thumbSizes are the cache's size directories and their edge, smallest
-// first.
-var thumbSizes = []struct {
-	dir string
-	px  int
-}{{"normal", 128}, {"large", 256}, {"x-large", 512}, {"xx-large", 1024}}
-
-// cachedThumbnail is the freedesktop thumbnail cache's image for the
-// file: the smallest size at least px, else the largest below it, named
-// by the MD5 of its URI, and only while its Thumb::MTime matches the
-// file's modification time (a stale one is no thumbnail).
-func cachedThumbnail(path string, info os.FileInfo, px int) (image.Image, error) {
-	cache, ok := xdg.OS.CacheHome()
-	if !ok {
-		return nil, errNoThumb
-	}
-	root := filepath.Join(cache, "thumbnails")
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return nil, err
-	}
-	sum := md5.Sum([]byte(fileuri.FromPath(abs))) //nolint:gosec // the spec's naming, not a security use
-	name := hex.EncodeToString(sum[:]) + ".png"
-	start := 0
-	for start < len(thumbSizes)-1 && thumbSizes[start].px < px {
-		start++
-	}
-	order := append([]int{}, start)
-	for i := start + 1; i < len(thumbSizes); i++ {
-		order = append(order, i)
-	}
-	for i := start - 1; i >= 0; i-- {
-		order = append(order, i)
-	}
-	mtime := strconv.FormatInt(info.ModTime().Unix(), 10)
-	for _, i := range order {
-		data, err := os.ReadFile(filepath.Join(root, thumbSizes[i].dir, name)) //nolint:gosec // the user's thumbnail cache
-		if err != nil {
-			continue
-		}
-		if pngText(data, "Thumb::MTime") != mtime {
-			continue
-		}
-		if img, err := png.Decode(bytes.NewReader(data)); err == nil {
-			return img, nil
-		}
-	}
-	return nil, errNoThumb
-}
-
-// pngText is the value of a PNG's tEXt chunk keyed key, "" without one.
-func pngText(data []byte, key string) string {
-	const signature = "\x89PNG\r\n\x1a\n"
-	if len(data) < len(signature) || string(data[:len(signature)]) != signature {
-		return ""
-	}
-	for p := len(signature); p+8 <= len(data); {
-		length := int(binary.BigEndian.Uint32(data[p:]))
-		kind := string(data[p+4 : p+8])
-		body := p + 8
-		if length < 0 || body+length > len(data) {
-			return ""
-		}
-		if kind == "tEXt" {
-			k, v, ok := bytes.Cut(data[body:body+length], []byte{0})
-			if ok && string(k) == key {
-				return string(v)
-			}
-		}
-		if kind == "IEND" {
-			return ""
-		}
-		p = body + length + 4
-	}
-	return ""
 }

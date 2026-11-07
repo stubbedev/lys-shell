@@ -29,7 +29,7 @@ func testDB(t *testing.T) *mime.Database {
 	}
 	files := map[string]string{
 		"globs2": "50:image/png:*.png\n50:image/jpeg:*.jpg\n50:image/webp:*.webp\n50:image/gif:*.gif\n" +
-			"50:text/plain:*.txt\n50:text/markdown:*.md\n50:image/svg+xml:*.svg\n",
+			"50:text/plain:*.txt\n50:text/markdown:*.md\n50:image/svg+xml:*.svg\n50:application/pdf:*.pdf\n",
 		"subclasses": "image/svg+xml application/xml\napplication/xml text/plain\n",
 	}
 	for name, body := range files {
@@ -557,7 +557,7 @@ func TestThumbnailIsACentreCroppedSquare(t *testing.T) {
 	_ = f.Close()
 	th := newThumbnailer()
 	ctx := context.Background()
-	got, err := th.thumbnail(ctx, path, 24)
+	got, err := th.thumbnail(ctx, path, "", 24)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,14 +570,14 @@ func TestThumbnailIsACentreCroppedSquare(t *testing.T) {
 	if err := th.free([]thumbRaster{got}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := th.thumbnail(ctx, filepath.Join(t.TempDir(), "missing.png"), 24); err == nil {
+	if _, err := th.thumbnail(ctx, filepath.Join(t.TempDir(), "missing.png"), "", 24); err == nil {
 		t.Error("a missing file thumbnailed")
 	}
 	garbage := filepath.Join(t.TempDir(), "g.png")
 	if err := os.WriteFile(garbage, []byte("not an image"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := th.thumbnail(ctx, garbage, 24); err == nil {
+	if _, err := th.thumbnail(ctx, garbage, "", 24); err == nil {
 		t.Error("garbage thumbnailed")
 	}
 	big := filepath.Join(t.TempDir(), "big.png")
@@ -587,7 +587,7 @@ func TestThumbnailIsACentreCroppedSquare(t *testing.T) {
 	if err := os.Truncate(big, thumbMaxBytes+1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := th.thumbnail(ctx, big, 24); !errors.Is(err, errThumbTooLarge) {
+	if _, err := th.thumbnail(ctx, big, "", 24); !errors.Is(err, errThumbTooLarge) {
 		t.Errorf("an oversized file = %v, want errThumbTooLarge", err)
 	}
 	if live := th.mem.Stats().Live; live != 0 {
