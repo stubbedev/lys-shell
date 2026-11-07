@@ -16,14 +16,20 @@ import (
 func TestRecorderLabel(t *testing.T) {
 	// helpers.rs's assertions: idle shows a dash, recording shows the
 	// clock.
-	if got := recorderLabel("{{ elapsed }}", false, false, 0); got != "-" {
+	if got := recorderLabel("{{ elapsed }}", recorder.Change{}); got != "-" {
 		t.Errorf("idle = %q", got)
 	}
-	if got := recorderLabel("{{ elapsed }}", true, false, 65); got != "1:05" {
+	if got := recorderLabel("{{ elapsed }}", recorder.Change{Active: true, ElapsedSecs: 65}); got != "1:05" {
 		t.Errorf("recording = %q", got)
 	}
-	if got := recorderLabel("{{ state }} {{ elapsed }}", true, true, 3661); got != i18n.T("bar-recorder-paused")+" 1:01:01" {
+	if got := recorderLabel("{{ state }} {{ elapsed }}", recorder.Change{Active: true, Paused: true, ElapsedSecs: 3661}); got != i18n.T("bar-recorder-paused")+" 1:01:01" {
 		t.Errorf("paused = %q", got)
+	}
+	if got := recorderLabel("{{ state }} {{ elapsed }}", recorder.Change{Replay: recorder.ReplayArmed}); got != i18n.T("bar-recorder-replay")+" -" {
+		t.Errorf("replay armed = %q", got)
+	}
+	if got := recorderLabel("{{ state }}", recorder.Change{Active: true, Replay: recorder.ReplayArmed}); got != i18n.T("bar-recorder-recording") {
+		t.Errorf("recording with replay armed = %q, want the recording state", got)
 	}
 }
 
@@ -45,6 +51,15 @@ func TestRecorderIconPriority(t *testing.T) {
 	// Paused only counts once recording: select_icon checks active first.
 	if got := recorderIconName(cfg, recorder.Change{Preparing: true, Paused: true}); got != cfg.Icons()[config.RecorderRecording].Name {
 		t.Errorf("preparing while paused icon = %q, want the recording icon", got)
+	}
+	if got := recorderIconName(cfg, recorder.Change{Replay: recorder.ReplayArmed}); got != cfg.Icons()[config.RecorderReplay].Name || got == cfg.Icons()[config.RecorderIdle].Name {
+		t.Errorf("replay armed icon = %q, want the distinct replay icon", got)
+	}
+	if got := recorderIconName(cfg, recorder.Change{Active: true, Replay: recorder.ReplayArmed}); got != cfg.Icons()[config.RecorderRecording].Name {
+		t.Errorf("recording with replay armed icon = %q, want the recording icon", got)
+	}
+	if got := recorderIconName(cfg, recorder.Change{Replay: recorder.ReplayStarting}); got != cfg.Icons()[config.RecorderIdle].Name {
+		t.Errorf("replay starting icon = %q, want idle until armed", got)
 	}
 }
 

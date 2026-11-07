@@ -162,12 +162,13 @@ plain: vet lint no-fused test schema-check build
 # audio, and the log shows the Vulkan device, the modifier the capture
 # took, the codecs the device encodes, and ffprobe's reading of each
 # file; every output transform and a region are recorded and checked
-# upright. A GPU without an H.264 encoder says so, and why, instead.
+# upright, and an instant replay is saved while it runs and checked.
+# A GPU without an H.264 encoder says so, and why, instead.
 # LYS_TEST_GPU makes it a hardware check: a run that cannot reach the
 # GPU (no render node, no Vulkan driver for it, no encoder) fails
 # instead of skipping.
 recorder-check:
-    LYS_TEST_GPU=host {{go}} test -count=1 -v -run '^(TestNoH264EncoderIsTheDefinedError|TestRecordsAnOutputOnTheGPU|TestWebcamOverlayIsEncodedIntoTheFrame|TestRecordsTransformedOutputsAndRegionsUpright)$' ./service/recorder/
+    LYS_TEST_GPU=host {{go}} test -count=1 -v -run '^(TestNoH264EncoderIsTheDefinedError|TestRecordsAnOutputOnTheGPU|TestWebcamOverlayIsEncodedIntoTheFrame|TestRecordsTransformedOutputsAndRegionsUpright|TestReplayOnTheGPU)$' ./service/recorder/
 
 # ─────────────────────────── Generated files ───────────────────────────
 

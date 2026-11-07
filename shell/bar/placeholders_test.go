@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/mpris"
+	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 	"github.com/stubbedev/lys-shell/service/treeman"
 	"github.com/stubbedev/lys-shell/service/weather"
@@ -52,7 +53,7 @@ func TestEveryModuleRendersExactlyItsDeclaredPlaceholders(t *testing.T) {
 		"modules.netstat.format":        renderedNames(netstatVars(sysinfo.Rate{})),
 		"modules.nightlight.format":     renderedNames(nightlightVars(nil, 4500, 80)),
 		"modules.power-profiles.format": renderedNames(powerProfilesVars("balanced")),
-		"modules.recorder.format":       renderedNames(recorderVars(false, false, 0)),
+		"modules.recorder.format":       renderedNames(recorderVars(recorder.Change{})),
 		"modules.treeman.format":        renderedNames(treemanVars(&treeman.Status{})),
 		"modules.weather.format":        renderedNames(weatherVars(&weather.Weather{}, false)),
 		"modules.window-title.format":   renderedNames(windowTitleVars("", "")),

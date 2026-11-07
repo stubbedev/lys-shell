@@ -222,14 +222,17 @@ type probed struct {
 		Height    int    `json:"height"`
 		Frames    string `json:"nb_read_frames"`
 	} `json:"streams"`
-	Packets []struct {
-		Stream int    `json:"stream_index"`
-		PTS    string `json:"pts_time"`
-		Flags  string `json:"flags"`
-	} `json:"packets"`
-	Format struct {
+	Packets []probedPacket `json:"packets"`
+	Format  struct {
 		Duration string `json:"duration"`
 	} `json:"format"`
+}
+
+// probedPacket is one packet ffprobe read back.
+type probedPacket struct {
+	Stream int    `json:"stream_index"`
+	PTS    string `json:"pts_time"`
+	Flags  string `json:"flags"`
 }
 
 // ffprobe demuxes path's packets and decodes every frame: a file it

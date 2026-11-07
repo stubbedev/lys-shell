@@ -8,7 +8,9 @@ import (
 	"context"
 	"os"
 	"sync"
+	"time"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/recorder"
 )
 
@@ -26,6 +28,8 @@ type Engine struct {
 	mu         sync.Mutex
 	sessions   []*Session
 	recordings []*Recording
+	replays    []*Replay
+	outputs    []string
 }
 
 // OpenSession implements recorder.Engine.
@@ -45,6 +49,35 @@ func (e *Engine) OpenSession(ctx context.Context, _ bool) (recorder.Session, err
 	e.sessions = append(e.sessions, s)
 	e.mu.Unlock()
 	return s, nil
+}
+
+// OpenOutput implements recorder.Engine.
+func (e *Engine) OpenOutput(output string, _ bool) (recorder.Session, error) {
+	e.mu.Lock()
+	e.outputs = append(e.outputs, output)
+	e.mu.Unlock()
+	if e.OpenErr != nil {
+		return nil, e.OpenErr
+	}
+	s := &Session{e: e}
+	e.mu.Lock()
+	e.sessions = append(e.sessions, s)
+	e.mu.Unlock()
+	return s, nil
+}
+
+// Outputs are the outputs OpenOutput was asked for.
+func (e *Engine) Outputs() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]string(nil), e.outputs...)
+}
+
+// Replays are the started replays.
+func (e *Engine) Replays() []*Replay {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]*Replay(nil), e.replays...)
 }
 
 // Sessions are the opened sessions.
@@ -76,6 +109,18 @@ func (s *Session) Start(opts recorder.Options, term func(string)) (recorder.Reco
 	r := &Recording{Opts: opts, term: term, write: s.e.WriteOutput, stopErr: s.e.StopErr}
 	s.e.mu.Lock()
 	s.e.recordings = append(s.e.recordings, r)
+	s.e.mu.Unlock()
+	return r, nil
+}
+
+// StartReplay implements recorder.Session.
+func (s *Session) StartReplay(opts recorder.Options, span time.Duration, term func(string), onKey func()) (recorder.Replay, error) {
+	if s.e.StartErr != nil {
+		return nil, s.e.StartErr
+	}
+	r := &Replay{Opts: opts, Span: span, term: term, onKey: onKey}
+	s.e.mu.Lock()
+	s.e.replays = append(s.e.replays, r)
 	s.e.mu.Unlock()
 	return r, nil
 }
@@ -157,3 +202,78 @@ func (r *Recording) Stops() int {
 
 // Fail ends the recording on its own, as a dying capture reports.
 func (r *Recording) Fail(reason string) { r.term(reason) }
+
+// Replay is a fake recorder.Replay: Save writes the path and format it
+// was asked for into the file, as a muxed ring would write footage.
+type Replay struct {
+	// Opts and Span are what it started with.
+	Opts recorder.Options
+	Span time.Duration
+
+	mu      sync.Mutex
+	term    func(string)
+	onKey   func()
+	bytes   uint64
+	saves   []string
+	stops   int
+	saveErr error
+}
+
+// Save implements recorder.Replay.
+func (r *Replay) Save(path string, format config.RecorderFormat) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.saveErr != nil {
+		return r.saveErr
+	}
+	r.saves = append(r.saves, path)
+	return os.WriteFile(path, []byte("replay "+string(format)), 0o600)
+}
+
+// Bytes implements recorder.Replay.
+func (r *Replay) Bytes() uint64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.bytes
+}
+
+// Stop implements recorder.Replay.
+func (r *Replay) Stop() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.stops++
+	return nil
+}
+
+// Keyframe makes the ring hold n bytes and reports a keyframe entering
+// it.
+func (r *Replay) Keyframe(n uint64) {
+	r.mu.Lock()
+	r.bytes = n
+	r.mu.Unlock()
+	r.onKey()
+}
+
+// FailSaves makes every following Save fail with err.
+func (r *Replay) FailSaves(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.saveErr = err
+}
+
+// Saves are the paths saved to.
+func (r *Replay) Saves() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.saves...)
+}
+
+// Stops counts Stop calls.
+func (r *Replay) Stops() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.stops
+}
+
+// Fail ends the replay on its own, as a dying capture reports.
+func (r *Replay) Fail(reason string) { r.term(reason) }

@@ -2,6 +2,7 @@ package bar
 
 import (
 	"context"
+	"log"
 	"slices"
 
 	"github.com/stubbedev/lys-lib/intconv"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
 
 // Recorder config paths the dropdown writes.
@@ -22,6 +24,7 @@ const (
 	recorderPathCamDevice = "modules.recorder.webcam-device"
 	recorderPathWebcamX   = "modules.recorder.webcam-x"
 	recorderPathWebcamY   = "modules.recorder.webcam-y"
+	recorderPathReplay    = "modules.recorder.replay.enable"
 )
 
 // previewGeometry is preview_geometry: the 16:9 screen frame across the
@@ -215,9 +218,11 @@ type recorderView struct {
 	preview    *webcamPreview
 
 	*openFollow
-	micReads *refresher[[]recorder.DeviceChoice]
-	camReads *refresher[[]recorder.DeviceChoice]
-	camSlot  *widget.Box
+	micReads     *refresher[[]recorder.DeviceChoice]
+	camReads     *refresher[[]recorder.DeviceChoice]
+	camSlot      *widget.Box
+	replayMemory *widget.Label
+	replaySave   *widget.Button
 }
 
 func recorderDropdown(ctx ModuleContext) widget.Widget {
@@ -279,6 +284,18 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	v.webcam.SetVisible(len(v.cams) > 1)
 	content.Append(v.webcam, false)
 
+	replayCard, replay := itemCard()
+	replayCard.AddClass("recorder-card")
+	replay.Append(v.switchRow(i18n.T("dropdown-recorder-replay"), cfg.Replay.Enable, recorderPathReplay))
+	memory := v.row(i18n.T("dropdown-recorder-replay-memory"))
+	v.replayMemory = widget.NewLabel(font, px, "", 0)
+	v.replayMemory.AddClass("recorder-replay-memory", css.Numeric)
+	memory.AddAction(v.replayMemory)
+	replay.Append(memory)
+	content.Append(dropdownGroup(v.sectionHeader("ld-history-symbolic", i18n.T("dropdown-recorder-section-replay")), replayCard), false)
+	v.replaySave = dropdownButton(widget.NewButtonContent(font, px, "ld-history-symbolic", i18n.T("dropdown-recorder-replay-save")), v.saveReplay, "recorder-replay-save-button")
+	content.Append(v.replaySave, false)
+
 	v.startFollowing()
 	return v
 }
@@ -313,6 +330,20 @@ func (v *recorderView) controls() widget.Widget {
 	}, "recorder-pause-button", css.Secondary, css.Icon)
 	row.Append(v.pause, false)
 	return row
+}
+
+// saveReplay saves the instant replay off the loop: the service reports
+// the file or the failure through the OSD and a notification.
+func (v *recorderView) saveReplay() {
+	r := v.ctx.Recorder
+	if r == nil {
+		return
+	}
+	go func() {
+		if _, err := r.SaveReplay(); err != nil {
+			log.Printf("recorder: %v", err)
+		}
+	}()
 }
 
 // sectionHeader is the recorder's icon-led section label.
@@ -387,6 +418,13 @@ func (v *recorderView) applyState(c recorder.Change) {
 		v.recordFace.SetLabel(i18n.T("dropdown-recorder-record"))
 	}
 	v.pause.SetEnabled(c.Active)
+	armed := c.Replay == recorder.ReplayArmed
+	v.replaySave.SetEnabled(armed)
+	memory := "-"
+	if armed {
+		memory = sysinfo.AutoBytes(c.ReplayBytes)
+	}
+	v.replayMemory.SetText(memory)
 	if c.Paused {
 		v.pauseIcon.SetThemeName("ld-play-symbolic")
 		v.pause.SetTooltip(i18n.T("dropdown-recorder-resume"))

@@ -29,10 +29,12 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 		Interface: ServiceName,
 		Methods:   d,
 		Properties: dbusx.Getters{
-			"Active":  func() any { return d.state.Snapshot().Active },
-			"Paused":  func() any { return d.state.Snapshot().Paused },
-			"Elapsed": func() any { return d.state.Snapshot().ElapsedSecs },
-			"File":    func() any { return d.state.Snapshot().OutputPath },
+			"Active":      func() any { return d.state.Snapshot().Active },
+			"Paused":      func() any { return d.state.Snapshot().Paused },
+			"Elapsed":     func() any { return d.state.Snapshot().ElapsedSecs },
+			"File":        func() any { return d.state.Snapshot().OutputPath },
+			"Replay":      func() any { return d.state.Snapshot().Replay.String() },
+			"ReplayBytes": func() any { return d.state.Snapshot().ReplayBytes },
 		},
 	})
 }
@@ -65,4 +67,25 @@ func (d *Daemon) Pause() *dbus.Error {
 func (d *Daemon) Resume() *dbus.Error {
 	d.state.SetPaused(false)
 	return nil
+}
+
+// ReplayStart arms the instant replay.
+func (d *Daemon) ReplayStart() *dbus.Error {
+	d.state.StartReplay()
+	return nil
+}
+
+// ReplayStop disarms the instant replay.
+func (d *Daemon) ReplayStop() *dbus.Error {
+	d.state.StopReplay()
+	return nil
+}
+
+// ReplaySave writes the replay's last seconds to a file and returns it.
+func (d *Daemon) ReplaySave() (string, *dbus.Error) {
+	path, err := d.state.SaveReplay()
+	if err != nil {
+		return "", dbusx.Failed(err.Error())
+	}
+	return path, nil
 }

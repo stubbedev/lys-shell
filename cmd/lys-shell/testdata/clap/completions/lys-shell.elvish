@@ -740,6 +740,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand pause 'Pause the active recording'
             cand resume 'Resume a paused recording'
             cand status 'Show current recorder status'
+            cand replay 'Instant replay: keep the last seconds in memory and save them on demand'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'lys-shell;recorder;start'= {
@@ -766,6 +767,40 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'lys-shell;recorder;replay'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand start 'Arm the instant replay'
+            cand stop 'Disarm the instant replay and free its memory'
+            cand save 'Save the last seconds to a file and print its path'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;recorder;replay;start'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;replay;stop'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;replay;save'= {
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'lys-shell;recorder;replay;help'= {
+            cand start 'Arm the instant replay'
+            cand stop 'Disarm the instant replay and free its memory'
+            cand save 'Save the last seconds to a file and print its path'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'lys-shell;recorder;replay;help;start'= {
+        }
+        &'lys-shell;recorder;replay;help;stop'= {
+        }
+        &'lys-shell;recorder;replay;help;save'= {
+        }
+        &'lys-shell;recorder;replay;help;help'= {
+        }
         &'lys-shell;recorder;help'= {
             cand start 'Start recording'
             cand stop 'Stop recording'
@@ -773,6 +808,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand pause 'Pause the active recording'
             cand resume 'Resume a paused recording'
             cand status 'Show current recorder status'
+            cand replay 'Instant replay: keep the last seconds in memory and save them on demand'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'lys-shell;recorder;help;start'= {
@@ -786,6 +822,17 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;recorder;help;resume'= {
         }
         &'lys-shell;recorder;help;status'= {
+        }
+        &'lys-shell;recorder;help;replay'= {
+            cand start 'Arm the instant replay'
+            cand stop 'Disarm the instant replay and free its memory'
+            cand save 'Save the last seconds to a file and print its path'
+        }
+        &'lys-shell;recorder;help;replay;start'= {
+        }
+        &'lys-shell;recorder;help;replay;stop'= {
+        }
+        &'lys-shell;recorder;help;replay;save'= {
         }
         &'lys-shell;recorder;help;help'= {
         }
@@ -1327,6 +1374,7 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand pause 'Pause the active recording'
             cand resume 'Resume a paused recording'
             cand status 'Show current recorder status'
+            cand replay 'Instant replay: keep the last seconds in memory and save them on demand'
         }
         &'lys-shell;help;recorder;start'= {
         }
@@ -1339,6 +1387,17 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
         &'lys-shell;help;recorder;resume'= {
         }
         &'lys-shell;help;recorder;status'= {
+        }
+        &'lys-shell;help;recorder;replay'= {
+            cand start 'Arm the instant replay'
+            cand stop 'Disarm the instant replay and free its memory'
+            cand save 'Save the last seconds to a file and print its path'
+        }
+        &'lys-shell;help;recorder;replay;start'= {
+        }
+        &'lys-shell;help;recorder;replay;stop'= {
+        }
+        &'lys-shell;help;recorder;replay;save'= {
         }
         &'lys-shell;help;screenshot'= {
             cand region 'Capture a dragged region or a clicked window'

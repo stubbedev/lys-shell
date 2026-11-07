@@ -53,6 +53,9 @@ func (p *fakePicker) Dismiss(_ context.Context, handle string) error {
 // noLogical knows no output's logical size.
 func noLogical(string) (image.Point, bool) { return image.Point{}, false }
 
+// noFocus knows no focused output.
+func noFocus() (string, bool) { return "", false }
+
 // The recorder asks the picker for an output or a region, offering to
 // remember the choice when it has somewhere to keep it, and takes one
 // back; a cancel, a window, several sources or a malformed reply are
@@ -73,7 +76,7 @@ func TestPickAsksForOneOutputOrRegion(t *testing.T) {
 		"garbage":                    {err: "not one output or region"},
 	} {
 		p := &fakePicker{reply: reply}
-		e := NewGPUEngine(p, nil, noLogical, t.TempDir())
+		e := NewGPUEngine(p, nil, noLogical, noFocus, t.TempDir())
 		target, remember, err := e.pick(context.Background())
 		switch {
 		case want.err != "":
@@ -88,11 +91,11 @@ func TestPickAsksForOneOutputOrRegion(t *testing.T) {
 		}
 	}
 	p := &fakePicker{reply: "r/screen:DP-1"}
-	if _, _, err := NewGPUEngine(p, nil, noLogical, "").pick(context.Background()); err != nil || p.asked[0].AllowToken {
+	if _, _, err := NewGPUEngine(p, nil, noLogical, noFocus, "").pick(context.Background()); err != nil || p.asked[0].AllowToken {
 		t.Errorf("no state dir: asked %+v (%v), want no remember box", p.asked[0], err)
 	}
 	p = &fakePicker{err: errors.New("org.freedesktop.DBus.Error.ServiceUnknown")}
-	if _, _, err := NewGPUEngine(p, nil, noLogical, "").pick(context.Background()); err == nil || !strings.Contains(err.Error(), "share picker: org.freedesktop.DBus.Error.ServiceUnknown") {
+	if _, _, err := NewGPUEngine(p, nil, noLogical, noFocus, "").pick(context.Background()); err == nil || !strings.Contains(err.Error(), "share picker: org.freedesktop.DBus.Error.ServiceUnknown") {
 		t.Errorf("no picker: %v", err)
 	}
 }
@@ -101,7 +104,7 @@ func TestPickAsksForOneOutputOrRegion(t *testing.T) {
 // the handle it was asked under, and is the context's error.
 func TestCancelledPickDismissesThePicker(t *testing.T) {
 	p := &fakePicker{block: true}
-	e := NewGPUEngine(p, nil, noLogical, "")
+	e := NewGPUEngine(p, nil, noLogical, noFocus, "")
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	if _, err := e.OpenSession(ctx, true); !errors.Is(err, context.DeadlineExceeded) {
@@ -133,7 +136,7 @@ func TestRememberedSourceGoneAsksAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 		p := &fakePicker{reply: "r/screen:HEADLESS-1"}
-		_, err := NewGPUEngine(p, nil, noLogical, dir).OpenSession(context.Background(), false)
+		_, err := NewGPUEngine(p, nil, noLogical, noFocus, dir).OpenSession(context.Background(), false)
 		if len(p.asked) != 1 {
 			t.Errorf("%q: asked %d times, want the picker once", content, len(p.asked))
 		}
@@ -145,7 +148,7 @@ func TestRememberedSourceGoneAsksAgain(t *testing.T) {
 		}
 	}
 	p := &fakePicker{reply: "/screen:NOPE-1"}
-	if _, err := NewGPUEngine(p, nil, noLogical, dir).OpenSession(context.Background(), false); !errors.Is(err, errOutputGone) {
+	if _, err := NewGPUEngine(p, nil, noLogical, noFocus, dir).OpenSession(context.Background(), false); !errors.Is(err, errOutputGone) {
 		t.Errorf("a picked output that does not exist: %v, want errOutputGone", err)
 	}
 }

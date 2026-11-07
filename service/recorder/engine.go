@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 
+	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
@@ -35,6 +36,10 @@ const dismissTimeout = 2 * time.Second
 
 // audioFragment is the PCM chunk a source delivers, in frames: 10 ms.
 const audioFragment = audioRate / 100
+
+// errNoFocusedOutput is a replay set to the focused output when the
+// compositor names none.
+var errNoFocusedOutput = errors.New("recorder: the compositor reports no focused output")
 
 // ErrPickerCancelled is a start the user dismissed at the picker.
 var ErrPickerCancelled = errors.New("recorder: nothing was picked to record")
@@ -58,6 +63,7 @@ type GPUEngine struct {
 	audio      *pulse.Service
 	stateDir   string
 	logical    LogicalSize
+	focused    func() (string, bool)
 	openDevice func(uint64) (*gpu.Device, error)
 	wall       wallClock
 	picks      atomic.Uint64
@@ -65,10 +71,10 @@ type GPUEngine struct {
 
 // NewGPUEngine records through picker, with audio from audio (nil when
 // there is no audio server, which fails a recording that asks for
-// sound), regions measured by logical, remembering the pick in stateDir
-// ("" remembers nothing).
-func NewGPUEngine(picker Picker, audio *pulse.Service, logical LogicalSize, stateDir string) *GPUEngine {
-	return &GPUEngine{picker: picker, audio: audio, logical: logical, stateDir: stateDir, openDevice: gpu.OpenNode, wall: systemClock{}}
+// sound), regions measured by logical, the focused output named by
+// focused, remembering the pick in stateDir ("" remembers nothing).
+func NewGPUEngine(picker Picker, audio *pulse.Service, logical LogicalSize, focused func() (string, bool), stateDir string) *GPUEngine {
+	return &GPUEngine{picker: picker, audio: audio, logical: logical, focused: focused, stateDir: stateDir, openDevice: gpu.OpenNode, wall: systemClock{}}
 }
 
 // OpenSession implements Engine: the remembered output or region, else
@@ -91,6 +97,19 @@ func (e *GPUEngine) OpenSession(ctx context.Context, showCursor bool) (Session, 
 		e.rememberSource(target)
 	}
 	return e.session(s, err)
+}
+
+// OpenOutput implements Engine: output, or the focused one, opened for
+// capture on its GPU with no picker.
+func (e *GPUEngine) OpenOutput(output string, showCursor bool) (Session, error) {
+	if output == config.ReplayOutputFocused {
+		focused, ok := e.focused()
+		if !ok {
+			return nil, errNoFocusedOutput
+		}
+		output = focused
+	}
+	return e.session(openScreen(sharepicker.Target{Kind: sharepicker.TargetOutput, Name: output}, showCursor, e.logical, e.openDevice))
 }
 
 // recordable is a target the recorder captures: an output or a region.
@@ -181,17 +200,36 @@ type gpuSession struct {
 	wall   wallClock
 }
 
-// Start implements Session: the encoder on the screen's GPU, the webcam
-// and the audio sources opts asks for, into a new file.
+// Start implements Session: the parts opts asks for, into a new file.
 func (g *gpuSession) Start(opts Options, term func(reason string)) (Recording, error) {
-	sources, err := audioSources(g.audio, opts)
+	parts, err := g.parts(opts)
 	if err != nil {
 		return nil, err
+	}
+	return startRecording(parts, opts, term)
+}
+
+// StartReplay implements Session: the parts opts asks for, into a ring
+// holding span.
+func (g *gpuSession) StartReplay(opts Options, span time.Duration, term func(reason string), onKey func()) (Replay, error) {
+	parts, err := g.parts(opts)
+	if err != nil {
+		return nil, err
+	}
+	return startReplay(parts, span, term, onKey)
+}
+
+// parts are the encoder on the screen's GPU, the webcam and the audio
+// sources opts asks for.
+func (g *gpuSession) parts(opts Options) (recordingParts, error) {
+	sources, err := audioSources(g.audio, opts)
+	if err != nil {
+		return recordingParts{}, err
 	}
 	fps := max(opts.Framerate, 1)
 	video, err := newGPUVideo(g.screen, fps)
 	if err != nil {
-		return nil, err
+		return recordingParts{}, err
 	}
 	parts := recordingParts{video: video, audio: sources, fps: fps, wall: g.wall}
 	if opts.Webcam != nil {
@@ -200,17 +238,17 @@ func (g *gpuSession) Start(opts Options, term func(reason string)) (Recording, e
 		height, errH := intconv.Exact[int32](size.Y)
 		if err := errors.Join(errW, errH); err != nil {
 			video.Close()
-			return nil, fmt.Errorf("recorder: a %dx%d frame: %w", size.X, size.Y, err)
+			return recordingParts{}, fmt.Errorf("recorder: a %dx%d frame: %w", size.X, size.Y, err)
 		}
 		parts.camRect = webcamRect(*opts.Webcam, width, height)
 		cam, err := openWebcam(opts.Webcam.Device, parts.camRect.Size())
 		if err != nil {
 			video.Close()
-			return nil, err
+			return recordingParts{}, err
 		}
 		parts.cam = cam
 	}
-	return startRecording(parts, opts, term)
+	return parts, nil
 }
 
 // Close releases the screen.

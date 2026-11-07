@@ -40,6 +40,7 @@ bar-idle-stage-suspend = mettre en veille
 bar-recorder-idle = Inactif
 bar-recorder-recording = Enregistrement
 bar-recorder-paused = Suspendu
+bar-recorder-replay = Relecture armée
 
 ## Mode de raccourcis
 bar-keybind-mode-default = par défaut

@@ -915,6 +915,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
             [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            [CompletionResult]::new('replay', 'replay', [CompletionResultType]::ParameterValue, 'Instant replay: keep the last seconds in memory and save them on demand')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -948,6 +949,49 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'lys-shell;recorder;replay' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Arm the instant replay')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Disarm the instant replay and free its memory')
+            [CompletionResult]::new('save', 'save', [CompletionResultType]::ParameterValue, 'Save the last seconds to a file and print its path')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;recorder;replay;start' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;replay;stop' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;replay;save' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'lys-shell;recorder;replay;help' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Arm the instant replay')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Disarm the instant replay and free its memory')
+            [CompletionResult]::new('save', 'save', [CompletionResultType]::ParameterValue, 'Save the last seconds to a file and print its path')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'lys-shell;recorder;replay;help;start' {
+            break
+        }
+        'lys-shell;recorder;replay;help;stop' {
+            break
+        }
+        'lys-shell;recorder;replay;help;save' {
+            break
+        }
+        'lys-shell;recorder;replay;help;help' {
+            break
+        }
         'lys-shell;recorder;help' {
             [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Start recording')
             [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Stop recording')
@@ -955,6 +999,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
             [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            [CompletionResult]::new('replay', 'replay', [CompletionResultType]::ParameterValue, 'Instant replay: keep the last seconds in memory and save them on demand')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -974,6 +1019,21 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;recorder;help;status' {
+            break
+        }
+        'lys-shell;recorder;help;replay' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Arm the instant replay')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Disarm the instant replay and free its memory')
+            [CompletionResult]::new('save', 'save', [CompletionResultType]::ParameterValue, 'Save the last seconds to a file and print its path')
+            break
+        }
+        'lys-shell;recorder;help;replay;start' {
+            break
+        }
+        'lys-shell;recorder;help;replay;stop' {
+            break
+        }
+        'lys-shell;recorder;help;replay;save' {
             break
         }
         'lys-shell;recorder;help;help' {
@@ -1671,6 +1731,7 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             [CompletionResult]::new('pause', 'pause', [CompletionResultType]::ParameterValue, 'Pause the active recording')
             [CompletionResult]::new('resume', 'resume', [CompletionResultType]::ParameterValue, 'Resume a paused recording')
             [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Show current recorder status')
+            [CompletionResult]::new('replay', 'replay', [CompletionResultType]::ParameterValue, 'Instant replay: keep the last seconds in memory and save them on demand')
             break
         }
         'lys-shell;help;recorder;start' {
@@ -1689,6 +1750,21 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;help;recorder;status' {
+            break
+        }
+        'lys-shell;help;recorder;replay' {
+            [CompletionResult]::new('start', 'start', [CompletionResultType]::ParameterValue, 'Arm the instant replay')
+            [CompletionResult]::new('stop', 'stop', [CompletionResultType]::ParameterValue, 'Disarm the instant replay and free its memory')
+            [CompletionResult]::new('save', 'save', [CompletionResultType]::ParameterValue, 'Save the last seconds to a file and print its path')
+            break
+        }
+        'lys-shell;help;recorder;replay;start' {
+            break
+        }
+        'lys-shell;help;recorder;replay;stop' {
+            break
+        }
+        'lys-shell;help;recorder;replay;save' {
             break
         }
         'lys-shell;help;screenshot' {

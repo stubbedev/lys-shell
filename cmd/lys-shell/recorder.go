@@ -5,6 +5,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
 
 // recorderCommand is lys-shell/src/cli/recorder/commands.rs.
@@ -19,6 +20,15 @@ func recorderCommand() *cli.Command {
 			{Name: "pause", About: "Pause the active recording", Run: withRecorder(recorderAction("pause recording", "Pause", "Paused"))},
 			{Name: "resume", About: "Resume a paused recording", Run: withRecorder(recorderAction("resume recording", "Resume", "Resumed"))},
 			{Name: "status", About: "Show current recorder status", Run: withRecorder(recorderStatus)},
+			{
+				Name:  "replay",
+				About: "Instant replay: keep the last seconds in memory and save them on demand",
+				Subcommands: []*cli.Command{
+					{Name: "start", About: "Arm the instant replay", Run: withRecorder(recorderAction("arm the instant replay", "ReplayStart", "Instant replay armed"))},
+					{Name: "stop", About: "Disarm the instant replay and free its memory", Run: withRecorder(recorderAction("disarm the instant replay", "ReplayStop", "Instant replay stopped"))},
+					{Name: "save", About: "Save the last seconds to a file and print its path", Run: withRecorder(recorderReplaySave)},
+				},
+			},
 		},
 	}
 }
@@ -57,6 +67,17 @@ func recorderStatus(m *cli.Matches, p *daemonProxy) error {
 	if err := p.prop("get active state", "Active", &active); err != nil {
 		return err
 	}
+	var replay string
+	if err := p.prop("get the instant replay state", "Replay", &replay); err != nil {
+		return err
+	}
+	if replay == recorder.ReplayArmed.String() {
+		var held uint64
+		if err := p.prop("get the instant replay memory", "ReplayBytes", &held); err != nil {
+			return err
+		}
+		fmt.Fprintf(m.Stdout(), "Instant replay armed (%s)\n", sysinfo.AutoBytes(held))
+	}
 	if !active {
 		fmt.Fprintln(m.Stdout(), "Idle")
 		return nil
@@ -76,5 +97,14 @@ func recorderStatus(m *cli.Matches, p *daemonProxy) error {
 	} else {
 		fmt.Fprintf(m.Stdout(), "%s (%d:%02d) -> %s\n", state, elapsed/60, elapsed%60, file)
 	}
+	return nil
+}
+
+func recorderReplaySave(m *cli.Matches, p *daemonProxy) error {
+	var path string
+	if err := p.call("save the instant replay", "ReplaySave", []any{&path}); err != nil {
+		return err
+	}
+	fmt.Fprintln(m.Stdout(), path)
 	return nil
 }

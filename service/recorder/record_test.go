@@ -166,7 +166,7 @@ func TestFailuresOfBothTracksAreReportedOnce(t *testing.T) {
 	stopTone := make(chan struct{})
 	defer close(stopTone)
 	go src.tone(100, stopTone)
-	_ = r.file.Close()
+	_ = r.sink.(*fileSink).file.Close()
 	ended := make(chan struct{})
 	go func() { r.loops.Wait(); close(ended) }()
 	select {

@@ -112,7 +112,7 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 	for i, format := range []config.RecorderFormat{config.RecorderFormatMp4, config.RecorderFormatMkv} {
 		t.Run(string(format), func(t *testing.T) {
 			p := &fakePicker{reply: "r/screen:" + output}
-			e := NewGPUEngine(p, audio, noLogical, stateDir)
+			e := NewGPUEngine(p, audio, noLogical, noFocus, stateDir)
 			period := time.Second / 30
 			wall := newFakeWall(time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC), period, audioFrameTime)
 			e.wall = wall
@@ -164,6 +164,61 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 				t.Errorf("remembered %q (%v)", data, err)
 			}
 		})
+	}
+}
+
+// On a real GPU behind a private sway, an instant replay on the focused
+// output keeps the last span cut on the encoder's keyframes: a save
+// while it runs is a file starting on a keyframe, every frame decoding,
+// at least the span long and less than the span and one keyframe
+// interval; stopping it frees the ring.
+func TestReplayOnTheGPU(t *testing.T) {
+	requireFFmpeg(t)
+	output := gpuSway(t)
+	e := NewGPUEngine(&fakePicker{}, nil, noLogical, func() (string, bool) { return output, true }, "")
+	const fps = 30
+	period := time.Second / fps
+	wall := newFakeWall(time.Date(2026, 11, 7, 12, 0, 0, 0, time.UTC), period, audioFrameTime)
+	e.wall = wall
+	s, err := e.OpenOutput(config.ReplayOutputFocused, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	span := 2 * time.Second
+	terms := &termLog{}
+	rp, err := s.StartReplay(Options{Format: config.RecorderFormatMkv, Framerate: fps, ShowCursor: true}, span, terms.term, func() {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 5 * fps {
+		wall.advance(period)
+		wall.tick(period)
+	}
+	path := filepath.Join(t.TempDir(), "replay.mkv")
+	if err := rp.Save(path, config.RecorderFormatMkv); err != nil {
+		t.Fatal(err)
+	}
+	if err := rp.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if held := rp.Bytes(); held != 0 {
+		t.Errorf("a stopped replay holds %d bytes", held)
+	}
+	if got := terms.all(); len(got) != 0 {
+		t.Errorf("reported %q", got)
+	}
+	pr := ffprobe(t, path)
+	vpts := pr.ptsOf(0)
+	t.Logf("%s from %s: %ss, %s frames decoded, first packet %+v", path, output, pr.Format.Duration, pr.Streams[0].Frames, pr.Packets[0])
+	if len(vpts) == 0 || vpts[0] != 0 || pr.Packets[0].Flags[0] != 'K' {
+		t.Fatalf("the replay starts at %v (%+v), want a keyframe at 0", vpts, pr.Packets[0])
+	}
+	if pr.Streams[0].Frames != strconv.Itoa(len(vpts)) {
+		t.Errorf("%s of %d frames decode", pr.Streams[0].Frames, len(vpts))
+	}
+	if length := time.Duration(len(vpts)) * period; length < span || length >= span+keyframeEverySecs*time.Second {
+		t.Errorf("the replay holds %v, want at least %v and less than one keyframe interval more", length, span)
 	}
 }
 

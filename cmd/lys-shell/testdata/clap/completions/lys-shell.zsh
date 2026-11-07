@@ -1265,6 +1265,74 @@ _arguments "${_arguments_options[@]}" : \
 '--help[Print help]' \
 && ret=0
 ;;
+(replay)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_lys-shell__recorder__replay_commands" \
+"*::: :->replay" \
+&& ret=0
+
+    case $state in
+    (replay)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-recorder-replay-command-$line[1]:"
+        case $line[1] in
+            (start)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(stop)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(save)
+_arguments "${_arguments_options[@]}" : \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_lys-shell__recorder__replay__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-recorder-replay-help-command-$line[1]:"
+        case $line[1] in
+            (start)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(stop)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(save)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_lys-shell__recorder__help_commands" \
@@ -1300,6 +1368,34 @@ _arguments "${_arguments_options[@]}" : \
 (status)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
+;;
+(replay)
+_arguments "${_arguments_options[@]}" : \
+":: :_lys-shell__recorder__help__replay_commands" \
+"*::: :->replay" \
+&& ret=0
+
+    case $state in
+    (replay)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-recorder-help-replay-command-$line[1]:"
+        case $line[1] in
+            (start)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(stop)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(save)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
 ;;
 (help)
 _arguments "${_arguments_options[@]}" : \
@@ -2325,6 +2421,34 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(replay)
+_arguments "${_arguments_options[@]}" : \
+":: :_lys-shell__help__recorder__replay_commands" \
+"*::: :->replay" \
+&& ret=0
+
+    case $state in
+    (replay)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:lys-shell-help-recorder-replay-command-$line[1]:"
+        case $line[1] in
+            (start)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(stop)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(save)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
         esac
     ;;
 esac
@@ -3305,6 +3429,7 @@ _lys-shell__help__recorder_commands() {
 'pause:Pause the active recording' \
 'resume:Resume a paused recording' \
 'status:Show current recorder status' \
+'replay:Instant replay\: keep the last seconds in memory and save them on demand' \
     )
     _describe -t commands 'lys-shell help recorder commands' commands "$@"
 }
@@ -3312,6 +3437,30 @@ _lys-shell__help__recorder_commands() {
 _lys-shell__help__recorder__pause_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell help recorder pause commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__recorder__replay_commands] )) ||
+_lys-shell__help__recorder__replay_commands() {
+    local commands; commands=(
+'start:Arm the instant replay' \
+'stop:Disarm the instant replay and free its memory' \
+'save:Save the last seconds to a file and print its path' \
+    )
+    _describe -t commands 'lys-shell help recorder replay commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__recorder__replay__save_commands] )) ||
+_lys-shell__help__recorder__replay__save_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help recorder replay save commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__recorder__replay__start_commands] )) ||
+_lys-shell__help__recorder__replay__start_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help recorder replay start commands' commands "$@"
+}
+(( $+functions[_lys-shell__help__recorder__replay__stop_commands] )) ||
+_lys-shell__help__recorder__replay__stop_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell help recorder replay stop commands' commands "$@"
 }
 (( $+functions[_lys-shell__help__recorder__resume_commands] )) ||
 _lys-shell__help__recorder__resume_commands() {
@@ -4453,6 +4602,7 @@ _lys-shell__recorder_commands() {
 'pause:Pause the active recording' \
 'resume:Resume a paused recording' \
 'status:Show current recorder status' \
+'replay:Instant replay\: keep the last seconds in memory and save them on demand' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'lys-shell recorder commands' commands "$@"
@@ -4466,6 +4616,7 @@ _lys-shell__recorder__help_commands() {
 'pause:Pause the active recording' \
 'resume:Resume a paused recording' \
 'status:Show current recorder status' \
+'replay:Instant replay\: keep the last seconds in memory and save them on demand' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'lys-shell recorder help commands' commands "$@"
@@ -4479,6 +4630,30 @@ _lys-shell__recorder__help__help_commands() {
 _lys-shell__recorder__help__pause_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell recorder help pause commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__help__replay_commands] )) ||
+_lys-shell__recorder__help__replay_commands() {
+    local commands; commands=(
+'start:Arm the instant replay' \
+'stop:Disarm the instant replay and free its memory' \
+'save:Save the last seconds to a file and print its path' \
+    )
+    _describe -t commands 'lys-shell recorder help replay commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__help__replay__save_commands] )) ||
+_lys-shell__recorder__help__replay__save_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder help replay save commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__help__replay__start_commands] )) ||
+_lys-shell__recorder__help__replay__start_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder help replay start commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__help__replay__stop_commands] )) ||
+_lys-shell__recorder__help__replay__stop_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder help replay stop commands' commands "$@"
 }
 (( $+functions[_lys-shell__recorder__help__resume_commands] )) ||
 _lys-shell__recorder__help__resume_commands() {
@@ -4509,6 +4684,61 @@ _lys-shell__recorder__help__toggle_commands() {
 _lys-shell__recorder__pause_commands() {
     local commands; commands=()
     _describe -t commands 'lys-shell recorder pause commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay_commands] )) ||
+_lys-shell__recorder__replay_commands() {
+    local commands; commands=(
+'start:Arm the instant replay' \
+'stop:Disarm the instant replay and free its memory' \
+'save:Save the last seconds to a file and print its path' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'lys-shell recorder replay commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__help_commands] )) ||
+_lys-shell__recorder__replay__help_commands() {
+    local commands; commands=(
+'start:Arm the instant replay' \
+'stop:Disarm the instant replay and free its memory' \
+'save:Save the last seconds to a file and print its path' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'lys-shell recorder replay help commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__help__help_commands] )) ||
+_lys-shell__recorder__replay__help__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder replay help help commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__help__save_commands] )) ||
+_lys-shell__recorder__replay__help__save_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder replay help save commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__help__start_commands] )) ||
+_lys-shell__recorder__replay__help__start_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder replay help start commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__help__stop_commands] )) ||
+_lys-shell__recorder__replay__help__stop_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder replay help stop commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__save_commands] )) ||
+_lys-shell__recorder__replay__save_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder replay save commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__start_commands] )) ||
+_lys-shell__recorder__replay__start_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder replay start commands' commands "$@"
+}
+(( $+functions[_lys-shell__recorder__replay__stop_commands] )) ||
+_lys-shell__recorder__replay__stop_commands() {
+    local commands; commands=()
+    _describe -t commands 'lys-shell recorder replay stop commands' commands "$@"
 }
 (( $+functions[_lys-shell__recorder__resume_commands] )) ||
 _lys-shell__recorder__resume_commands() {

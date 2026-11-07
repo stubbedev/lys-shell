@@ -33,6 +33,7 @@ bar:
 | `icon-idle` | string | `"ld-video-symbolic"` | Icon when idle (not recording). |
 | `icon-recording` | string | `"ld-circle-dot-symbolic"` | Icon while recording. |
 | `icon-paused` | string | `"ld-circle-pause-symbolic"` | Icon while recording is paused. |
+| `icon-replay` | string | `"ld-history-symbolic"` | Icon while only the instant replay is armed. |
 | `format` | string | `"{{ elapsed }}"` | Format string for the label. |
 | `microphone` | bool | `false` | Capture the microphone in the recording. |
 | `microphone-device` | string | `""` | Microphone PipeWire/PulseAudio source name. Empty uses the default source. |
@@ -47,6 +48,7 @@ bar:
 | `output-format` | [`RecorderFormat`](/config/types#recorder-format) | `"mkv"` | Container format / codec preset. |
 | `show-cursor` | bool | `true` | Draw the mouse cursor in the recording. |
 | `start-delay-ms` | u32 | `1400` | Delay between choosing the capture source and the recording actually starting, in milliseconds. Gives on-screen UI (the start toast) time to clear so it isn't captured in the video. |
+| `replay` | [`RecorderReplayConfig`](/config/types#recorder-replay-config) | `{...}` | Instant replay: keep the last seconds of an output encoded in memory and save them on demand. |
 | `border-show` | bool | `false` | Display border around button. |
 | `icon-show` | bool | `true` | Display module icon. |
 | `label-show` | bool | `true` | Display label. |
@@ -56,7 +58,7 @@ bar:
 
 #### Placeholders
 
-- `{{ state }}` - Recorder state (Idle, Recording, Paused)
+- `{{ state }}` - Recorder state (Idle, Replay armed, Recording, Paused)
 - `{{ elapsed }}` - Elapsed recording time as M:SS or H:MM:SS (- while idle)
 
 :::
@@ -89,6 +91,7 @@ modules:
     icon-idle: ld-video-symbolic
     icon-recording: ld-circle-dot-symbolic
     icon-paused: ld-circle-pause-symbolic
+    icon-replay: ld-history-symbolic
     format: '{{ elapsed }}'
     microphone: false
     microphone-device: ""
@@ -103,6 +106,10 @@ modules:
     output-format: mkv
     show-cursor: true
     start-delay-ms: 1400
+    replay:
+      enable: false
+      seconds: 30
+      output: focused
     border-show: false
     border-color: red
     icon-show: true

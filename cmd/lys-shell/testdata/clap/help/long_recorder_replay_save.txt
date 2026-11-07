@@ -1,0 +1,6 @@
+Save the last seconds to a file and print its path
+
+Usage: lys-shell recorder replay save
+
+Options:
+  -h, --help  Print help

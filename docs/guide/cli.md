@@ -150,7 +150,22 @@ lys-shell recorder toggle
 lys-shell recorder pause
 lys-shell recorder resume
 lys-shell recorder status
+lys-shell recorder replay start    # arm the instant replay
+lys-shell recorder replay save     # write the last seconds, print the file
+lys-shell recorder replay stop     # disarm it and free its memory
 ```
+
+The instant replay keeps the last `modules.recorder.replay.seconds` (30 by
+default) of an output encoded in memory: video cut on its keyframes, which come
+every 2 s, and the configured audio. `replay save` writes from the oldest
+keyframe to now into `lys-shell-replay-<time>.<format>` in the output directory,
+through a temporary file renamed into place, and the capture goes on without
+losing a frame. The memory is the encoded bitrate times the seconds plus one
+keyframe interval; the recorder dropdown shows it, and the bar icon turns to
+`icon-replay` while only the replay runs. `replay.enable: true` arms it when
+the shell starts; `replay.output` is `focused` or an output name. A normal
+recording runs beside it on its own encoder session, so it keeps the output or
+region picked for it and can pause without cutting the replay.
 
 Screenshots:
 

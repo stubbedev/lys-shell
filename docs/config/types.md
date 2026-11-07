@@ -1303,6 +1303,29 @@ Container format / codec preset for recordings.
 | `"mp4"` | H.264 in an MP4 container. |
 | `"mkv"` | H.264 in a Matroska container. |
 
+## RecorderReplayConfig {#recorder-replay-config}
+
+The instant replay: while armed it captures an output and keeps the
+last `seconds` of encoded video and audio in memory, cut on keyframes,
+so `lys-shell recorder replay save` writes what just happened to a file
+in the output directory without stopping. Memory grows with the
+encoded bitrate times `seconds`, and the recorder dropdown shows it.
+Controllable from the CLI: `lys-shell recorder replay start|stop|save`.
+
+| Field | Description |
+|---|---|
+| `enable` | Arm the instant replay at start and whenever this is switched on. |
+| `seconds` | Seconds a save writes, plus at most one 2 s keyframe interval. |
+| `output` | Output captured: `focused` (when armed) or a name such as `DP-1`. |
+
+## ReplaySeconds {#replay-seconds}
+
+Seconds of instant replay, clamped to 5-600.
+
+Number in `[5, 600]`.
+
+Serialises as `uint32`.
+
 ## RestartDelay {#restart-delay}
 
 Restart delay in milliseconds, clamped to >= 1.

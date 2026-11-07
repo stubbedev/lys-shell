@@ -40,6 +40,7 @@ bar-idle-stage-suspend = suspend
 bar-recorder-idle = Idle
 bar-recorder-recording = Recording
 bar-recorder-paused = Paused
+bar-recorder-replay = Replay armed
 
 ## Keybind Mode
 bar-keybind-mode-default = default

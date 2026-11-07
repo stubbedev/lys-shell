@@ -466,6 +466,9 @@ _lys-shell() {
             lys__shell__help__recorder,pause)
                 cmd="lys__shell__help__recorder__pause"
                 ;;
+            lys__shell__help__recorder,replay)
+                cmd="lys__shell__help__recorder__replay"
+                ;;
             lys__shell__help__recorder,resume)
                 cmd="lys__shell__help__recorder__resume"
                 ;;
@@ -480,6 +483,15 @@ _lys-shell() {
                 ;;
             lys__shell__help__recorder,toggle)
                 cmd="lys__shell__help__recorder__toggle"
+                ;;
+            lys__shell__help__recorder__replay,save)
+                cmd="lys__shell__help__recorder__replay__save"
+                ;;
+            lys__shell__help__recorder__replay,start)
+                cmd="lys__shell__help__recorder__replay__start"
+                ;;
+            lys__shell__help__recorder__replay,stop)
+                cmd="lys__shell__help__recorder__replay__stop"
                 ;;
             lys__shell__help__screenshot,output)
                 cmd="lys__shell__help__screenshot__output"
@@ -985,6 +997,9 @@ _lys-shell() {
             lys__shell__recorder,pause)
                 cmd="lys__shell__recorder__pause"
                 ;;
+            lys__shell__recorder,replay)
+                cmd="lys__shell__recorder__replay"
+                ;;
             lys__shell__recorder,resume)
                 cmd="lys__shell__recorder__resume"
                 ;;
@@ -1006,6 +1021,9 @@ _lys-shell() {
             lys__shell__recorder__help,pause)
                 cmd="lys__shell__recorder__help__pause"
                 ;;
+            lys__shell__recorder__help,replay)
+                cmd="lys__shell__recorder__help__replay"
+                ;;
             lys__shell__recorder__help,resume)
                 cmd="lys__shell__recorder__help__resume"
                 ;;
@@ -1020,6 +1038,39 @@ _lys-shell() {
                 ;;
             lys__shell__recorder__help,toggle)
                 cmd="lys__shell__recorder__help__toggle"
+                ;;
+            lys__shell__recorder__help__replay,save)
+                cmd="lys__shell__recorder__help__replay__save"
+                ;;
+            lys__shell__recorder__help__replay,start)
+                cmd="lys__shell__recorder__help__replay__start"
+                ;;
+            lys__shell__recorder__help__replay,stop)
+                cmd="lys__shell__recorder__help__replay__stop"
+                ;;
+            lys__shell__recorder__replay,help)
+                cmd="lys__shell__recorder__replay__help"
+                ;;
+            lys__shell__recorder__replay,save)
+                cmd="lys__shell__recorder__replay__save"
+                ;;
+            lys__shell__recorder__replay,start)
+                cmd="lys__shell__recorder__replay__start"
+                ;;
+            lys__shell__recorder__replay,stop)
+                cmd="lys__shell__recorder__replay__stop"
+                ;;
+            lys__shell__recorder__replay__help,help)
+                cmd="lys__shell__recorder__replay__help__help"
+                ;;
+            lys__shell__recorder__replay__help,save)
+                cmd="lys__shell__recorder__replay__help__save"
+                ;;
+            lys__shell__recorder__replay__help,start)
+                cmd="lys__shell__recorder__replay__help__start"
+                ;;
+            lys__shell__recorder__replay__help,stop)
+                cmd="lys__shell__recorder__replay__help__stop"
                 ;;
             lys__shell__screenshot,help)
                 cmd="lys__shell__screenshot__help"
@@ -2900,7 +2951,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__help__recorder)
-            opts="start stop toggle pause resume status"
+            opts="start stop toggle pause resume status replay"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2916,6 +2967,62 @@ _lys-shell() {
         lys__shell__help__recorder__pause)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__recorder__replay)
+            opts="start stop save"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__recorder__replay__save)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__recorder__replay__start)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__help__recorder__replay__stop)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -5588,7 +5695,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__recorder)
-            opts="-h --help start stop toggle pause resume status help"
+            opts="-h --help start stop toggle pause resume status replay help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -5602,7 +5709,7 @@ _lys-shell() {
             return 0
             ;;
         lys__shell__recorder__help)
-            opts="start stop toggle pause resume status help"
+            opts="start stop toggle pause resume status replay help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -5632,6 +5739,62 @@ _lys-shell() {
         lys__shell__recorder__help__pause)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__help__replay)
+            opts="start stop save"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__help__replay__save)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__help__replay__start)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__help__replay__stop)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -5716,6 +5879,132 @@ _lys-shell() {
         lys__shell__recorder__pause)
             opts="-h --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay)
+            opts="-h --help start stop save help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__help)
+            opts="start stop save help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__help__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__help__save)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__help__start)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__help__stop)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 5 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__save)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__start)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        lys__shell__recorder__replay__stop)
+            opts="-h --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi

@@ -1,0 +1,6 @@
+Arm the instant replay
+
+Usage: lys-shell recorder replay start
+
+Options:
+  -h, --help  Print help

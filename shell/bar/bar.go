@@ -410,7 +410,8 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 		if !ok {
 			log.Print("recorder: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path; a picked source is not remembered")
 		}
-		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, logicalOutputSize(s.application, s.sess.Outputs), stateDir),
+		focus := screenshot.CompositorFocus{Hyprland: s.ctx.Hyprland}
+		recState := recorder.NewState(recorder.NewGPUEngine(sharepicker.NewClient(conn), audio, logicalOutputSize(s.application, s.sess.Outputs), focus.FocusedOutput, stateDir),
 			func() config.RecorderConfig { return s.current.Load().Recorder },
 			recorder.Hooks{Toast: func(label, icon string, ms uint32) {
 				if o := s.osdRef.Load(); o != nil {
@@ -418,13 +419,13 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 				}
 			}, Notify: desktopnotify.Notify})
 		s.ctx.Recorder = recState
+		recState.ConfigureReplay(s.current.Load().Recorder.Replay.Enable)
 		if release, err := recorder.NewDaemon(recState).Export(conn); err == nil {
 			s.down.add(release)
 		} else {
 			log.Printf("recorder: daemon: %v", err)
 		}
 		floor := func() float64 { return float64(s.current.Load().Brightness.MinBrightness) }
-		focus := screenshot.CompositorFocus{Hyprland: s.ctx.Hyprland}
 		if release, err := brightness.NewDaemon(backlights, focus.FocusedOutput, floor).Export(conn); err == nil {
 			s.down.add(release)
 		} else {
@@ -708,6 +709,9 @@ func (s *shellStart) mount() {
 			}
 			if popupHost != nil {
 				popupHost.SetConfig(next)
+			}
+			if baseCtx.Recorder != nil {
+				baseCtx.Recorder.ConfigureReplay(next.Recorder.Replay.Enable)
 			}
 			if baseCtx.Clipboard != nil {
 				reconfigureClipboard(baseCtx.Clipboard, next.Clipboard)

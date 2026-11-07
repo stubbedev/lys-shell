@@ -1,0 +1,12 @@
+Instant replay: keep the last seconds in memory and save them on demand
+
+Usage: lys-shell recorder replay <COMMAND>
+
+Commands:
+  start  Arm the instant replay
+  stop   Disarm the instant replay and free its memory
+  save   Save the last seconds to a file and print its path
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

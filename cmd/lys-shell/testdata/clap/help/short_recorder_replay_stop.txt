@@ -1,0 +1,6 @@
+Disarm the instant replay and free its memory
+
+Usage: lys-shell recorder replay stop
+
+Options:
+  -h, --help  Print help

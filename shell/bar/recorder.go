@@ -11,35 +11,40 @@ import (
 	"github.com/stubbedev/lys-shell/service/recorder"
 )
 
-// recorderLabel is helpers.rs's build_label: Idle/Paused/Recording
-// for {{ state }}, the H:MM:SS (or M:SS) clock for {{ elapsed }}, a
-// dash while idle.
-func recorderLabel(format string, active, paused bool, elapsedSecs uint32) string {
-	return jinja.RenderOr(format, recorderVars(active, paused, elapsedSecs))
+// recorderLabel is helpers.rs's build_label: Idle/Replay armed/Paused/
+// Recording for {{ state }}, the H:MM:SS (or M:SS) clock for
+// {{ elapsed }}, a dash while idle.
+func recorderLabel(format string, snap recorder.Change) string {
+	return jinja.RenderOr(format, recorderVars(snap))
 }
 
-func recorderVars(active, paused bool, elapsedSecs uint32) map[string]any {
+func recorderVars(snap recorder.Change) map[string]any {
 	state := i18n.T("bar-recorder-idle")
 	switch {
-	case active && paused:
+	case snap.Active && snap.Paused:
 		state = i18n.T("bar-recorder-paused")
-	case active:
+	case snap.Active:
 		state = i18n.T("bar-recorder-recording")
+	case snap.Replay == recorder.ReplayArmed:
+		state = i18n.T("bar-recorder-replay")
 	}
 	elapsed := "-"
-	if active {
-		elapsed = recorder.FormatElapsed(elapsedSecs)
+	if snap.Active {
+		elapsed = recorder.FormatElapsed(snap.ElapsedSecs)
 	}
 	return map[string]any{"state": state, "elapsed": elapsed}
 }
 
-// recorderIconName is helpers.rs's select_icon over the state trio.
+// recorderIconName is helpers.rs's select_icon over the states: a
+// recording wins over an armed replay.
 func recorderIconName(cfg config.RecorderConfig, snap recorder.Change) string {
 	switch {
 	case snap.Active && snap.Paused:
 		return cfg.Icons()[config.RecorderPaused].Name
 	case snap.Active, snap.Preparing:
 		return cfg.Icons()[config.RecorderRecording].Name
+	case snap.Replay == recorder.ReplayArmed:
+		return cfg.Icons()[config.RecorderReplay].Name
 	}
 	return cfg.Icons()[config.RecorderIdle].Name
 }
@@ -75,7 +80,7 @@ func (m *recorderModule) refresh() {
 	snap := m.src.Snapshot()
 	text := ""
 	if cfg.LabelShow {
-		text = recorderLabel(cfg.Format, snap.Active, snap.Paused, snap.ElapsedSecs)
+		text = recorderLabel(cfg.Format, snap)
 	}
 	m.btn.SetLabel(text)
 	if setter := m.icon; setter != nil {
@@ -84,6 +89,7 @@ func (m *recorderModule) refresh() {
 	// The pre-capture delay pulses the icon through the module root's
 	// recorder-preparing class.
 	setClass(m.chrome, "recorder-preparing", snap.Preparing)
+	setClass(m.chrome, "recorder-replay", snap.Replay == recorder.ReplayArmed)
 	// A failed start or a recording that died stays visible until the
 	// next start: recorder-failed tints the icon, the tooltip says why.
 	failed := recorderFailure(snap)

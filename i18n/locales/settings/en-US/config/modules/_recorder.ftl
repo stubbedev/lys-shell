@@ -11,6 +11,9 @@ settings-modules-recorder-icon-recording = Recording Icon
 settings-modules-recorder-icon-paused = Paused Icon
     .description = Icon while recording is paused
 
+settings-modules-recorder-icon-replay = Replay Icon
+    .description = Icon while only the instant replay is armed
+
 settings-modules-recorder-format = Format
     .description = Format string using placeholders: {"{{ state }}"}, {"{{ elapsed }}"}
 
@@ -100,8 +103,19 @@ settings-modules-recorder-scroll-down = Scroll Down
 enum-recorder-format-mp4 = MP4
 enum-recorder-format-mkv = MKV
 
+## Instant replay
+
+settings-modules-recorder-replay-enable = Instant Replay
+    .description = Keep the last seconds of an output in memory, ready to save
+
+settings-modules-recorder-replay-seconds = Replay Length
+    .description = Seconds of footage a replay save writes (5-600)
+
+settings-modules-recorder-replay-output = Replay Output
+    .description = The output captured: focused, or an output name such as DP-1
+
 ## Format placeholders
 
-settings-modules-recorder-format-placeholder-state = Recorder state (Idle, Recording, Paused)
+settings-modules-recorder-format-placeholder-state = Recorder state (Idle, Replay armed, Recording, Paused)
 
 settings-modules-recorder-format-placeholder-elapsed = Elapsed recording time as M:SS or H:MM:SS (- while idle)

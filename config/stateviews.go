@@ -9,6 +9,7 @@ const (
 	RecorderIdle      = "idle"
 	RecorderRecording = "recording"
 	RecorderPaused    = "paused"
+	RecorderReplay    = "replay"
 )
 
 // Icons maps each recorder state to its icon.
@@ -17,6 +18,7 @@ func (c RecorderConfig) Icons() map[string]IconConfig {
 		RecorderIdle:      IconWith(c.IconShow, c.IconIdle, c.IconColor),
 		RecorderRecording: IconWith(c.IconShow, c.IconRecording, c.IconColor),
 		RecorderPaused:    IconWith(c.IconShow, c.IconPaused, c.IconColor),
+		RecorderReplay:    IconWith(c.IconShow, c.IconReplay, c.IconColor),
 	}
 }
 

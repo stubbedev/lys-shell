@@ -204,8 +204,8 @@ func TestRecorderSettingsAreItemCards(t *testing.T) {
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
 	cards := treetest.WithClass(v, "recorder-card")
-	if len(cards) != 2 {
-		t.Fatalf("recorder cards = %d, want audio and webcam", len(cards))
+	if len(cards) != 3 {
+		t.Fatalf("recorder cards = %d, want audio, webcam and instant replay", len(cards))
 	}
 	for _, c := range cards {
 		if !widget.HasClass(c, css.Card) || len(treetest.All[*widget.ItemGroup](c)) != 1 {
@@ -338,4 +338,31 @@ func TestRecorderShortCameraSelectKeepsItsWidth(t *testing.T) {
 // recordText is the record button's label.
 func recordText(v *recorderView) string {
 	return treetest.All[*widget.Label](v.recordFace)[0].Text()
+}
+
+// The instant replay card's switch writes replay.enable; while the
+// replay is off the memory reads a dash and Save is disabled; armed, the
+// memory follows the ring at each keyframe and Save writes a file.
+func TestRecorderDropdownInstantReplay(t *testing.T) {
+	ctx, log, engine := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
+	v := recorderDropdown(ctx).(*recorderView)
+	defer v.dropdownClosed()
+	if v.replaySave.Enabled() || v.replayMemory.Text() != "-" {
+		t.Errorf("off: save enabled %v, memory %q", v.replaySave.Enabled(), v.replayMemory.Text())
+	}
+	card := treetest.WithClass(v, "recorder-card")[2]
+	sw := treetest.First[*widget.Switch](t, card)
+	sw.SetOn(true)
+	if log.get(recorderPathReplay) != true {
+		t.Errorf("replay switch wrote %v", log.get(recorderPathReplay))
+	}
+	ctx.Recorder.StartReplay()
+	waitHeadless(t, "armed", func() bool { return v.replaySave.Enabled() })
+	rp := engine.Replays()[0]
+	rp.Keyframe(3 << 20)
+	waitHeadless(t, "the ring's memory", func() bool { return v.replayMemory.Text() == "3.0 MiB" })
+	v.replaySave.OnClick()
+	waitHeadless(t, "the save", func() bool { return len(rp.Saves()) == 1 })
+	ctx.Recorder.StopReplay()
+	waitHeadless(t, "off", func() bool { return !v.replaySave.Enabled() && v.replayMemory.Text() == "-" })
 }

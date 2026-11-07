@@ -91,15 +91,11 @@ type recordingParts struct {
 
 // recording is one running capture: a video goroutine capturing and
 // encoding at the frame rate, an audio goroutine mixing and encoding
-// every 20 ms, both writing to one muxer on one clock.
+// every 20 ms, both writing to one sink on one clock.
 type recording struct {
 	p    recordingParts
-	file *os.File
-	path string
 	term func(reason string)
-
-	muxMu sync.Mutex
-	mux   fileMuxer
+	sink sampleSink
 
 	// mu guards the clock and the mixer: the audio sources push from
 	// their own goroutines.
@@ -123,11 +119,88 @@ type recording struct {
 	videoFrames atomic.Uint64
 }
 
+// sampleSink is where a recording's encoded samples go, from both of
+// its loops at once: a file being muxed, or the replay ring.
+type sampleSink interface {
+	write(s mux.Sample, key bool) error
+	// close finishes the sink after the last sample.
+	close() error
+	// discard drops a sink whose recording failed to start.
+	discard()
+}
+
+// fileSink muxes the samples into a new file.
+type fileSink struct {
+	path string
+	file *os.File
+
+	mu  sync.Mutex
+	mux fileMuxer
+}
+
+// openFileSink creates path, failing when it exists, and starts
+// format's container in it.
+func openFileSink(path string, format config.RecorderFormat, tracks []mux.Track) (*fileSink, error) {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // the user's recording, readable as their other videos
+	if err != nil {
+		return nil, fmt.Errorf("recorder: create the output: %w", err)
+	}
+	s := &fileSink{path: path, file: file}
+	if s.mux, err = newMuxer(format, file, tracks...); err != nil {
+		s.discard()
+		return nil, fmt.Errorf("recorder: %s: %w", path, err)
+	}
+	return s, nil
+}
+
+func (s *fileSink) write(sample mux.Sample, _ bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.mux.WriteSample(sample); err != nil {
+		return fmt.Errorf("recorder: write %s: %w", s.path, err)
+	}
+	return nil
+}
+
+func (s *fileSink) close() error {
+	var errs []error
+	s.mu.Lock()
+	if err := s.mux.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("recorder: finalize %s: %w", s.path, err))
+	}
+	s.mu.Unlock()
+	if err := s.file.Sync(); err != nil {
+		errs = append(errs, fmt.Errorf("recorder: sync %s: %w", s.path, err))
+	}
+	if err := s.file.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("recorder: close %s: %w", s.path, err))
+	}
+	return errors.Join(errs...)
+}
+
+func (s *fileSink) discard() {
+	_ = s.file.Close()
+	_ = os.Remove(s.path)
+}
+
 // startRecording opens opts.OutputPath and starts recording parts into
 // it. On failure everything parts held is released and the file
 // removed.
-func startRecording(parts recordingParts, opts Options, term func(reason string)) (_ *recording, err error) {
-	r := &recording{p: parts, path: opts.OutputPath, term: term, stop: make(chan struct{})}
+func startRecording(parts recordingParts, opts Options, term func(reason string)) (*recording, error) {
+	return startPipeline(parts, term, func(tracks []mux.Track) (sampleSink, error) {
+		sink, err := openFileSink(opts.OutputPath, opts.Format, tracks)
+		if err != nil {
+			return nil, err
+		}
+		return sink, nil
+	})
+}
+
+// startPipeline starts recording parts into the sink open makes for
+// the recording's tracks. On failure everything parts held is
+// released, the sink discarded.
+func startPipeline(parts recordingParts, term func(reason string), open func([]mux.Track) (sampleSink, error)) (_ *recording, err error) {
+	r := &recording{p: parts, term: term, stop: make(chan struct{})}
 	defer func() {
 		if err != nil {
 			r.release()
@@ -142,12 +215,8 @@ func startRecording(parts recordingParts, opts Options, term func(reason string)
 		}
 		r.mixer = newMixer(len(parts.audio))
 	}
-	r.file, err = os.OpenFile(opts.OutputPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644) //nolint:gosec // the user's recording, readable as their other videos
-	if err != nil {
-		return nil, fmt.Errorf("recorder: create the output: %w", err)
-	}
-	if r.mux, err = newMuxer(opts.Format, r.file, tracks...); err != nil {
-		return nil, fmt.Errorf("recorder: %s: %w", opts.OutputPath, err)
+	if r.sink, err = open(tracks); err != nil {
+		return nil, err
 	}
 	r.clock = newActiveClock(parts.wall.Now())
 	for i, start := range parts.audio {
@@ -176,9 +245,8 @@ func (r *recording) release() {
 		r.p.cam.Close()
 	}
 	r.p.video.Close()
-	if r.file != nil {
-		_ = r.file.Close()
-		_ = os.Remove(r.path)
+	if r.sink != nil {
+		r.sink.discard()
 	}
 }
 
@@ -189,18 +257,9 @@ func (r *recording) fail(err error) {
 	r.failOnce.Do(func() { go r.term(err.Error()) })
 }
 
-func (r *recording) writeSample(s mux.Sample) error {
-	r.muxMu.Lock()
-	defer r.muxMu.Unlock()
-	if err := r.mux.WriteSample(s); err != nil {
-		return fmt.Errorf("recorder: write %s: %w", r.path, err)
-	}
-	return nil
-}
-
 func (r *recording) writeVideo(pkts []gpu.Packet) error {
 	for _, p := range pkts {
-		if err := r.writeSample(mux.Sample{Track: videoTrack, PTS: p.PTS, Data: p.Data}); err != nil {
+		if err := r.sink.write(mux.Sample{Track: videoTrack, PTS: p.PTS, Data: p.Data}, p.Key); err != nil {
 			return err
 		}
 		r.videoFrames.Add(1)
@@ -292,7 +351,7 @@ func (r *recording) audioLoop() {
 			if packet, err = r.opus.Encode(packet[:0], pcm); err != nil {
 				return fmt.Errorf("recorder: Opus-encode the audio at %v: %w", time.Duration(emitted)*audioFrameTime, err)
 			}
-			if err := r.writeSample(mux.Sample{Track: audioTrack, PTS: time.Duration(emitted) * audioFrameTime, Data: packet}); err != nil {
+			if err := r.sink.write(mux.Sample{Track: audioTrack, PTS: time.Duration(emitted) * audioFrameTime, Data: packet}, true); err != nil {
 				return err
 			}
 			emitted++
@@ -352,16 +411,8 @@ func (r *recording) finish() error {
 		errs = append(errs, err)
 	}
 	r.p.video.Close()
-	r.muxMu.Lock()
-	if err := r.mux.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("recorder: finalize %s: %w", r.path, err))
-	}
-	r.muxMu.Unlock()
-	if err := r.file.Sync(); err != nil {
-		errs = append(errs, fmt.Errorf("recorder: sync %s: %w", r.path, err))
-	}
-	if err := r.file.Close(); err != nil {
-		errs = append(errs, fmt.Errorf("recorder: close %s: %w", r.path, err))
+	if err := r.sink.close(); err != nil {
+		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
 }

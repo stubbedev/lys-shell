@@ -65,6 +65,9 @@ type Session interface {
 	// Start records the source with opts; term reports an unexpected
 	// end (a source disconnect, a full disk), never a requested Stop.
 	Start(opts Options, term func(reason string)) (Recording, error)
+	// StartReplay records the source with opts into a ring holding the
+	// last span; onKey runs after each keyframe enters it.
+	StartReplay(opts Options, span time.Duration, term func(reason string), onKey func()) (Replay, error)
 	Close()
 }
 
@@ -78,11 +81,25 @@ type Recording interface {
 	Stop() error
 }
 
+// Replay is one armed instant replay.
+type Replay interface {
+	// Save writes what the ring holds to path as format without
+	// stopping the capture.
+	Save(path string, format config.RecorderFormat) error
+	// Bytes is the memory the ring holds.
+	Bytes() uint64
+	// Stop ends the capture and frees the ring.
+	Stop() error
+}
+
 // Engine opens capture sessions.
 type Engine interface {
 	// OpenSession negotiates the source, showing the picker when no
 	// choice is remembered; ctx cancels it.
 	OpenSession(ctx context.Context, showCursor bool) (Session, error)
+	// OpenOutput opens the output named output, or the focused one for
+	// config.ReplayOutputFocused, without asking.
+	OpenOutput(output string, showCursor bool) (Session, error)
 }
 
 // Hooks are the user-facing reports: an OSD toast and a desktop
@@ -104,6 +121,10 @@ type Change struct {
 	// Error is why the last recording failed to start or ended on its
 	// own, "" once a new one starts.
 	Error string
+	// Replay is the instant replay's state, ReplayBytes the memory its
+	// ring holds while armed.
+	Replay      ReplayStatus
+	ReplayBytes uint64
 }
 
 // State is the recorder service. Safe for concurrent use.
@@ -131,6 +152,15 @@ type State struct {
 	// newTicker starts the elapsed-seconds clock: time.NewTicker's
 	// channel and stop, a hand-driven one in tests.
 	newTicker func(time.Duration) (<-chan time.Time, func())
+
+	replayStatus  ReplayStatus
+	replay        Replay
+	replaySession Session
+	// replayGen numbers each arming, so a late report from an earlier
+	// one is ignored.
+	replayGen uint64
+	// replayWanted is the last modules.recorder.replay.enable applied.
+	replayWanted bool
 }
 
 // NewState builds the service over an engine, reading options from
@@ -158,7 +188,7 @@ func (s *State) Snapshot() Change {
 }
 
 func (s *State) snapshotLocked() Change {
-	return Change{
+	c := Change{
 		Status:      s.status,
 		Active:      s.active,
 		Paused:      s.paused,
@@ -166,7 +196,12 @@ func (s *State) snapshotLocked() Change {
 		ElapsedSecs: s.elapsed,
 		OutputPath:  s.output,
 		Error:       s.lastErr,
+		Replay:      s.replayStatus,
 	}
+	if s.replay != nil {
+		c.ReplayBytes = s.replay.Bytes()
+	}
+	return c
 }
 
 func (s *State) notify() { s.changes.Publish(s.Snapshot()) }
@@ -459,11 +494,22 @@ func BuildOptions(cfg config.RecorderConfig, now time.Time) Options {
 // the configured directory, else the videos directory; a format's name
 // is its extension.
 func OutputPath(configuredDir string, format config.RecorderFormat, now time.Time) string {
+	return outputFile(configuredDir, version.Name+"-"+now.Format("20060102-150405"), format)
+}
+
+// ReplayPath is where a replay saved at now goes: lys-shell-replay-<local
+// timestamp to the millisecond>.<format>, beside the recordings, so two
+// saves in one second never replace each other.
+func ReplayPath(configuredDir string, format config.RecorderFormat, now time.Time) string {
+	return outputFile(configuredDir, version.Name+"-replay-"+now.Format("20060102-150405.000"), format)
+}
+
+func outputFile(configuredDir, stem string, format config.RecorderFormat) string {
 	dir := configuredDir
 	if dir == "" {
 		dir = VideosDir()
 	}
-	return filepath.Join(dir, version.Name+"-"+now.Format("20060102-150405")+"."+string(format))
+	return filepath.Join(dir, stem+"."+string(format))
 }
 
 // VideosDir is videos_dir: $XDG_VIDEOS_DIR, else $HOME/Videos.

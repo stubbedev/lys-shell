@@ -85,7 +85,7 @@ func TestRecordsTransformedOutputsAndRegionsUpright(t *testing.T) {
 				if target.Kind == sharepicker.TargetRegion {
 					want = image.Rect(int(target.X)*2, int(target.Y)*2, int(target.X+target.Width)*2, int(target.Y+target.Height)*2)
 				}
-				e := NewGPUEngine(&fakePicker{reply: "/" + target.Payload()}, nil, layout, "")
+				e := NewGPUEngine(&fakePicker{reply: "/" + target.Payload()}, nil, layout, noFocus, "")
 				s, err := e.OpenSession(context.Background(), false)
 				if err != nil {
 					t.Fatal(err)

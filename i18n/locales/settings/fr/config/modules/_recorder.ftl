@@ -4,6 +4,14 @@ settings-modules-recorder-icon-recording = Icône d'enregistrement
     .description = Icône pendant l'enregistrement
 settings-modules-recorder-icon-paused = Icône de pause
     .description = Icône lorsque l'enregistrement est en pause
+settings-modules-recorder-icon-replay = Icône de relecture
+    .description = Icône lorsque seule la relecture instantanée est armée
+settings-modules-recorder-replay-enable = Relecture instantanée
+    .description = Garder en mémoire les dernières secondes d'une sortie, prêtes à être enregistrées
+settings-modules-recorder-replay-seconds = Durée de la relecture
+    .description = Secondes de vidéo qu'écrit un enregistrement de relecture (5-600)
+settings-modules-recorder-replay-output = Sortie de la relecture
+    .description = La sortie capturée : focused, ou un nom de sortie comme DP-1
 settings-modules-recorder-format = Format
     .description = Chaîne de format. Espaces réservés : {"{{ state }}"}, {"{{ elapsed }}"}
 settings-modules-recorder-microphone = Microphone
@@ -65,6 +73,6 @@ enum-recorder-format-mkv = MKV
 
 ## Format placeholders
 
-settings-modules-recorder-format-placeholder-state = État de l'enregistreur (inactif, enregistrement, pause)
+settings-modules-recorder-format-placeholder-state = État de l'enregistreur (inactif, relecture armée, enregistrement, pause)
 
 settings-modules-recorder-format-placeholder-elapsed = Durée d'enregistrement écoulée en M:SS ou H:MM:SS (- si inactif)

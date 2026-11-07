@@ -6701,6 +6701,7 @@
             "icon-idle": "ld-video-symbolic",
             "icon-paused": "ld-circle-pause-symbolic",
             "icon-recording": "ld-circle-dot-symbolic",
+            "icon-replay": "ld-history-symbolic",
             "icon-show": true,
             "label-color": "fg-default",
             "label-max-length": 0,
@@ -6711,6 +6712,11 @@
             "middle-click": "",
             "output-directory": "",
             "output-format": "mkv",
+            "replay": {
+              "enable": false,
+              "output": "focused",
+              "seconds": 30
+            },
             "right-click": "dropdown:recorder",
             "scroll-down": "",
             "scroll-up": "",
@@ -8794,10 +8800,10 @@
         "format": {
           "$ref": "#/$defs/string",
           "default": "{{ elapsed }}",
-          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ state }}` - Recorder state (Idle, Recording, Paused)\n- `{{ elapsed }}` - Elapsed recording time as M:SS or H:MM:SS (- while idle)",
+          "description": "Format string for the label.\n\n## Placeholders\n\n- `{{ state }}` - Recorder state (Idle, Replay armed, Recording, Paused)\n- `{{ elapsed }}` - Elapsed recording time as M:SS or H:MM:SS (- while idle)",
           "x-placeholders": [
             {
-              "description": "Recorder state (Idle, Recording, Paused)",
+              "description": "Recorder state (Idle, Replay armed, Recording, Paused)",
               "name": "state",
               "sample": "Recording",
               "token": "{{ state }}"
@@ -8839,6 +8845,11 @@
           "$ref": "#/$defs/string",
           "default": "ld-circle-dot-symbolic",
           "description": "Icon while recording."
+        },
+        "icon-replay": {
+          "$ref": "#/$defs/string",
+          "default": "ld-history-symbolic",
+          "description": "Icon while only the instant replay is armed."
         },
         "icon-show": {
           "$ref": "#/$defs/boolean",
@@ -8889,6 +8900,15 @@
           "$ref": "#/$defs/RecorderFormat",
           "default": "mkv",
           "description": "Container format / codec preset."
+        },
+        "replay": {
+          "$ref": "#/$defs/RecorderReplayConfig",
+          "default": {
+            "enable": false,
+            "output": "focused",
+            "seconds": 30
+          },
+          "description": "Instant replay: keep the last seconds of an output encoded in memory\nand save them on demand."
         },
         "right-click": {
           "$ref": "#/$defs/ClickAction",
@@ -8962,6 +8982,34 @@
           "type": "string"
         }
       ]
+    },
+    "RecorderReplayConfig": {
+      "description": "The instant replay: while armed it captures an output and keeps the\nlast `seconds` of encoded video and audio in memory, cut on keyframes,\nso `lys-shell recorder replay save` writes what just happened to a file\nin the output directory without stopping. Memory grows with the\nencoded bitrate times `seconds`, and the recorder dropdown shows it.\nControllable from the CLI: `lys-shell recorder replay start|stop|save`.",
+      "properties": {
+        "enable": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Arm the instant replay at start and whenever this is switched on."
+        },
+        "output": {
+          "$ref": "#/$defs/string",
+          "default": "focused",
+          "description": "Output captured: `focused` (when armed) or a name such as `DP-1`."
+        },
+        "seconds": {
+          "$ref": "#/$defs/ReplaySeconds",
+          "default": 30,
+          "description": "Seconds a save writes, plus at most one 2 s keyframe interval."
+        }
+      },
+      "type": "object"
+    },
+    "ReplaySeconds": {
+      "description": "Seconds of instant replay, clamped to 5-600.",
+      "format": "uint32",
+      "maximum": 600,
+      "minimum": 5,
+      "type": "integer"
     },
     "RestartDelay": {
       "description": "Restart delay in milliseconds, clamped to >= 1.",
@@ -12577,6 +12625,7 @@
           "icon-idle": "ld-video-symbolic",
           "icon-paused": "ld-circle-pause-symbolic",
           "icon-recording": "ld-circle-dot-symbolic",
+          "icon-replay": "ld-history-symbolic",
           "icon-show": true,
           "label-color": "fg-default",
           "label-max-length": 0,
@@ -12587,6 +12636,11 @@
           "middle-click": "",
           "output-directory": "",
           "output-format": "mkv",
+          "replay": {
+            "enable": false,
+            "output": "focused",
+            "seconds": 30
+          },
           "right-click": "dropdown:recorder",
           "scroll-down": "",
           "scroll-up": "",
