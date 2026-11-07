@@ -92,7 +92,7 @@ func TestTheIndicatorShowsWhileAShareRunsAndStopEndsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sm := m.(*screenShareModule)
+	sm := m.(*countIndicator)
 	defer sm.Stop()
 	chrome := widget.NewBox(widget.Row, 0, 0)
 	onHeadlessLoop(func() bool { sm.setChrome(chrome); return true })
@@ -132,7 +132,7 @@ func TestTheIndicatorStaysWhileAnotherShareRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sm := m.(*screenShareModule)
+	sm := m.(*countIndicator)
 	defer sm.Stop()
 	chrome := widget.NewBox(widget.Row, 0, 0)
 	onHeadlessLoop(func() bool { sm.setChrome(chrome); return true })

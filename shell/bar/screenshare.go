@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -35,79 +34,16 @@ var screenShareSource = sync.OnceValues(func() (shareSource, error) {
 	return screenshare.Follow(conn)
 })
 
-// screenShareModule is the screen share indicator: shown while the
-// portal streams the screen or a window, the number of shares beside
-// its icon under label-show.
-type screenShareModule struct {
-	ctx    ModuleContext
-	btn    *barButton
-	chrome moduleChrome
-	count  int
-	stop   func()
-}
-
+// newScreenShare is the screen share indicator: shown while the portal
+// streams the screen or a window, the number of shares beside its icon
+// under label-show.
 func newScreenShare(ctx ModuleContext) (Module, error) {
 	src, err := screenShareSource()
 	if err != nil {
 		return nil, fmt.Errorf("screen-share: %w", err)
 	}
 	cfg := ctx.Config.ScreenShare
-	m := &screenShareModule{ctx: ctx}
-	m.btn = newBarButton(ctx, moduleIcon(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor)), "")
-	m.apply(len(src.List()))
-	ticks, unsubscribe := src.Subscribe()
-	done := make(chan struct{})
-	m.stop = func() {
-		unsubscribe()
-		close(done)
-	}
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case _, ok := <-ticks:
-				if !ok {
-					return
-				}
-			}
-			count := len(src.List())
-			m.ctx.Invoke(func() { m.apply(count) })
-		}
-	}()
-	return m, nil
-}
-
-// apply shows count shares, the module hidden at none.
-func (m *screenShareModule) apply(count int) {
-	m.count = count
-	text := ""
-	if m.ctx.Config.ScreenShare.LabelShow {
-		text = strconv.Itoa(count)
-	}
-	m.btn.SetLabel(text)
-	m.showChrome()
-}
-
-func (m *screenShareModule) showChrome() {
-	if m.chrome != nil {
-		m.chrome.SetVisible(m.count > 0)
-	}
-}
-
-func (m *screenShareModule) setChrome(c moduleChrome) {
-	m.chrome = c
-	m.showChrome()
-}
-
-func (m *screenShareModule) Root() widget.Widget { return m.btn }
-
-// Stop unsubscribes from the shares.
-func (m *screenShareModule) Stop() {
-	if m.stop != nil {
-		m.stop()
-		m.stop = nil
-	}
+	return newCountIndicator(ctx, config.IconWith(cfg.IconShow, cfg.Icon, cfg.IconColor), cfg.LabelShow, func() int { return len(src.List()) }, src.Subscribe), nil
 }
 
 // screenShareView is the screen share dropdown: a row per share, its app
@@ -224,19 +160,5 @@ func (v *screenShareView) follow(life context.Context) {
 	if v.src == nil {
 		return
 	}
-	ticks, stop := v.src.Subscribe()
-	go func() {
-		defer stop()
-		for {
-			select {
-			case <-life.Done():
-				return
-			case _, ok := <-ticks:
-				if !ok {
-					return
-				}
-				v.ctx.Invoke(v.rebuild)
-			}
-		}
-	}()
+	followTicks(life, v.src.Subscribe, func() { v.ctx.Invoke(v.rebuild) })
 }
