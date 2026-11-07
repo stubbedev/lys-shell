@@ -72,10 +72,11 @@ type notifier struct {
 	// listening is whether the daemon's signals reach handle; without
 	// them no ask could be answered.
 	listening atomic.Bool
+	sounds    *soundCache
 }
 
 func newNotifier(conn *dbus.Conn) *notifier {
-	return &notifier{conn: conn, byDaemon: map[uint32]shown{}, byKey: map[portalKey]uint32{}, asks: map[uint32]chan string{}, tokens: map[uint32]string{}}
+	return &notifier{conn: conn, byDaemon: map[uint32]shown{}, byKey: map[portalKey]uint32{}, asks: map[uint32]chan string{}, tokens: map[uint32]string{}, sounds: newSoundCache()}
 }
 
 func (n *notifier) iface() dbusx.Interface {
@@ -83,11 +84,8 @@ func (n *notifier) iface() dbusx.Interface {
 		Name:    NotificationIface,
 		Methods: notificationObject{n},
 		Properties: dbusx.Getters{
-			"version": func() any { return uint32(2) },
-			// The daemon treats no category or button purpose specially.
-			"SupportedOptions": func() any {
-				return Vardict{"category": dbus.MakeVariant([]string{}), "button-purpose": dbus.MakeVariant([]string{})}
-			},
+			"version":          func() any { return uint32(2) },
+			"SupportedOptions": func() any { return n.supportedOptions() },
 		},
 	}
 }
@@ -190,6 +188,19 @@ func (n *notifier) handle(s *dbus.Signal) {
 			parameter = append(parameter, dbus.MakeVariant(Vardict{"activation-token": dbus.MakeVariant(token)}))
 		}
 		_ = n.conn.Emit(ObjectPath, NotificationIface+".ActionInvoked", sh.key.appID, sh.key.id, action.name, parameter)
+	case notifications.Interface + ".NotificationReplied":
+		if len(s.Body) != 2 {
+			return
+		}
+		id, _ := s.Body[0].(uint32)
+		text, _ := s.Body[1].(string)
+		n.mu.Lock()
+		sh, ok := n.byDaemon[id]
+		action, known := sh.actions[notifications.InlineReplyActionID]
+		n.mu.Unlock()
+		if ok && known {
+			_ = n.conn.Emit(ObjectPath, NotificationIface+".ActionInvoked", sh.key.appID, sh.key.id, action.name, []dbus.Variant{dbus.MakeVariant(text)})
+		}
 	case notifications.Interface + ".NotificationClosed":
 		if len(s.Body) != 2 {
 			return
@@ -263,8 +274,8 @@ type notificationObject struct{ n *notifier }
 // A daemon that refuses it fails the call.
 func (o notificationObject) AddNotification(appID, id string, notification Vardict) *dbus.Error {
 	key := portalKey{appID, id}
-	hints := notificationHints(appID, notification)
-	actions, labels := notificationActions(notification)
+	buttons := notificationActions(notification)
+	hints := o.n.notificationHints(appID, notification, buttons)
 	o.n.mu.Lock()
 	replaces := o.n.byKey[key]
 	o.n.mu.Unlock()
@@ -276,13 +287,13 @@ func (o notificationObject) AddNotification(appID, id string, notification Vardi
 		replaces = 0
 	}
 	expire := int32(-1)
-	if slices.Contains(stringList(notification, "display-hint"), "persistent") {
+	if slices.Contains(stringList(notification, "display-hint"), "persistent") || ringing(notification) {
 		expire = 0
 	}
 	var daemonID uint32
 	err := o.n.daemon().CallWithContext(context.Background(), notifications.Interface+".Notify", 0,
 		appID, replaces, notificationIcon(notification), stringOr(notification, "title", appID),
-		notificationBody(notification), labels, hints, expire,
+		notificationBody(notification), buttons.labels, hints, expire,
 	).Store(&daemonID)
 	if err != nil {
 		return dbusx.Failed(fmt.Sprintf("show the notification: %v", err))
@@ -291,7 +302,7 @@ func (o notificationObject) AddNotification(appID, id string, notification Vardi
 	if replaces != 0 && replaces != daemonID {
 		delete(o.n.byDaemon, replaces)
 	}
-	o.n.byDaemon[daemonID] = shown{key: key, actions: actions}
+	o.n.byDaemon[daemonID] = shown{key: key, actions: buttons.actions}
 	o.n.byKey[key] = daemonID
 	o.n.mu.Unlock()
 	return nil
@@ -312,14 +323,26 @@ func (o notificationObject) RemoveNotification(appID, id string) *dbus.Error {
 	return nil
 }
 
+// notificationButtons is a portal notification's actions as the daemon
+// takes them: what each key stands for, the [key, label, ...] list, the
+// purposes of the keys that have one, and the reply field's placeholder.
+type notificationButtons struct {
+	actions     map[string]portalAction
+	labels      []string
+	purposes    map[string]string
+	placeholder string
+}
+
 // notificationActions maps the default action to the daemon's body-click
-// key "default" and each labelled button to a key of its own; it returns
-// what each key stands for and the freedesktop [key, label, ...] list.
-// A button without a label (a purpose-only one, such as
-// system.custom-alert) is not shown.
-func notificationActions(notification Vardict) (map[string]portalAction, []string) {
+// key "default", an im.reply-with-text button to its inline-reply action
+// (the label becoming the field's placeholder), and each other labelled
+// button to a key of its own, its purpose kept. A button without a label
+// (a purpose-only one, such as system.custom-alert) is not shown.
+func notificationActions(notification Vardict) notificationButtons {
 	actions := map[string]portalAction{}
 	labels := []string{}
+	purposes := map[string]string{}
+	placeholder := ""
 	if def, ok := optString(notification, "default-action"); ok && def != "" {
 		actions[notifications.DefaultActionID] = portalAction{name: def, target: optVariant(notification, "default-action-target")}
 		labels = append(labels, notifications.DefaultActionID, "")
@@ -332,10 +355,16 @@ func notificationActions(notification Vardict) (map[string]portalAction, []strin
 			continue
 		}
 		key := "button-" + strconv.Itoa(i)
+		purpose, _ := optString(b, "purpose")
+		if purpose == replyPurpose {
+			key, placeholder = notifications.InlineReplyActionID, label
+		} else if purpose != "" {
+			purposes[key] = purpose
+		}
 		actions[key] = portalAction{name: action, target: optVariant(b, "target")}
 		labels = append(labels, key, label)
 	}
-	return actions, labels
+	return notificationButtons{actions: actions, labels: labels, purposes: purposes, placeholder: placeholder}
 }
 
 // optVariant is a v option, nil when absent.
@@ -364,8 +393,14 @@ func notificationBody(notification Vardict) string {
 // the app for grouping, priority as urgency, the category, the transient
 // and persistent display hints, a silent sound, and a file or bytes icon
 // as image-data.
-func notificationHints(appID string, notification Vardict) map[string]dbus.Variant {
+func (n *notifier) notificationHints(appID string, notification Vardict, buttons notificationButtons) map[string]dbus.Variant {
 	hints := map[string]dbus.Variant{}
+	if buttons.placeholder != "" {
+		hints["x-kde-reply-placeholder-text"] = dbus.MakeVariant(buttons.placeholder)
+	}
+	if len(buttons.purposes) > 0 {
+		hints[notifications.ActionPurposesHint] = dbus.MakeVariant(buttons.purposes)
+	}
 	if appID != "" {
 		hints["desktop-entry"] = dbus.MakeVariant(appID)
 	}
@@ -379,12 +414,13 @@ func notificationHints(appID string, notification Vardict) map[string]dbus.Varia
 	if slices.Contains(display, "transient") {
 		hints["transient"] = dbus.MakeVariant(true)
 	}
-	if slices.Contains(display, "persistent") {
+	if slices.Contains(display, "persistent") || ringing(notification) {
 		hints["resident"] = dbus.MakeVariant(true)
 	}
-	if sound, ok := notification["sound"].Value().(string); ok && sound == "silent" {
-		hints["suppress-sound"] = dbus.MakeVariant(true)
+	if ringing(notification) {
+		hints["urgency"] = dbus.MakeVariant(byte(2))
 	}
+	n.soundHints(appID, notification, hints)
 	if img, err := iconImage(notification); err != nil {
 		warnf("notification: icon for %s: %v", appID, err)
 	} else if img != nil {

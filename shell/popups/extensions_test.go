@@ -1,10 +1,12 @@
 package popups
 
 import (
+	"slices"
 	"testing"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/notifications"
@@ -118,5 +120,29 @@ func TestOnlyWebAndMailLinksOpen(t *testing.T) {
 	}
 	if len(opened) != 2 || opened[0] != "https://example.com/a" || opened[1] != "mailto:ada@example.com" {
 		t.Errorf("opened %v, want the web and mail links only", opened)
+	}
+}
+
+func TestCallButtonsAreStyledByTheirPurpose(t *testing.T) {
+	s := newSurface(t, config.DefaultsNotification())
+	purposes := map[string]string{"accept": "call.accept", "decline": "call.decline"}
+	id := s.svc.NotifyHints("chat", 0, "", "Ada calling", "", []string{"accept", "Accept", "decline", "Decline", "later", "Later"},
+		map[string]dbus.Variant{notifications.ActionPurposesHint: dbus.MakeVariant(purposes)}, 0)
+	s.sync()
+	c := s.p.cards[id]
+	var classes [][]string
+	for _, row := range c.actions.Children() {
+		for _, b := range row.(*widget.Box).Children() {
+			classes = append(classes, b.(*widget.Button).Classes())
+		}
+	}
+	if len(classes) != 3 {
+		t.Fatalf("%d buttons", len(classes))
+	}
+	if !slices.Contains(classes[0], css.SuggestedAction) || !slices.Contains(classes[1], css.DestructiveAction) {
+		t.Errorf("accept %v, decline %v", classes[0], classes[1])
+	}
+	if slices.Contains(classes[2], css.SuggestedAction) || slices.Contains(classes[2], css.DestructiveAction) {
+		t.Errorf("a button without a purpose styled %v", classes[2])
 	}
 }

@@ -29,12 +29,19 @@ func UrgencyFromByte(v byte) Urgency {
 	return UrgencyNormal
 }
 
-// Action is one notification action: the id ActionInvoked reports and
-// its label (core/types.rs's Action).
+// Action is one notification action: the id ActionInvoked reports, its
+// label (core/types.rs's Action), and what the button does when the
+// sender said (ActionPurposesHint), which styles it.
 type Action struct {
-	ID    string
-	Label string
+	ID      string
+	Label   string
+	Purpose string
 }
+
+// ActionPurposesHint is lys-shell's a{ss} hint from action id to the
+// button purpose a portal notification gave it (call.accept,
+// call.decline, call.hang-up).
+const ActionPurposesHint = "x-lys-action-purposes"
 
 // DefaultActionID is the spec's body-click action.
 const DefaultActionID = "default"
@@ -63,6 +70,7 @@ type hints struct {
 	progress         Progress
 	stackTag         string
 	replyPlaceholder string
+	purposes         map[string]string
 	soundFile        string
 	soundName        string
 	suppressSound    bool
@@ -87,6 +95,7 @@ func decodeHints(raw map[string]dbus.Variant, cache func(imageData) (string, boo
 	h.soundFile = soundFileHint(raw["sound-file"])
 	h.soundName, _ = raw["sound-name"].Value().(string)
 	h.suppressSound, _ = raw["suppress-sound"].Value().(bool)
+	h.purposes, _ = raw[ActionPurposesHint].Value().(map[string]string)
 	for _, key := range []string{"image-data", "image_data", "icon_data"} {
 		v, ok := raw[key]
 		if !ok {
@@ -205,4 +214,12 @@ func soundFileHint(v dbus.Variant) string {
 		return ""
 	}
 	return filepath.Clean(raw)
+}
+
+// withPurposes is actions with the purposes the hint gave their ids.
+func withPurposes(actions []Action, purposes map[string]string) []Action {
+	for i := range actions {
+		actions[i].Purpose = purposes[actions[i].ID]
+	}
+	return actions
 }

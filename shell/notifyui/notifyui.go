@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
+	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
@@ -302,4 +303,17 @@ func OpenLink(uri, token string) error {
 		cmd.Env = append(os.Environ(), "XDG_ACTIVATION_TOKEN="+token)
 	}
 	return spawn.Detached(cmd, "xdg-open")
+}
+
+// PurposeClass is the style class a button purpose gives an action
+// button: accepting a call is the suggested action, declining or hanging
+// up the destructive one; "" for any other.
+func PurposeClass(purpose string) string {
+	switch purpose {
+	case "call.accept":
+		return css.SuggestedAction
+	case "call.decline", "call.hang-up":
+		return css.DestructiveAction
+	}
+	return ""
 }

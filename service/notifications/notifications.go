@@ -464,7 +464,7 @@ func (s *Service) NotifyHints(appName string, replacesID uint32, appIcon, summar
 		AppIcon:          appIcon,
 		Summary:          summary,
 		Body:             body,
-		Actions:          ParseActions(actions),
+		Actions:          withPurposes(ParseActions(actions), h.purposes),
 		ExpireMS:         expireTimeout,
 		Added:            s.clock.Now(),
 		Urgency:          h.urgency,

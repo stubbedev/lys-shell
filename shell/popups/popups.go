@@ -631,6 +631,9 @@ func (p *Popups) actionRows(n *notifications.Notification, px float64) *widget.B
 			label.SetAlignment(render.AlignCenter)
 			b := widget.NewButton(label, 0, 0)
 			b.AddClass("notification-popup-action-btn", css.Outline, css.Small)
+			if class := notifyui.PurposeClass(a.Purpose); class != "" {
+				b.AddClass(class)
+			}
 			id, key := n.ID, a.ID
 			b.OnClick = func() { p.invokeAction(id, key) }
 			row.Append(b, true)

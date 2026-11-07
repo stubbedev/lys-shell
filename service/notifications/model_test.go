@@ -4,6 +4,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -16,7 +17,7 @@ func TestParseActions(t *testing.T) {
 		t.Errorf("nil = %v", got)
 	}
 	got := ParseActions([]string{"reply", "Reply", "delete", "Delete", "odd"})
-	want := []Action{{"reply", "Reply"}, {"delete", "Delete"}, {"odd", "odd"}}
+	want := []Action{{ID: "reply", Label: "Reply"}, {ID: "delete", Label: "Delete"}, {ID: "odd", Label: "odd"}}
 	if !slices.Equal(got, want) {
 		t.Errorf("= %v, want %v", got, want)
 	}
@@ -50,7 +51,7 @@ func rgbImage(w, h, stride int32) dbus.Variant {
 func TestDecodeHints(t *testing.T) {
 	none := func(imageData) (string, bool) { t.Error("cached without image data"); return "", false }
 	h := decodeHints(nil, none)
-	if h != (hints{urgency: UrgencyNormal}) {
+	if !reflect.DeepEqual(h, hints{urgency: UrgencyNormal}) {
 		t.Errorf("no hints = %+v, want normal urgency only", h)
 	}
 	h = decodeHints(map[string]dbus.Variant{
@@ -61,7 +62,7 @@ func TestDecodeHints(t *testing.T) {
 		"resident":      dbus.MakeVariant(true),
 	}, none)
 	want := hints{urgency: UrgencyCritical, imagePath: "/img.png", desktopEntry: "firefox", transient: true, resident: true}
-	if h != want {
+	if !reflect.DeepEqual(h, want) {
 		t.Errorf("hints = %+v, want %+v", h, want)
 	}
 	// Mistyped hints keep their defaults.
