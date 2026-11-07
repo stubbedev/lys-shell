@@ -23,6 +23,7 @@ const (
 	kindRemoteDesktop
 	kindGlobalShortcuts
 	kindInhibitMonitor
+	kindInputCapture
 )
 
 func (k sessionKind) String() string {
@@ -33,6 +34,8 @@ func (k sessionKind) String() string {
 		return "RemoteDesktop"
 	case kindGlobalShortcuts:
 		return "GlobalShortcuts"
+	case kindInputCapture:
+		return "InputCapture"
 	case kindInhibitMonitor:
 		return "Inhibit"
 	}

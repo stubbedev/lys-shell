@@ -34,6 +34,7 @@ type WM struct {
 	dispatched chan string
 	watching   chan struct{}
 	Events     chan string
+	capture    *captureFake
 }
 
 // Start serves the fake and advertises it. It answers a lys-wm with no
@@ -119,7 +120,8 @@ func (w *WM) Requests() []string {
 
 func (w *WM) serve(conn net.Conn, done <-chan struct{}) {
 	defer func() { _ = conn.Close() }()
-	line, err := bufio.NewReader(conn).ReadBytes('\n')
+	reader := bufio.NewReader(conn)
+	line, err := reader.ReadBytes('\n')
 	if err != nil {
 		return
 	}
@@ -149,6 +151,10 @@ func (w *WM) serve(conn net.Conn, done <-chan struct{}) {
 		w.dispatched <- req.Action
 	}
 	if _, err := conn.Write([]byte(answer + "\n")); err != nil {
+		return
+	}
+	if req.Request == "capture" && answer == ack {
+		w.serveCapture(conn, reader, done)
 		return
 	}
 	if req.Request != "watch" {

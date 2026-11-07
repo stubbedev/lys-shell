@@ -50,6 +50,7 @@ install -m 0644 lys-shell.service xdg-desktop-portal-lys-shell.service %{buildro
 
 install -d %{buildroot}%{_datadir}/xdg-desktop-portal/portals
 install -m 0644 lys-shell.portal %{buildroot}%{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
+install -m 0644 lys-shell-lys-wm.portal %{buildroot}%{_datadir}/xdg-desktop-portal/portals/lys-shell-lys-wm.portal
 install -m 0644 lys-shell-portals.conf %{buildroot}%{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
 install -d %{buildroot}%{_datadir}/dbus-1/services
 install -m 0644 org.freedesktop.impl.portal.desktop.lys.service %{buildroot}%{_datadir}/dbus-1/services/
@@ -87,6 +88,7 @@ install -m 0644 completions/lys-shell.fish %{buildroot}%{_datadir}/fish/vendor_c
 %{_userunitdir}/lys-shell.service
 %{_userunitdir}/xdg-desktop-portal-lys-shell.service
 %{_datadir}/xdg-desktop-portal/portals/lys-shell.portal
+%{_datadir}/xdg-desktop-portal/portals/lys-shell-lys-wm.portal
 %{_datadir}/xdg-desktop-portal/lys-shell-portals.conf
 %{_datadir}/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service
 %{_datadir}/dbus-1/services/dev.stubbe.lys.*.service

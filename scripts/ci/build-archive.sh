@@ -30,6 +30,7 @@ cp -R resources/icons/hicolor "${STAGING}/icons/"
 cp resources/lys-shell.service \
 	resources/dev.stubbe.lys.vpn-sso-callback.desktop \
 	resources/lys-shell.portal \
+	resources/lys-shell-lys-wm.portal \
 	resources/org.freedesktop.impl.portal.desktop.lys.service \
 	resources/dev.stubbe.lys.*.service \
 	resources/xdg-desktop-portal-lys-shell.service \

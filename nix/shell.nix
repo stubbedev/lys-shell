@@ -57,7 +57,7 @@
         # The binaries dlopen these through purego, with the GPU driver
         # setup's own; the ScreenCast tests add libpipewire, whose streams
         # are the reference consumers the portal is checked against, and the
-        # RemoteDesktop tests libei, the reference EIS client.
+        # RemoteDesktop and InputCapture tests libei, the reference EIS client.
         LD_LIBRARY_PATH = lib.makeLibraryPath (
           lib.unique (gpuDrivers.libraries ++ self'.packages.lys-shell.libs ++ [ pkgs.pipewire pkgs.libei ])
         );

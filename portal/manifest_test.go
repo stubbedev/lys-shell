@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-lib/portaldialogs"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
@@ -25,7 +26,9 @@ var pendingInterfaces []string
 
 // mounted is the short names of the portal interfaces the backend
 // serves; the shell's own (screen shares) are not the frontend's.
-func mounted() []string {
+func mounted(t *testing.T) []string {
+	t.Helper()
+	t.Setenv(lyswm.SocketEnv, "")
 	var names []string
 	for _, iface := range New(nil, config.Load("", config.DiscardDiagnostics)).interfaces() {
 		if name, ok := strings.CutPrefix(iface.Name, implPrefix); ok {
@@ -50,7 +53,7 @@ func readResource(t *testing.T, name string) string {
 // the backend mounts: a drifted list silently
 // drops an interface at runtime.
 func TestManifestsMatchTheMountedInterfaces(t *testing.T) {
-	want := slices.Sorted(slices.Values(append(mounted(), pendingInterfaces...)))
+	want := slices.Sorted(slices.Values(append(mounted(t), pendingInterfaces...)))
 	for i := 1; i < len(want); i++ {
 		if want[i] == want[i-1] {
 			t.Fatalf("%s is both mounted and pending", want[i])
@@ -90,16 +93,50 @@ func TestManifestsMatchTheMountedInterfaces(t *testing.T) {
 	}
 }
 
-// InputCapture cannot capture on any compositor lys-shell targets, so it
-// is neither declared nor mounted: the frontend then reports the portal
-// unavailable instead of routing apps to sessions that never capture.
-func TestInputCaptureIsNotOffered(t *testing.T) {
-	if slices.Contains(mounted(), "InputCapture") {
-		t.Error("InputCapture is mounted")
+func declared(t *testing.T, portal string) (dbusName string, interfaces []string) {
+	t.Helper()
+	for line := range strings.Lines(readResource(t, portal)) {
+		key, value, _ := strings.Cut(strings.TrimSpace(line), "=")
+		switch key {
+		case "DBusName":
+			dbusName = value
+		case "Interfaces":
+			for iface := range strings.SplitSeq(value, ";") {
+				if name, ok := strings.CutPrefix(iface, implPrefix); ok {
+					interfaces = append(interfaces, name)
+				}
+			}
+		}
+	}
+	return dbusName, interfaces
+}
+
+func TestInputCaptureIsDeclaredForLysWMAlone(t *testing.T) {
+	if slices.Contains(mounted(t), "InputCapture") {
+		t.Error("InputCapture is mounted without lys-wm")
 	}
 	for _, manifest := range []string{"lys-shell.portal", "lys-shell-portals.conf"} {
 		if strings.Contains(readResource(t, manifest), implPrefix+"InputCapture") {
-			t.Errorf("%s declares InputCapture", manifest)
+			t.Errorf("%s declares InputCapture, which every desktop would then export", manifest)
+		}
+	}
+	name, ifaces := declared(t, "lys-shell-lys-wm.portal")
+	if shellName, _ := declared(t, "lys-shell.portal"); name != shellName || name != BusName {
+		t.Errorf("lys-shell-lys-wm.portal names %q, want the backend's %q", name, BusName)
+	}
+	if !slices.Equal(ifaces, []string{"InputCapture"}) {
+		t.Errorf("lys-shell-lys-wm.portal declares %v, want InputCapture alone", ifaces)
+	}
+	if strings.Contains(readResource(t, "lys-shell-lys-wm.portal"), "UseIn") {
+		t.Error("lys-shell-lys-wm.portal volunteers through UseIn; only lys-wm-portals.conf routes to it")
+	}
+	for _, installer := range []string{"../nix/lys-shell.nix", "../nix/hm-module.nix", "../packaging/debian/rules", "../packaging/rpm/lys-shell.spec.in", "../scripts/ci/build-archive.sh"} {
+		b, err := os.ReadFile(installer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), "lys-shell-lys-wm.portal") {
+			t.Errorf("%s does not install lys-shell-lys-wm.portal", installer)
 		}
 	}
 }
@@ -108,8 +145,11 @@ func TestInputCaptureIsNotOffered(t *testing.T) {
 // the impl interfaces whose XML defines it (xdg-desktop-portal 1.22):
 // the others must not export one the frontend never reads.
 func TestVersionOnlyWhereTheSpecDefinesOne(t *testing.T) {
-	versioned := []string{"Clipboard", "DynamicLauncher", "GlobalShortcuts", "Notification", "RemoteDesktop", "ScreenCast", "Screenshot", "Secret", "Settings", "Usb"}
-	for _, iface := range New(nil, config.Load("", config.DiscardDiagnostics)).interfaces() {
+	versioned := []string{"Clipboard", "DynamicLauncher", "GlobalShortcuts", "InputCapture", "Notification", "RemoteDesktop", "ScreenCast", "Screenshot", "Secret", "Settings", "Usb"}
+	t.Setenv(lyswm.SocketEnv, "")
+	b := New(nil, config.Load("", config.DiscardDiagnostics))
+	b.input = newInputCapture(nil, b.sessions, nil, nil, nil)
+	for _, iface := range b.interfaces() {
 		name := strings.TrimPrefix(iface.Name, implPrefix)
 		_, has := iface.Properties["version"]
 		if want := slices.Contains(versioned, name); has != want {

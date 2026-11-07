@@ -116,7 +116,7 @@ buildGo127Module {
 
     # The xdg-desktop-portal backend: the interface declaration, the D-Bus
     # activation file, and the reference unit and portals.conf.
-    install -Dm0644 resources/lys-shell.portal \
+    install -Dm0644 resources/lys-shell.portal resources/lys-shell-lys-wm.portal \
       -t $out/share/xdg-desktop-portal/portals
     install -d $out/share/dbus-1/services
     substitute resources/org.freedesktop.impl.portal.desktop.lys.service \

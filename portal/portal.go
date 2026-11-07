@@ -49,6 +49,7 @@ type Backend struct {
 	shortcuts  *globalShortcuts
 	screenCast *screenCast
 	remote     *remoteDesktop
+	input      *inputCapture
 	shares     *shares
 	// windows is the compositor's window list (a fake in tests).
 	windows windowSource
@@ -78,12 +79,13 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b.shortcuts = newGlobalShortcuts(conn, b.sessions, permissions.ShortcutsPath(), waylandShortcutsStarter(loop))
 	loop.onEnd(b.clipboard.loopEnded)
 	loop.onEnd(b.shortcuts.loopEnded)
+	b.input = offeredInputCapture(conn, b.sessions, loop)
 	return b
 }
 
 // interfaces is every interface the backend mounts at ObjectPath.
 func (b *Backend) interfaces() []dbusx.Interface {
-	return append([]dbusx.Interface{
+	ifaces := append([]dbusx.Interface{
 		b.settings.iface(),
 		lockdown{b.cfg}.iface(),
 		background{b.conn, b.notifier, b.windows}.iface(),
@@ -102,6 +104,10 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		b.notifier.iface(),
 		wallpaperIface(b.conn, b.cfg, b.dataDir),
 	}, dialogIfaces(b.conn, b.cfg)...)
+	if b.input != nil {
+		ifaces = append(ifaces, b.input.iface())
+	}
+	return ifaces
 }
 
 // Serve mounts the interfaces, claims BusName (failing loudly when

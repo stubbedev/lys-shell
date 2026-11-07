@@ -25,6 +25,7 @@ Implemented natively by `lys-shell portal`:
 | `Wallpaper` | `dev.stubbe.lys.Wallpaper1` |
 | `Inhibit` | systemd-logind block locks (idle, sleep, shutdown for logout) with the app's reason, plus a hold on the shell's own idle inhibitor; monitor sessions follow the lock screen (user switching cannot be inhibited) |
 | `Clipboard` | `zwlr_data_control` (read/own the Wayland selection for RemoteDesktop sessions) |
+| `InputCapture` (lys-wm only) | lys-wm's `capture` IPC: barriers on the outside edges of the outputs' logical rectangles, the captured keyboard and pointer handed to the app as an EIS receiver context; consent through `dev.stubbe.lys.PortalDialogs1` |
 | `Background` | autostart `.desktop` entries + permission |
 | `Usb` | device-access permission grant (enumeration is frontend-side) |
 | `FileChooser` | the shell's native `gtk::FileDialog` via `dev.stubbe.lys.FileChooser1` |
@@ -41,11 +42,14 @@ interface itself, using GTK's own widgets (`FileDialog`, `PrintUnixDialog`,
 `AlertDialog`) inside the shell, never the `xdg-desktop-portal-gtk` package. The
 backend has no other portal as a dependency or fallback.
 
-`InputCapture` is not offered: real input capture needs the compositor to
-redirect local input to the portal, which wlroots compositors and niri do not
-expose (only KWin/Mutter back it). With no backend advertising it, the frontend
-does not export the portal, and clients see it is unavailable instead of
-creating sessions that can never capture.
+`InputCapture` needs the compositor to redirect local input to the portal, which
+only lys-wm's `capture` IPC does here (wlroots compositors and niri expose
+nothing for it). It is declared in a second file, `lys-shell-lys-wm.portal`,
+which only lys-wm's `lys-wm-portals.conf` routes to, and the backend mounts it
+only when the running lys-wm answers a capture: on any other desktop the
+frontend does not export the portal, and clients see it is unavailable instead
+of creating sessions that can never capture. Super+Escape, a session lock or
+the app closing its session always gives the input back.
 
 Every call that takes a request handle mounts an
 `org.freedesktop.impl.portal.Request` there for as long as it runs. When the
@@ -81,8 +85,8 @@ placeholder arguments, so they exercise the UI but do not act on a real request.
 ```sh
 # 1. The backend binary is just `lys-shell portal`; make sure `lys-shell` is on PATH.
 # 2. Declare the backend + its interfaces to the frontend:
-install -Dm644 resources/lys-shell.portal \
-  /usr/share/xdg-desktop-portal/portals/lys-shell.portal
+install -Dm644 resources/lys-shell.portal resources/lys-shell-lys-wm.portal \
+  -t /usr/share/xdg-desktop-portal/portals
 # 3. Let the frontend D-Bus-activate it (edit Exec= if lys-shell is elsewhere):
 install -Dm644 resources/org.freedesktop.impl.portal.desktop.lys.service \
   /usr/share/dbus-1/services/org.freedesktop.impl.portal.desktop.lys.service
@@ -126,9 +130,8 @@ NixOS / home-manager module alongside the shell.
 - **RemoteDesktop touch injection**: there is no virtual-touchscreen protocol on
   wlroots, so touch events are accepted but dropped. Pointer + keyboard (incl.
   keysym + EIS) are fully injected.
-- **InputCapture**: real input capture needs the compositor to redirect local
-  input to the portal, which wlroots/niri do not expose (only KWin/Mutter do),
-  so the interface is not advertised.
+- **InputCapture**: only on lys-wm, whose `capture` IPC grabs local input; other
+  compositors do not let a portal grab it, so it is not advertised there.
 - **ScreenCast dmabuf**: a whole output streams zero-copy into dmabufs that
   lys-lib's Vulkan device allocates on the DRM device the compositor names, in
   the first modifier it imports that a probe copy proves (linear first, which

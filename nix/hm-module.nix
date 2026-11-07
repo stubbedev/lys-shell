@@ -222,7 +222,10 @@ in
     xdg.dataFile = lib.mkIf cfg.portal.enable (
       lib.genAttrs
         (
-          [ "xdg-desktop-portal/portals/lys-shell.portal" ]
+          [
+            "xdg-desktop-portal/portals/lys-shell.portal"
+            "xdg-desktop-portal/portals/lys-shell-lys-wm.portal"
+          ]
           ++ map (name: "dbus-1/services/${name}") busActivated
         )
         (path: {
