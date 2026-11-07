@@ -23,6 +23,7 @@ Recommends:
  libva-drm2,
  intel-media-va-driver | mesa-va-drivers,
  xdg-desktop-portal,
+ bubblewrap,
  geoclue-2.0,
  lys-settings
 Suggests:

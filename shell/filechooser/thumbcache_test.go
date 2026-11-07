@@ -169,28 +169,26 @@ func TestDecodedThumbnailsAreCached(t *testing.T) {
 	}
 }
 
-// installThumbnailer installs a thumbnailer for PDFs running script,
-// which sh runs with the output path; the returned file counts its runs.
-func installThumbnailer(t *testing.T, hs *harness, script string) string {
+// thumbnailerArgv is the command line of the fake thumbnailer doing
+// mode, with the field codes a .thumbnailer gives it.
+func thumbnailerArgv(t *testing.T, mode string) []string {
+	t.Helper()
+	bin, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []string{bin, fakeThumbnailerArg, mode, "%s", "%u", "%o"}
+}
+
+// installThumbnailer installs the fake thumbnailer doing mode for PDFs
+// and gives hs a thumbnailer that finds it.
+func installThumbnailer(t *testing.T, hs *harness, mode string) {
 	t.Helper()
 	data := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", data)
 	t.Setenv("XDG_DATA_DIRS", filepath.Join(data, "none"))
-	runs := filepath.Join(data, "runs")
-	page := filepath.Join(data, "page.png")
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 200, 300))); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(page, buf.Bytes(), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	bin := filepath.Join(data, "fake-thumbnailer")
-	body := "#!/bin/sh\necho run >> '" + runs + "'\n" + strings.ReplaceAll(script, "PNG", "'"+page+"'") + "\n"
-	if err := os.WriteFile(bin, []byte(body), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	entry := "[Thumbnailer Entry]\nTryExec=" + bin + "\nExec=" + bin + " -s %s %u %o\nMimeType=application/pdf;\n"
+	argv := thumbnailerArgv(t, mode)
+	entry := "[Thumbnailer Entry]\nTryExec=" + argv[0] + "\nExec=" + strings.Join(argv, " ") + "\nMimeType=application/pdf;\n"
 	if err := os.MkdirAll(filepath.Join(data, "thumbnailers"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -199,19 +197,20 @@ func installThumbnailer(t *testing.T, hs *harness, script string) string {
 	}
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	hs.c.thumbnailer = newThumbnailer()
-	return runs
 }
 
-func countRuns(t *testing.T, runs string) int {
+// switchThumbnailer makes the PDF thumbnailer hs runs the fake doing
+// mode, in the same sandbox, between openings.
+func switchThumbnailer(t *testing.T, hs *harness, mode string) {
 	t.Helper()
-	data, err := os.ReadFile(runs)
-	if os.IsNotExist(err) {
-		return 0
+	installed := hs.c.thumbnailer.installed()
+	if installed.byType == nil {
+		t.Fatal("no thumbnailer is installed to switch")
 	}
-	if err != nil {
-		t.Fatal(err)
+	entry := thumbnailerEntry{argv: thumbnailerArgv(t, mode), file: mode + ".thumbnailer"}
+	hs.c.thumbnailer.installed = func() installedThumbnailers {
+		return installedThumbnailers{sandbox: installed.sandbox, byType: map[string]thumbnailerEntry{"application/pdf": entry}}
 	}
-	return strings.Count(string(data), "run\n")
 }
 
 func pdfFile(t *testing.T, hs *harness) string {
@@ -223,31 +222,30 @@ func pdfFile(t *testing.T, hs *harness) string {
 	return doc
 }
 
-// A PDF gets the thumbnail its installed thumbnailer makes, which runs
-// once for it across two openings.
+// A PDF gets the thumbnail its installed thumbnailer makes, in the
+// sandbox, and the second opening reads it from the cache: a
+// thumbnailer that now fails changes nothing.
 func TestThumbnailersMakeThumbnailsOnce(t *testing.T) {
 	hs := newHarness(t, "")
 	doc := pdfFile(t, hs)
-	runs := installThumbnailer(t, hs, `while [ $# -gt 1 ]; do shift; done; cp PNG "$1"`)
+	installThumbnailer(t, hs, "png")
 	if hs.openRows(t, filepath.Dir(doc), []string{doc}) != 1 {
 		t.Fatal("the PDF row got no thumbnail")
 	}
+	switchThumbnailer(t, hs, "fail")
 	if hs.openRows(t, filepath.Dir(doc), []string{doc}) != 1 {
 		t.Error("the PDF row got no cached thumbnail")
-	}
-	if got := countRuns(t, runs); got != 1 {
-		t.Errorf("the thumbnailer ran %d times over two openings, want once", got)
 	}
 }
 
 // A thumbnailer that hangs is killed at its timeout, and the fail
-// entry it leaves stops the next opening from running it again; a
+// entry it leaves stops the next opening from running one again; a
 // file changed since gets another try.
 func TestHangingThumbnailerFailsOnce(t *testing.T) {
 	hs := newHarness(t, "")
 	doc := pdfFile(t, hs)
-	runs := installThumbnailer(t, hs, "exec sleep 60")
-	hs.c.thumbnailer.runTimeout = 200 * time.Millisecond
+	installThumbnailer(t, hs, "hang")
+	hs.c.thumbnailer.runTimeout = 500 * time.Millisecond
 	start := time.Now()
 	if hs.openRows(t, filepath.Dir(doc), []string{doc}) != 0 {
 		t.Error("a hung thumbnailer made a thumbnail")
@@ -255,17 +253,17 @@ func TestHangingThumbnailerFailsOnce(t *testing.T) {
 	if waited := time.Since(start); waited > 10*time.Second {
 		t.Errorf("the hanging thumbnailer held the row for %v", waited)
 	}
-	hs.openRows(t, filepath.Dir(doc), []string{doc})
-	if got := countRuns(t, runs); got != 1 {
-		t.Errorf("the failed thumbnailer ran %d times over two openings, want once", got)
+	switchThumbnailer(t, hs, "png")
+	hs.c.thumbnailer.runTimeout = thumbnailerTimeout
+	if hs.openRows(t, filepath.Dir(doc), []string{doc}) != 0 {
+		t.Error("a file that failed ran a thumbnailer again")
 	}
 	later := time.Now().Add(time.Hour)
 	if err := os.Chtimes(doc, later, later); err != nil {
 		t.Fatal(err)
 	}
-	hs.openRows(t, filepath.Dir(doc), []string{doc})
-	if got := countRuns(t, runs); got != 2 {
-		t.Errorf("a changed file ran the thumbnailer %d times in all, want twice", got)
+	if hs.openRows(t, filepath.Dir(doc), []string{doc}) != 1 {
+		t.Error("a changed file got no second try")
 	}
 }
 

@@ -23,6 +23,7 @@ Recommends:     libva
 Recommends:     intel-media-driver
 Recommends:     mesa-va-drivers
 Recommends:     xdg-desktop-portal
+Recommends:     bubblewrap
 Recommends:     geoclue2
 Recommends:     lys-settings
 Suggests:       pipewire-pulseaudio

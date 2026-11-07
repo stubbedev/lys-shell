@@ -292,7 +292,7 @@ func TestFolderPreviewCountsItems(t *testing.T) {
 func TestQuicklookShowsAThumbnailerPage(t *testing.T) {
 	hs := newHarness(t, "")
 	doc := pdfFile(t, hs)
-	installThumbnailer(t, hs, `while [ $# -gt 1 ]; do shift; done; cp PNG "$1"`)
+	installThumbnailer(t, hs, "png")
 	got := hs.quicklookOn(t, filepath.Dir(doc), "paper.pdf")
 	var imgs []*widget.Image
 	hs.run(func() {

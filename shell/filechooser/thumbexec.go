@@ -2,16 +2,15 @@ package filechooser
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"image"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/stubbedev/lys-shell/imagedecode"
@@ -87,31 +86,23 @@ func (t thumbnailerEntry) expand(input, uri, output string, size int) []string {
 	return argv
 }
 
-// run makes input's thumbnail at size with the thumbnailer: the
-// command runs in its own process group with no input or output, and
-// the whole group is killed at timeout or when ctx ends. A command that
-// fails, writes nothing, or writes more than thumbnailerMaxBytes or an
-// image that does not decode, fails.
-func (t thumbnailerEntry) run(ctx context.Context, input, uri string, size int, timeout time.Duration) (image.Image, error) {
+// run makes input's thumbnail at size with the thumbnailer, in sb: it
+// reads the input under its sandbox path and URI and writes into a
+// temporary directory of its own, and is killed at timeout or when ctx
+// ends. A command that fails, writes nothing, or writes more than
+// thumbnailerMaxBytes or an image that does not decode, fails.
+func (t thumbnailerEntry) run(ctx context.Context, sb sandbox, input string, size int, timeout time.Duration) (image.Image, error) {
 	dir, err := os.MkdirTemp("", "lys-thumbnailer-")
 	if err != nil {
 		return nil, fmt.Errorf("thumbnailer %s: %w", t.file, err)
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
-	output := filepath.Join(dir, "thumbnail.png")
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	argv := t.expand(input, uri, output, size)
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // an installed thumbnailer, as every file manager runs it
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
-	cmd.WaitDelay = time.Second
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() != nil {
-			err = errors.Join(err, ctx.Err())
-		}
+	const name = "thumbnail.png"
+	argv := t.expand(sandboxPath(input), sandboxURI(input), path.Join(sandboxDir, name), size)
+	if err := sb.run(ctx, input, dir, argv, timeout); err != nil {
 		return nil, fmt.Errorf("thumbnailer %s on %s: %w", t.file, input, err)
 	}
+	output := filepath.Join(dir, name)
 	info, err := os.Stat(output)
 	if err != nil {
 		return nil, fmt.Errorf("thumbnailer %s on %s wrote nothing: %w", t.file, input, err)

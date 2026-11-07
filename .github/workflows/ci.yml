@@ -43,6 +43,10 @@ jobs:
             - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
+            # Ubuntu keeps unconfined programs out of user namespaces, which
+            # Nix's bwrap needs for the file chooser's thumbnailer sandbox.
+            - name: Allow user namespaces
+              run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
             - name: just plain
               run: nix develop --accept-flake-config -c just plain
 
@@ -61,6 +65,10 @@ jobs:
             - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
+            # Ubuntu keeps unconfined programs out of user namespaces, which
+            # Nix's bwrap needs for the file chooser's thumbnailer sandbox.
+            - name: Allow user namespaces
+              run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
             - name: just race
               run: nix develop --accept-flake-config -c just race
 

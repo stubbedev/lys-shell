@@ -104,7 +104,10 @@ schema-check:
 # and NVIDIA nodes only. Memory is capped, as the race suite runs many
 # binaries. An empty /run/systemd/system, private to the container, is all
 # loginctl asks before it talks to the fake logind on a private bus; nothing of
-# the host's systemd is there. `just docker race` or `just docker check`.
+# the host's systemd is there. The container user may make namespaces and
+# mount a fresh /proc in them (seccomp and the masked system paths lifted, as
+# an unprivileged user still), which bubblewrap needs for the thumbnailer
+# sandbox. `just docker race` or `just docker check`.
 docker recipe="check" memory="10g":
     #!/usr/bin/env bash
     set -euo pipefail
@@ -125,6 +128,7 @@ docker recipe="check" memory="10g":
         gpu+=(-v /run/opengl-driver:/run/opengl-driver:ro)
     fi
     docker run --rm --init --user "$(id -u):$(id -g)" --device /dev/kvm "${gpu[@]}" --tmpfs /run/systemd/system \
+        --security-opt seccomp=unconfined --security-opt systempaths=unconfined \
         --memory {{quote(memory)}} --memory-swap {{quote(memory)}} --pids-limit 4096 --shm-size 1g \
         -v /nix/store:/nix/store:ro -v "$dir/env.sh:/env.sh:ro" -v "$dir/passwd:/etc/passwd:ro" -v "$dir/group:/etc/group:ro" -v "$PWD:/src" -v lys-shell-go:/go -w /src -e SSL_CERT_FILE="$certs" \
         debian:trixie-slim "$bash" -c 'source /env.sh && export HOME=/go/home GOMODCACHE=/go/mod GOCACHE=/go/cache GOLANGCI_LINT_CACHE=/go/lint TMPDIR=/tmp && unset XDG_RUNTIME_DIR WAYLAND_DISPLAY DISPLAY DBUS_SESSION_BUS_ADDRESS && mkdir -p "$HOME" && exec just "$1"' docker {{quote(recipe)}}

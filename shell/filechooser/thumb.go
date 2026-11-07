@@ -49,7 +49,7 @@ type thumbRaster struct {
 // holds. work is the lookups running and the thumbnails they made that
 // the loop has not taken yet. decode opens a raster image, store writes
 // a cache file whole, and the installed thumbnailers (loaded on first
-// use) run for at most runTimeout each.
+// use) run sandboxed for at most runTimeout each.
 type thumbnailer struct {
 	mem        memory.Shared
 	work       handoff.Handoffs
@@ -58,15 +58,33 @@ type thumbnailer struct {
 	decode     func(ctx context.Context, path string) (image.Image, error)
 	store      func(path string, data []byte) error
 	runTimeout time.Duration
-	installed  func() map[string]thumbnailerEntry
+	installed  func() installedThumbnailers
+}
+
+// installedThumbnailers are the thumbnailers per MIME type and the
+// sandbox they run in.
+type installedThumbnailers struct {
+	sandbox sandbox
+	byType  map[string]thumbnailerEntry
 }
 
 func newThumbnailer() *thumbnailer {
 	return &thumbnailer{
 		workers: make(chan struct{}, thumbWorkers), budget: newByteBudget(thumbDecodeBudget),
 		decode: imagedecode.OpenContext, store: storeThumbnail, runTimeout: thumbnailerTimeout,
-		installed: sync.OnceValue(func() map[string]thumbnailerEntry { return loadThumbnailers(mime.DataDirs()) }),
+		installed: sync.OnceValue(func() installedThumbnailers { return loadInstalled(mime.DataDirs()) }),
 	}
+}
+
+// loadInstalled is the thumbnailers installed in dataDirs and their
+// sandbox; without a sandbox none run, which is logged.
+func loadInstalled(dataDirs []string) installedThumbnailers {
+	sb, err := newSandbox(context.Background())
+	if err != nil {
+		log.Printf("file chooser: installed thumbnailers are not run without a sandbox: %v", err)
+		return installedThumbnailers{}
+	}
+	return installedThumbnailers{sandbox: sb, byType: loadThumbnailers(dataDirs)}
 }
 
 // thumbnail is the file's thumbnail as an exact px square,
@@ -152,11 +170,12 @@ func (th *thumbnailer) source(ctx context.Context, path, mimeType string, px int
 		return nil, errNoThumb
 	}
 	var src image.Image
-	switch entry, ok := th.installed()[mimeType]; {
+	installed := th.installed()
+	switch entry, ok := installed.byType[mimeType]; {
 	case isRaster(path):
 		src, err = th.decodeRaster(ctx, path, info)
 	case ok:
-		src, err = entry.run(ctx, path, tc.uri, flavorFor(px).px, th.runTimeout)
+		src, err = entry.run(ctx, installed.sandbox, path, flavorFor(px).px, th.runTimeout)
 	default:
 		return nil, errNoThumb
 	}

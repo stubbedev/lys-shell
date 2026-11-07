@@ -49,6 +49,8 @@
           # wl-paste, the out-of-process data-control reader the screenshot
           # clipboard tests read the selection back with.
           wl-clipboard
+          # bwrap, the sandbox the file chooser runs thumbnailers in.
+          bubblewrap
           # GTK 3 and GTK 4 apps, through PyGObject, printing through the
           # real portal to the print dialog (portal's GTK print tests).
           (python3.withPackages (ps: [ ps.pygobject3 ]))
