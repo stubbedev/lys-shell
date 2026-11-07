@@ -48,6 +48,7 @@ type Output struct {
 	Description string  `json:"description"`
 	Rect        Rect    `json:"rect"`
 	Scale       float64 `json:"scale"`
+	Mode        Mode    `json:"mode"`
 	Workspace   int     `json:"workspace"`
 	Focused     bool    `json:"focused"`
 	Powered     bool    `json:"powered"`

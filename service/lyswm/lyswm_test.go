@@ -67,7 +67,7 @@ func TestQueriesDecodeTheResults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(outputs) != 1 || outputs[0].Name != "DP-1" || !outputs[0].Focused || outputs[0].Scale != 1.25 || outputs[0].Rect.Width != 2048 {
+	if len(outputs) != 1 || outputs[0].Name != "DP-1" || !outputs[0].Focused || outputs[0].Scale != 1.25 || outputs[0].Rect.Width != 2048 || outputs[0].Mode != (lyswm.Mode{Width: 2560, Height: 1440, RefreshMHz: 143912}) {
 		t.Fatalf("outputs = %+v", outputs)
 	}
 	wantSent := []string{`{"request":"workspaces"}`, `{"request":"windows"}`, `{"request":"outputs"}`}
