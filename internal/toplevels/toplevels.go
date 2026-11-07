@@ -20,7 +20,8 @@ import (
 const managerIface = "zwlr_foreign_toplevel_manager_v1"
 
 // maxManagerVersion is the version bound: v3 is the newest the binding
-// knows, and only app_id, state, done and closed are read.
+// knows, and the first with parent; only app_id, state, parent, done
+// and closed are read.
 const maxManagerVersion = 3
 
 // ErrUnsupported is a compositor without the foreign-toplevel manager.
@@ -30,6 +31,9 @@ var ErrUnsupported = errors.New("toplevels: the compositor offers no " + manager
 type Window struct {
 	AppID     string
 	Activated bool
+	// Parent is the app id of the window this one is transient for, ""
+	// for none.
+	Parent string
 }
 
 // Watcher follows the windows until Close or until the compositor goes
@@ -144,9 +148,10 @@ func (w *Watcher) HandleZwlrForeignToplevelManagerV1Toplevel(ev wlr.ZwlrForeignT
 	if ev.Toplevel == nil {
 		return
 	}
-	h := w.tracker.add(func() { _ = ev.Toplevel.Destroy() })
+	h := w.tracker.add(ev.Toplevel, func() { _ = ev.Toplevel.Destroy() })
 	ev.Toplevel.AddAppIdHandler(h)
 	ev.Toplevel.AddStateHandler(h)
+	ev.Toplevel.AddParentHandler(h)
 	ev.Toplevel.AddDoneHandler(h)
 	ev.Toplevel.AddClosedHandler(h)
 }
@@ -176,10 +181,10 @@ type tracker struct {
 
 func newTracker() *tracker { return &tracker{} }
 
-// add starts following one window; destroy frees its handle once it
-// closes.
-func (t *tracker) add(destroy func()) *handle {
-	h := &handle{t: t, destroy: destroy}
+// add starts following the window proxy names; destroy frees its handle
+// once it closes.
+func (t *tracker) add(proxy *wlr.ZwlrForeignToplevelHandleV1, destroy func()) *handle {
+	h := &handle{t: t, proxy: proxy, destroy: destroy}
 	t.mu.Lock()
 	t.handles = append(t.handles, h)
 	t.mu.Unlock()
@@ -191,9 +196,14 @@ func (t *tracker) windows() []Window {
 	defer t.mu.Unlock()
 	out := make([]Window, 0, len(t.handles))
 	for _, h := range t.handles {
-		if h.shown {
-			out = append(out, h.applied)
+		if !h.shown {
+			continue
 		}
+		w := h.applied
+		if i := slices.IndexFunc(t.handles, func(p *handle) bool { return p.shown && p.proxy == h.parent }); h.parent != nil && i >= 0 {
+			w.Parent = t.handles[i].applied.AppID
+		}
+		out = append(out, w)
 	}
 	return out
 }
@@ -213,10 +223,14 @@ func (t *tracker) update(fn func() bool) {
 // window is listed from its first done.
 type handle struct {
 	t       *tracker
+	proxy   *wlr.ZwlrForeignToplevelHandleV1
 	destroy func()
 	pending Window
 	applied Window
-	shown   bool
+	// pendingParent and parent are the batch's and the applied parent
+	// handle, resolved to an app id when the list is read.
+	pendingParent, parent *wlr.ZwlrForeignToplevelHandleV1
+	shown                 bool
 }
 
 // HandleZwlrForeignToplevelHandleV1AppId takes the app id into the
@@ -235,11 +249,19 @@ func (h *handle) HandleZwlrForeignToplevelHandleV1State(ev wlr.ZwlrForeignToplev
 	h.t.mu.Unlock()
 }
 
+// HandleZwlrForeignToplevelHandleV1Parent takes the parent into the
+// batch.
+func (h *handle) HandleZwlrForeignToplevelHandleV1Parent(ev wlr.ZwlrForeignToplevelHandleV1ParentEvent) {
+	h.t.mu.Lock()
+	h.pendingParent = ev.Parent
+	h.t.mu.Unlock()
+}
+
 // HandleZwlrForeignToplevelHandleV1Done applies the batch.
 func (h *handle) HandleZwlrForeignToplevelHandleV1Done(wlr.ZwlrForeignToplevelHandleV1DoneEvent) {
 	h.t.update(func() bool {
-		changed := !h.shown || h.pending != h.applied
-		h.applied, h.shown = h.pending, true
+		changed := !h.shown || h.pending != h.applied || h.pendingParent != h.parent
+		h.applied, h.parent, h.shown = h.pending, h.pendingParent, true
 		return changed
 	})
 }

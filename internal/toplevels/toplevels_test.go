@@ -24,7 +24,7 @@ func TestTrackerAppliesBatchesOnDone(t *testing.T) {
 	var changes atomic.Int32
 	tr.changed = func() { changes.Add(1) }
 	destroyed := false
-	h := tr.add(func() { destroyed = true })
+	h := tr.add(nil, func() { destroyed = true })
 	h.HandleZwlrForeignToplevelHandleV1AppId(wlr.ZwlrForeignToplevelHandleV1AppIdEvent{AppId: "org.example.App"})
 	h.HandleZwlrForeignToplevelHandleV1State(wlr.ZwlrForeignToplevelHandleV1StateEvent{State: []int32{wlr.ZwlrForeignToplevelHandleV1StateMaximized, wlr.ZwlrForeignToplevelHandleV1StateActivated}})
 	if got := tr.windows(); len(got) != 0 || changes.Load() != 0 {
@@ -48,7 +48,7 @@ func TestTrackerAppliesBatchesOnDone(t *testing.T) {
 		t.Errorf("closed: %v, %d changes, destroyed %v", got, changes.Load(), destroyed)
 	}
 	// A window closing before its first batch was never listed.
-	early := tr.add(func() {})
+	early := tr.add(nil, func() {})
 	early.HandleZwlrForeignToplevelHandleV1Closed(wlr.ZwlrForeignToplevelHandleV1ClosedEvent{})
 	if changes.Load() != 3 {
 		t.Error("a window never listed announced its close")
@@ -156,5 +156,34 @@ func TestWatcherEndsWithTheCompositor(t *testing.T) {
 	}
 	if w.Err() == nil {
 		t.Error("the compositor went away without an error")
+	}
+}
+
+// A window's parent is listed by the parent's app id once a batch
+// carries it, announced as a change; one without a parent, or whose
+// parent closed, lists none.
+func TestTrackerResolvesTheParent(t *testing.T) {
+	tr := newTracker()
+	var changes atomic.Int32
+	tr.changed = func() { changes.Add(1) }
+	ownerProxy, dialogProxy := &wlr.ZwlrForeignToplevelHandleV1{}, &wlr.ZwlrForeignToplevelHandleV1{}
+	owner := tr.add(ownerProxy, func() {})
+	owner.HandleZwlrForeignToplevelHandleV1AppId(wlr.ZwlrForeignToplevelHandleV1AppIdEvent{AppId: "org.example.Owner"})
+	owner.HandleZwlrForeignToplevelHandleV1Done(wlr.ZwlrForeignToplevelHandleV1DoneEvent{})
+	dialog := tr.add(dialogProxy, func() {})
+	dialog.HandleZwlrForeignToplevelHandleV1AppId(wlr.ZwlrForeignToplevelHandleV1AppIdEvent{AppId: "org.example.Dialog"})
+	dialog.HandleZwlrForeignToplevelHandleV1Done(wlr.ZwlrForeignToplevelHandleV1DoneEvent{})
+	if got := tr.windows(); !slices.Equal(got, []Window{{AppID: "org.example.Owner"}, {AppID: "org.example.Dialog"}}) {
+		t.Fatalf("before a parent: %v", got)
+	}
+	before := changes.Load()
+	dialog.HandleZwlrForeignToplevelHandleV1Parent(wlr.ZwlrForeignToplevelHandleV1ParentEvent{Parent: ownerProxy})
+	dialog.HandleZwlrForeignToplevelHandleV1Done(wlr.ZwlrForeignToplevelHandleV1DoneEvent{})
+	if got := tr.windows(); !slices.Equal(got, []Window{{AppID: "org.example.Owner"}, {AppID: "org.example.Dialog", Parent: "org.example.Owner"}}) || changes.Load() != before+1 {
+		t.Errorf("parented: %v, %d changes", got, changes.Load()-before)
+	}
+	owner.HandleZwlrForeignToplevelHandleV1Closed(wlr.ZwlrForeignToplevelHandleV1ClosedEvent{})
+	if got := tr.windows(); !slices.Equal(got, []Window{{AppID: "org.example.Dialog"}}) {
+		t.Errorf("after the parent closed: %v", got)
 	}
 }
