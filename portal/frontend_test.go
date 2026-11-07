@@ -411,3 +411,46 @@ func TestFrontendScreenCastStreamsToARealConsumer(t *testing.T) {
 		t.Error("the backend kept the session")
 	}
 }
+
+func TestFrontendRelaysANewAccentToApps(t *testing.T) {
+	r := newRig(t, nil)
+	f := startFrontend(t, r, t.TempDir())
+	if err := f.conn.AddMatchSignal(dbus.WithMatchObjectPath(frontendPath), dbus.WithMatchInterface("org.freedesktop.portal.Settings"), dbus.WithMatchMember("SettingChanged")); err != nil {
+		t.Fatal(err)
+	}
+	signals := make(chan *dbus.Signal, 16)
+	f.conn.Signal(signals)
+	defer f.conn.RemoveSignal(signals)
+	want := []any{0x33 / 255.0, 0x66 / 255.0, 0x99 / 255.0}
+	var before dbus.Variant
+	if err := f.obj.Call("org.freedesktop.portal.Settings.ReadOne", 0, AppearanceNS, keyAccentColor).Store(&before); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Equal(before.Value().([]any), want) {
+		t.Fatalf("the accent is already %v", want)
+	}
+	if err := r.cfg.SetByPath("styling.palette.primary", "#336699"); err != nil {
+		t.Fatal(err)
+	}
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case s := <-signals:
+			var ns, key string
+			var value dbus.Variant
+			if dbus.Store(s.Body, &ns, &key, &value) != nil || ns != AppearanceNS || key != keyAccentColor {
+				continue
+			}
+			if got, _ := value.Value().([]any); !slices.Equal(got, want) {
+				t.Fatalf("the frontend relayed accent-color %v, want %v", value, want)
+			}
+			var after dbus.Variant
+			if err := f.obj.Call("org.freedesktop.portal.Settings.ReadOne", 0, AppearanceNS, keyAccentColor).Store(&after); err != nil || !slices.Equal(after.Value().([]any), want) {
+				t.Fatalf("ReadOne after the change = %v, %v; want %v", after, err, want)
+			}
+			return
+		case <-timeout:
+			t.Fatal("the frontend relayed no accent-color change")
+		}
+	}
+}
