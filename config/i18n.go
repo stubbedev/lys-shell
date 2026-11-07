@@ -51,6 +51,7 @@ var i18nPrefixes = map[string]string{
 	"NotificationConfig":        "settings-modules-notifications",
 	"OsdConfig":                 "settings-osd",
 	"PaletteConfig":             "settings-palette",
+	"PortalScreenCastConfig":    "settings-portal-screen-cast",
 	"PowerConfig":               "settings-modules-power",
 	"PowerProfilesConfig":       "settings-modules-power-profiles",
 	"RamConfig":                 "settings-modules-ram",

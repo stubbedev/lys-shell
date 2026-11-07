@@ -8066,6 +8066,24 @@
             "disable-sound-output": false
           },
           "description": "Features to lock down for every app, for kiosk or shared setups."
+        },
+        "screen-cast": {
+          "$ref": "#/$defs/PortalScreenCastConfig",
+          "default": {
+            "reminder-days": 30
+          },
+          "description": "Reminders that an app shares your screen without asking."
+        }
+      },
+      "type": "object"
+    },
+    "PortalScreenCastConfig": {
+      "description": "Persistent screen-sharing reminders.",
+      "properties": {
+        "reminder-days": {
+          "$ref": "#/$defs/uint32",
+          "default": 30,
+          "description": "Days an app may keep sharing your screen without asking, after you\nallowed it to, before its next share asks again whether to keep\nallowing it. 0 never asks again."
         }
       },
       "type": "object"
@@ -12451,6 +12469,9 @@
           "disable-printing": false,
           "disable-save-to-disk": false,
           "disable-sound-output": false
+        },
+        "screen-cast": {
+          "reminder-days": 30
         }
       },
       "description": "Desktop-portal policy for sandboxed apps."

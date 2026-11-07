@@ -21,6 +21,12 @@ Desktop-portal policy for sandboxed apps.
 |---|---|---|---|
 | `dynamic-launcher` | [`DynamicLauncherConfig`](/config/types#dynamic-launcher-config) | `{...}` | Which apps may install launchers without asking. |
 
+## Screen cast
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `screen-cast` | [`PortalScreenCastConfig`](/config/types#portal-screen-cast-config) | `{...}` | Reminders that an app shares your screen without asking. |
+
 ## Default configuration
 
 ```yaml
@@ -35,6 +41,8 @@ portal:
     disable-sound-output: false
   dynamic-launcher:
     install-token-apps: []
+  screen-cast:
+    reminder-days: 30
 ```
 
 

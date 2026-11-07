@@ -1223,6 +1223,14 @@ Screen position for notification popups.
 | `"all"` | Every popup shares one stack. |
 | `"off"` | Every popup is a card of its own. |
 
+## PortalScreenCastConfig {#portal-screen-cast-config}
+
+Persistent screen-sharing reminders.
+
+| Field | Description |
+|---|---|
+| `reminder-days` | Days an app may keep sharing your screen without asking, after you |
+
 ## Program {#program}
 
 A program name on the path, or its path.

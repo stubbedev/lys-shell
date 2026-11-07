@@ -128,7 +128,7 @@ func docSpecs() []docSpec {
 		top("launcher", docStandard(), func(c *Config) any { return &c.Launcher }),
 		top("login", docStandard(), func(c *Config) any { return &c.Login }),
 		top("osd", docStandard(), func(c *Config) any { return &c.Osd }),
-		top("portal", []DocGroup{docStandalone("Lockdown", "lockdown"), docStandalone("Dynamic launcher", "dynamic-launcher")}, func(c *Config) any { return &c.Portal }),
+		top("portal", []DocGroup{docStandalone("Lockdown", "lockdown"), docStandalone("Dynamic launcher", "dynamic-launcher"), docStandalone("Screen cast", "screen-cast")}, func(c *Config) any { return &c.Portal }),
 		top("share-picker", docStandard(), func(c *Config) any { return &c.SharePicker }),
 		top("styling", []DocGroup{
 			docGeneral(), docPrefix("Theme provider", "theme-"), docPrefix("Matugen", "matugen-"),

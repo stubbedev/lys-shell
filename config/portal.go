@@ -9,6 +9,18 @@ type PortalConfig struct {
 	Lockdown LockdownConfig `cfg:"lockdown"`
 	// Which apps may install launchers without asking.
 	DynamicLauncher DynamicLauncherConfig `cfg:"dynamic-launcher"`
+	// Reminders that an app shares your screen without asking.
+	ScreenCast PortalScreenCastConfig `cfg:"screen-cast"`
+}
+
+// PortalScreenCastConfig is the portal.screen-cast section.
+//
+// Persistent screen-sharing reminders.
+type PortalScreenCastConfig struct {
+	// Days an app may keep sharing your screen without asking, after you
+	// allowed it to, before its next share asks again whether to keep
+	// allowing it. 0 never asks again.
+	ReminderDays uint32 `cfg:"reminder-days"`
 }
 
 // DynamicLauncherConfig is the portal.dynamic-launcher section.
@@ -44,8 +56,12 @@ type LockdownConfig struct {
 	DisableSoundOutput bool `cfg:"disable-sound-output"`
 }
 
-// DefaultsPortal returns the schema defaults: nothing locked down, and
-// no app installs launchers without asking.
+// DefaultsPortal returns the schema defaults: nothing locked down, no
+// app installs launchers without asking, and a persistent screen share
+// is confirmed again after 30 days.
 func DefaultsPortal() PortalConfig {
-	return PortalConfig{DynamicLauncher: DynamicLauncherConfig{InstallTokenApps: []string{}}}
+	return PortalConfig{
+		DynamicLauncher: DynamicLauncherConfig{InstallTokenApps: []string{}},
+		ScreenCast:      PortalScreenCastConfig{ReminderDays: 30},
+	}
 }
