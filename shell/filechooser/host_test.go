@@ -521,6 +521,7 @@ func TestFiltersHiddenAndSort(t *testing.T) {
 		t.Error("grid view did not swap the views")
 	}
 	// The next chooser starts as this one was left.
+	hs.c.viewFile.wait()
 	again := newHarness(t, viewFile)
 	if again.c.view != (view{SortName, false, true}) {
 		t.Errorf("reloaded view = %+v", again.c.view)
