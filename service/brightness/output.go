@@ -7,31 +7,21 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/stubbedev/lys-shell/internal/drmconn"
 )
 
 // DRMDir is the sysfs class directory of DRM cards and connectors; a
 // var so tests can repoint it.
-var DRMDir = "/sys/class/drm"
+var DRMDir = drmconn.Dir
 
 // I2CAdapterDir lists every I²C adapter as a link into its device
 // tree; a var so tests can repoint it.
 var I2CAdapterDir = "/sys/bus/i2c/devices"
 
-func connectorName(component string) (string, bool) {
-	rest, ok := strings.CutPrefix(component, "card")
-	if !ok {
-		return "", false
-	}
-	card, name, ok := strings.Cut(rest, "-")
-	if !ok || card == "" || name == "" || strings.TrimLeft(card, "0123456789") != "" {
-		return "", false
-	}
-	return name, true
-}
-
 func ancestorConnector(path string) string {
 	for dir := path; dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
-		if name, ok := connectorName(filepath.Base(dir)); ok {
+		if name, ok := drmconn.Name(filepath.Base(dir)); ok {
 			return name
 		}
 	}
@@ -59,7 +49,7 @@ func i2cConnector(bus uint32) (string, error) {
 		return "", fmt.Errorf("brightness: list DRM connectors: %w", err)
 	}
 	for _, entry := range entries {
-		name, ok := connectorName(entry.Name())
+		name, ok := drmconn.Name(entry.Name())
 		if !ok {
 			continue
 		}
