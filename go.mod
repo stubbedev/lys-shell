@@ -6,7 +6,7 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	github.com/stubbedev/lys-lib v0.3.11-0.20261107145845-8b1cb7ee4b9a
 	github.com/stubbedev/lys-secrets v0.3.12
-	github.com/stubbedev/lys-ui v0.2.14
+	github.com/stubbedev/lys-ui v0.2.15-0.20261107153631-2ff6a4df89f9
 	github.com/stubbedev/memory-go v0.5.0
 	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/crypto v0.58.0
