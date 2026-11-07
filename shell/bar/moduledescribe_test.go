@@ -1,6 +1,7 @@
 package bar
 
 import (
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -32,20 +33,12 @@ func TestEveryModuleHasATitle(t *testing.T) {
 // Every built-in module that builds without its services is named by
 // its title, then its state, and shows the same as its tooltip.
 func TestEveryBuiltModuleIsNamedByItsTitleAndState(t *testing.T) {
-	names := make([]string, 0, len(factories))
-	for name := range factories {
-		names = append(names, name)
-	}
-	slices.Sort(names)
 	var built []string
-	for _, name := range names {
-		row, ok := mountWithoutServices(t, name)
-		if !ok {
-			continue
-		}
+	for _, m := range modulesBuiltWithoutServices(t) {
+		name := m.name
 		built = append(built, name)
 		title := i18n.T("bar-module-" + name)
-		for _, w := range treetest.WithClass(row, "bar-button") {
+		for _, w := range treetest.WithClass(m.row, "bar-button") {
 			b, ok := w.(*barButton)
 			if !ok {
 				continue
@@ -59,7 +52,7 @@ func TestEveryBuiltModuleIsNamedByItsTitleAndState(t *testing.T) {
 			}
 		}
 	}
-	for _, core := range []string{"clock", "dashboard", "idle-inhibit", "power", "privacy", "screenshot"} {
+	for _, core := range modulesThatNeedNoService {
 		if !slices.Contains(built, core) {
 			t.Errorf("%s did not build without its services (built %v)", core, built)
 		}
@@ -145,3 +138,25 @@ func TestEnterAndSpaceRunAModulesPrimaryBinding(t *testing.T) {
 		t.Errorf("ran %v, want the primary binding for Enter and for Space alone", ran)
 	}
 }
+
+// builtModule is a built-in module mounted alone in a bar row.
+type builtModule struct {
+	name string
+	row  *widget.Box
+}
+
+// modulesBuiltWithoutServices mounts, in name order, every built-in
+// module that builds with no service behind it.
+func modulesBuiltWithoutServices(t *testing.T) []builtModule {
+	var built []builtModule
+	for _, name := range slices.Sorted(maps.Keys(factories)) {
+		if row, ok := mountWithoutServices(t, name); ok {
+			built = append(built, builtModule{name: name, row: row})
+		}
+	}
+	return built
+}
+
+// modulesThatNeedNoService are modules every bar can show, with no
+// service running.
+var modulesThatNeedNoService = []string{"clock", "dashboard", "idle-inhibit", "power", "privacy", "screenshot"}
