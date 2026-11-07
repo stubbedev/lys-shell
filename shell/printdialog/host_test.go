@@ -225,7 +225,7 @@ func TestPrepareListsQueuesAndAnswersTheForm(t *testing.T) {
 	if !r.ok || r.token == 0 {
 		t.Fatalf("prepare = %+v", r)
 	}
-	for _, want := range []Setting{{"printer", "office"}, {"n-copies", "2"}, {"orientation", "landscape"}, {"use-color", "false"}, {"print-pages", "ranges"}, {"page-ranges", "1-2"}} {
+	for _, want := range []Setting{{"printer", "office"}, {"lys-printer-n-copies", "2"}, {"orientation", "landscape"}, {"use-color", "false"}, {"print-pages", "ranges"}, {"page-ranges", "1-2"}} {
 		if !slices.Contains(r.settings, want) {
 			t.Errorf("settings %v lack %v", r.settings, want)
 		}
@@ -267,7 +267,7 @@ func TestCopiesStayInBounds(t *testing.T) {
 		treetest.Button(t, c.Root, "Print").OnClick()
 	})
 	r := <-got
-	if !slices.Contains(r.settings, Setting{"n-copies", "999"}) {
+	if !slices.Contains(r.settings, Setting{"lys-printer-n-copies", "999"}) {
 		t.Errorf("past the top = %v, want 999", r.settings)
 	}
 }
@@ -519,7 +519,7 @@ func TestPrepareStartsFromTheApp(t *testing.T) {
 		t.Errorf("range = %q", e)
 	}
 	hs.do(func() { treetest.Button(t, c.Root, "Export").OnClick() })
-	if r := <-got; !slices.Contains(r.settings, Setting{"printer", "lab"}) || !slices.Contains(r.settings, Setting{"n-copies", "4"}) {
+	if r := <-got; !slices.Contains(r.settings, Setting{"printer", "lab"}) || !slices.Contains(r.settings, Setting{"lys-printer-n-copies", "4"}) || !slices.Contains(r.settings, Setting{"n-copies", "1"}) {
 		t.Errorf("settings = %v", r.settings)
 	}
 }

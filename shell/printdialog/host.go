@@ -185,7 +185,7 @@ func (h *Dialog) Prepare(c portaldialogs.Caller, r PrepareRequest) (bool, []Sett
 		log.Printf("print: %v", err)
 		return false, nil, PageSetup{}, 0
 	}
-	return true, p.form.settings(p.printer), p.form.pageSetup(), token
+	return true, p.form.appSettings(p.printer), p.form.pageSetup(), token
 }
 
 // ask shows the dialog for the request and waits for the user.
@@ -255,8 +255,10 @@ func (h *Dialog) Dismiss(handle string) {
 func (h *Dialog) Print(c portaldialogs.Caller, title string, document *os.File, token uint32) bool {
 	defer func() { _ = document.Close() }()
 	job, ok := h.claim(c.AppID, token)
+	drawn := drawnToSettings
 	if token == 0 {
 		job, ok = h.ask(c, PrepareRequest{Title: title})
+		drawn = drawnAsIs
 	}
 	if !ok {
 		return false
@@ -277,7 +279,7 @@ func (h *Dialog) Print(c portaldialogs.Caller, title string, document *os.File, 
 	}
 	_, err := h.d.CUPS.Print(ctx, ipp.Job{
 		Printer: printer, Title: title, User: h.d.User, Format: documentFormat,
-		Attrs: job.form.jobAttrs(), Document: document,
+		Attrs: job.form.jobAttrs(drawn), Document: document,
 	})
 	if err != nil {
 		log.Printf("print: spooling to %s: %v", job.printer, err)

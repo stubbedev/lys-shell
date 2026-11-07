@@ -82,7 +82,7 @@ func TestLayoutSettingsAndJobAttrs(t *testing.T) {
 				t.Errorf("%s: settings %v lack %v", tc.name, settings, want)
 			}
 		}
-		g := ipp.Group{Attrs: f.jobAttrs()}
+		g := ipp.Group{Attrs: f.jobAttrs(drawnToSettings)}
 		for name, want := range tc.attrs {
 			if got := g.Text(name); got != want {
 				t.Errorf("%s: %s = %q, want %q", tc.name, name, got, want)
@@ -110,8 +110,51 @@ func TestLayoutSettingsAndJobAttrs(t *testing.T) {
 	}
 }
 
+// The app draws a printer's document laying out nothing, the sheet
+// layout kept under printerSide for its next request; Print to File's
+// app lays out all of it.
+func TestTheAppLaysOutOnlyForAFile(t *testing.T) {
+	f := form{copies: 3, paper: a4(), color: "color", side: "one-sided", quality: qualityNormal, numberUp: 4, layout: "tblr", pageSet: "odd", reverse: true, collate: true, scale: 80}
+	app := f.appSettings("office")
+	for _, want := range []Setting{
+		{"n-copies", "1"},
+		{"number-up", "1"},
+		{"number-up-layout", "lrtb"},
+		{"page-set", "all"},
+		{"reverse", "false"},
+		{"collate", "false"},
+		{"lys-printer-n-copies", "3"},
+		{"lys-printer-number-up", "4"},
+		{"lys-printer-number-up-layout", "tblr"},
+		{"lys-printer-page-set", "odd"},
+		{"lys-printer-reverse", "true"},
+		{"lys-printer-collate", "true"},
+		{"scale", "80"},
+		{"printer", "office"},
+	} {
+		if !slices.Contains(app, want) {
+			t.Errorf("a printer's app settings %v lack %v", app, want)
+		}
+	}
+	if len(app) != len(f.settings("office"))+len(sheetLayout) {
+		t.Errorf("a printer's app settings %v repeat or drop keys", app)
+	}
+	f.output = "/tmp/out.pdf"
+	file := f.appSettings(fileQueue)
+	if !slices.Equal(file, f.settings(fileQueue)) {
+		t.Errorf("Print to File's app settings %v, want the form's %v", file, f.settings(fileQueue))
+	}
+	if slices.ContainsFunc(file, func(s Setting) bool { return strings.HasPrefix(s.Key, printerSide) }) {
+		t.Errorf("Print to File's app settings %v carry a printer's layout", file)
+	}
+	back := initialForm(PrepareRequest{Settings: app}, capabilitiesOf(&ipp.Printer{NumberUp: allNumberUp}))
+	if back.copies != 3 || back.numberUp != 4 || back.layout != "tblr" || back.pageSet != "odd" || !back.reverse || !back.collate {
+		t.Errorf("the settings an app keeps reopen as %+v", back)
+	}
+}
+
 // Through the dialog: four pages per sheet, even pages and reverse
-// come back as settings and reach the printer as IPP.
+// reach the printer as IPP, and the app is told to lay out none of it.
 func TestTheLayoutReachesTheAppAndThePrinter(t *testing.T) {
 	hs := newHarness(t)
 	hs.printers = []ipp.Printer{{Name: "office", State: ipp.StateIdle, Accepting: true, NumberUp: []int32{1, 2, 4, 6, 9, 16}}}
@@ -125,7 +168,7 @@ func TestTheLayoutReachesTheAppAndThePrinter(t *testing.T) {
 		treetest.Button(t, c.Root, "Print").OnClick()
 	})
 	r := <-got
-	for _, want := range []Setting{{"number-up", "4"}, {"page-set", "even"}, {"reverse", "true"}} {
+	for _, want := range []Setting{{"number-up", "1"}, {"page-set", "all"}, {"reverse", "false"}, {"lys-printer-number-up", "4"}, {"lys-printer-page-set", "even"}, {"lys-printer-reverse", "true"}} {
 		if !slices.Contains(r.settings, want) {
 			t.Errorf("settings %v lack %v", r.settings, want)
 		}

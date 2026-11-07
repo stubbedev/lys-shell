@@ -155,28 +155,41 @@ func TestFormPageSetup(t *testing.T) {
 	}
 }
 
+// A document drawn as is gets the whole form as job attributes; one
+// the app drew to the settings already holds the pages chosen in the
+// orientation chosen, which the printer must not apply again.
 func TestFormJobAttrs(t *testing.T) {
-	g := ipp.Group{Attrs: form{copies: 3, pages: pagesRanges, ranges: "2", landscape: true, paper: commonPapers[3], color: "monochrome", side: "two-sided-long-edge", quality: qualityHigh}.jobAttrs()}
-	if c, _ := g.Int("copies"); c != 3 {
-		t.Errorf("copies = %d", c)
-	}
-	if o, _ := g.Int("orientation-requested"); o != 4 {
-		t.Errorf("orientation = %d, want landscape 4", o)
-	}
-	for name, want := range map[string]string{"media": "iso_a3_297x420mm", "print-color-mode": "monochrome", "sides": "two-sided-long-edge"} {
-		if got := g.Text(name); got != want {
-			t.Errorf("%s = %q, want %q", name, got, want)
+	f := form{copies: 3, pages: pagesRanges, ranges: "2", landscape: true, paper: commonPapers[3], color: "monochrome", side: "two-sided-long-edge", quality: qualityHigh}
+	for _, d := range []drawing{drawnAsIs, drawnToSettings} {
+		g := ipp.Group{Attrs: f.jobAttrs(d)}
+		if c, _ := g.Int("copies"); c != 3 {
+			t.Errorf("drawing %d: copies = %d", d, c)
+		}
+		for name, want := range map[string]string{"media": "iso_a3_297x420mm", "print-color-mode": "monochrome", "sides": "two-sided-long-edge"} {
+			if got := g.Text(name); got != want {
+				t.Errorf("drawing %d: %s = %q, want %q", d, name, got, want)
+			}
+		}
+		if q, _ := g.Int("print-quality"); q != qualityHigh {
+			t.Errorf("drawing %d: quality = %d, want high 5", d, q)
 		}
 	}
-	if q, _ := g.Int("print-quality"); q != qualityHigh {
-		t.Errorf("quality = %d, want high 5", q)
+	asIs := ipp.Group{Attrs: f.jobAttrs(drawnAsIs)}
+	if o, _ := asIs.Int("orientation-requested"); o != 4 {
+		t.Errorf("orientation = %d, want landscape 4", o)
 	}
-	if a, ok := g.Get("page-ranges"); !ok || a.Values[0].Low != 2 || a.Values[0].Int != 2 {
+	if a, ok := asIs.Get("page-ranges"); !ok || a.Values[0].Low != 2 || a.Values[0].Int != 2 {
 		t.Errorf("page-ranges = %+v", a)
+	}
+	drawn := ipp.Group{Attrs: f.jobAttrs(drawnToSettings)}
+	for _, name := range []string{"orientation-requested", "page-ranges"} {
+		if _, ok := drawn.Get(name); ok {
+			t.Errorf("a document drawn to the settings is sent %s", name)
+		}
 	}
 	// The current page or selection is the whole document the app
 	// sends: no ranges.
-	current := ipp.Group{Attrs: form{copies: 1, pages: pagesCurrent, ranges: "4", paper: a4(), color: "color", side: "one-sided", quality: qualityNormal}.jobAttrs()}
+	current := ipp.Group{Attrs: form{copies: 1, pages: pagesCurrent, ranges: "4", paper: a4(), color: "color", side: "one-sided", quality: qualityNormal}.jobAttrs(drawnAsIs)}
 	if _, ok := current.Get("page-ranges"); ok {
 		t.Errorf("current page = %+v", current)
 	}

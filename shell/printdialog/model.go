@@ -357,8 +357,45 @@ var (
 	gtkQuality = map[int32]string{qualityDraft: "draft", qualityNormal: "normal", qualityHigh: "high"}
 )
 
-// settings are the GtkPrintSettings keys the portal returns, the
-// printer GTK's dialog records included, and Print to File's output.
+// sheetLayout are the settings that lay pages out on sheets, each with
+// the value under which an app lays out nothing.
+var sheetLayout = map[string]string{
+	"n-copies": "1", "number-up": "1", "number-up-layout": allLayouts[0],
+	"page-set": allPageSets[0], "reverse": "false", "collate": "false",
+}
+
+// printerSide prefixes the sheet layout a printer applies among the
+// settings an app gets back, which it keeps and a next request starts
+// from.
+const printerSide = "lys-printer-"
+
+// appSettings are the settings the portal returns, which the app draws
+// its document with. A printer applies the sheet layout itself, as it
+// does it after the pages, so the app gets the values that lay out
+// nothing (GTK 3 draws every one, GTK 4 all but the copies and pages
+// per sheet), and the form's under printerSide; Print to File's app
+// lays out all of it.
+func (f form) appSettings(printer string) []Setting {
+	s := f.settings(printer)
+	if printer == fileQueue {
+		return s
+	}
+	out := make([]Setting, 0, len(s)+len(sheetLayout))
+	var printerSet []Setting
+	for _, kv := range s {
+		none, ok := sheetLayout[kv.Key]
+		if !ok {
+			out = append(out, kv)
+			continue
+		}
+		out = append(out, Setting{kv.Key, none})
+		printerSet = append(printerSet, Setting{printerSide + kv.Key, kv.Value})
+	}
+	return append(out, printerSet...)
+}
+
+// settings are the form as GtkPrintSettings keys, the printer GTK's
+// dialog records included, and Print to File's output.
 func (f form) settings(printer string) []Setting {
 	orientation := "portrait"
 	if f.landscape {
@@ -421,23 +458,40 @@ func (f form) pageSetup() PageSetup {
 	}
 }
 
-// jobAttrs are the form as IPP job template attributes (what GTK's
-// CUPS backend maps the settings to).
-func (f form) jobAttrs() []ipp.Attr {
-	orientation := int32(3)
-	if f.landscape {
-		orientation = 4
-	}
+// drawing is how the document a job spools was drawn.
+type drawing uint8
+
+const (
+	// drawnToSettings is a document the app drew with the settings
+	// Prepare returned: the pages chosen, in the orientation chosen,
+	// one to a sheet, once and in order (appSettings).
+	drawnToSettings drawing = iota
+	// drawnAsIs is a document printed without a Prepare, drawn knowing
+	// nothing of the form: the printer applies all of it.
+	drawnAsIs
+)
+
+// jobAttrs are the form as IPP job template attributes: the paper,
+// colour, sides and quality, and the sheet layout appSettings leaves
+// to the printer; for a document drawn as is, the pages and the
+// orientation too.
+func (f form) jobAttrs(d drawing) []ipp.Attr {
 	attrs := []ipp.Attr{
 		ipp.Int("copies", intconv.Clamp[int32](f.copies)),
-		ipp.Enum("orientation-requested", orientation),
 		f.media(),
 		ipp.String(ipp.TagKeyword, "print-color-mode", f.color),
 		ipp.String(ipp.TagKeyword, "sides", f.side),
 		ipp.Enum("print-quality", f.quality),
 	}
-	if rs, ok := f.pageList(); ok {
-		attrs = append(attrs, ipp.Ranges("page-ranges", rs))
+	if d == drawnAsIs {
+		orientation := int32(3)
+		if f.landscape {
+			orientation = 4
+		}
+		attrs = append(attrs, ipp.Enum("orientation-requested", orientation))
+		if rs, ok := f.pageList(); ok {
+			attrs = append(attrs, ipp.Ranges("page-ranges", rs))
+		}
 	}
 	if f.numberUp > 1 {
 		attrs = append(attrs, ipp.Int("number-up", f.numberUp), ipp.String(ipp.TagKeyword, "number-up-layout", f.layout))
@@ -493,6 +547,11 @@ func initialForm(r PrepareRequest, c capabilities) form {
 	in := map[string]string{}
 	for _, s := range r.Settings {
 		in[s.Key] = s.Value
+	}
+	for key := range sheetLayout {
+		if v, ok := in[printerSide+key]; ok {
+			in[key] = v
+		}
 	}
 	f := form{
 		copies: minCopies, side: c.side, color: c.color, quality: c.quality,

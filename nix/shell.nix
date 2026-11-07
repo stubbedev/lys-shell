@@ -49,6 +49,12 @@
           # wl-paste, the out-of-process data-control reader the screenshot
           # clipboard tests read the selection back with.
           wl-clipboard
+          # GTK 3 and GTK 4 apps, through PyGObject, printing through the
+          # real portal to the print dialog (portal's GTK print tests).
+          (python3.withPackages (ps: [ ps.pygobject3 ]))
+          gobject-introspection
+          gtk3
+          gtk4
           inter # config default font-sans
           jetbrains-mono # config default font-mono
           nerd-fonts.jetbrains-mono # the common Nerd Font a user config names
