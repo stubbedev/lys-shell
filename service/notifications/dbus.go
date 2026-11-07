@@ -3,6 +3,7 @@ package notifications
 import (
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
@@ -110,6 +111,16 @@ func (d *lysShellDaemon) SetDnd(enabled bool) *dbus.Error {
 	return nil
 }
 
+// SetDndUntil turns do-not-disturb on until a Unix time in seconds.
+func (d *lysShellDaemon) SetDndUntil(until int64) *dbus.Error {
+	at := time.Unix(until, 0)
+	if !at.After(time.Now()) {
+		return dbusx.InvalidArgs("do-not-disturb until a time that has passed")
+	}
+	d.svc.SetDNDUntil(at)
+	return nil
+}
+
 // ToggleDnd flips do-not-disturb.
 func (d *lysShellDaemon) ToggleDnd() *dbus.Error {
 	d.svc.ToggleDND()
@@ -167,9 +178,18 @@ func ServeLysShell(conn *dbus.Conn, svc *Service) (func(), error) {
 		Methods:   d,
 		Properties: dbusx.Getters{
 			"Dnd":           func() any { return svc.DND() },
+			"DndReason":     func() any { return svc.Focus().Reason.String() },
+			"DndUntil":      func() any { return unixOrZero(svc.Focus().Until) },
 			"PopupDuration": func() any { return d.popupDuration.Load() },
 			"Count":         func() any { return intconv.Clamp[uint32](svc.Count()) },
 			"PopupCount":    func() any { return intconv.Clamp[uint32](len(svc.Popups())) },
 		},
 	})
+}
+
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
 }

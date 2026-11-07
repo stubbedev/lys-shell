@@ -70,6 +70,7 @@ func (m *notificationModule) refresh() {
 	if setter := m.icon; setter != nil {
 		setter.SetThemeName(notificationIconName(cfg, count, dnd))
 	}
+	m.btn.SetTooltip(focusText(m.src.Focus()))
 }
 
 func (m *notificationModule) Root() widget.Widget { return m.btn }

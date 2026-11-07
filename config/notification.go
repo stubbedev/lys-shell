@@ -51,6 +51,9 @@ type NotificationConfig struct {
 	//
 	// Examples: `["notify-send", "*chromium*", "Vivaldi*"]`
 	Blocklist []string `cfg:"blocklist"`
+	// Do-not-disturb rules: critical and allowed apps through, a schedule,
+	// and turning it on while sharing the screen or in fullscreen.
+	Dnd NotificationDndConfig `cfg:"dnd"`
 	// How notification icons are resolved.
 	//
 	// | Mode | Per-notification image | No image provided |
@@ -151,6 +154,7 @@ func DefaultsNotification() NotificationConfig {
 		ScrollUp:           ClickAction{},
 		ScrollDown:         ClickAction{},
 		Blocklist:          []string{},
+		Dnd:                DefaultsNotificationDnd(),
 		IconSource:         IconSourceAutomatic,
 		HistoryMemory:      NotificationHistoryMemory{limit: notifications.DefaultMemoryLimit()},
 		HistoryStored:      NotificationHistoryStored{limit: notifications.DefaultStoredLimit()},

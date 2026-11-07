@@ -349,6 +349,9 @@ func (v *dashboardView) quickActions() widget.Widget {
 		bt.icon.SetThemeName(dashboardGlyph(state.btOn, "ld-bluetooth-symbolic", "ld-bluetooth-off-symbolic"))
 		apply(airplane, air, state.hasWifi || state.hasBT)
 		apply(dnd, state.dndOn, v.ctx.Notifications != nil)
+		if n := v.ctx.Notifications; n != nil {
+			dnd.btn.SetTooltip(focusText(n.Focus()))
+		}
 		dnd.icon.SetThemeName(dashboardGlyph(state.dndOn, "ld-bell-off-symbolic", "ld-bell-symbolic"))
 		apply(idle, state.idleOn, true)
 		apply(saver, state.saverOn, state.hasPP)

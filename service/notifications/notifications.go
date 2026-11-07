@@ -1,7 +1,7 @@
 // Package notifications is the desktop notification service: the
 // org.freedesktop.Notifications server, the stored history, the popup
-// list with its pausable countdowns, and the sticky do-not-disturb
-// state.
+// list with its pausable countdowns, and do-not-disturb with its focus
+// rules: a schedule, sharing and fullscreen, and what still pops up.
 package notifications
 
 import (
@@ -159,7 +159,10 @@ type Service struct {
 	popups        []*Notification
 	timers        map[uint32]*popupTimer
 	popupDuration time.Duration
-	dnd           bool
+	focus         focusInputs
+	focusLoc      *time.Location
+	focusShown    Focus
+	focusStop     func() bool
 	removeExpired bool
 	block         []string
 	events        *feed.Feed[Event]
@@ -207,7 +210,7 @@ func (s *Service) UseClock(c Clock) {
 // expiryTimer is one history entry's armed expiry.
 type expiryTimer struct{ stop func() bool }
 
-// NewService restores the DND flag from the state dir.
+// NewService restores the manual do-not-disturb flag from the state dir.
 func NewService() *Service {
 	idle := make(chan struct{})
 	close(idle)
@@ -219,7 +222,8 @@ func NewService() *Service {
 		expiry:        make(map[uint32]*expiryTimer),
 		timers:        make(map[uint32]*popupTimer),
 		popupDuration: DefaultPopupDuration,
-		dnd:           loadDND(),
+		focus:         focusInputs{manual: loadDND()},
+		focusLoc:      time.Local,
 		removeExpired: true,
 		owners:        make(map[uint32]string),
 		cacheImage:    cacheImage,
@@ -373,33 +377,6 @@ func (s *Service) SetPopupDuration(d time.Duration) {
 	s.mu.Unlock()
 }
 
-// DND reports do-not-disturb.
-func (s *Service) DND() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.dnd
-}
-
-// SetDND flips do-not-disturb and persists it.
-func (s *Service) SetDND(on bool) {
-	s.mu.Lock()
-	s.dnd = on
-	s.enqueueLocked(func() { saveDND(on) })
-	s.mu.Unlock()
-	s.notify(Event{Kind: EventDnd})
-}
-
-// ToggleDND flips do-not-disturb, returning the new state.
-func (s *Service) ToggleDND() bool {
-	s.mu.Lock()
-	s.dnd = !s.dnd
-	on := s.dnd
-	s.enqueueLocked(func() { saveDND(on) })
-	s.mu.Unlock()
-	s.notify(Event{Kind: EventDnd})
-	return on
-}
-
 // SetRemoveExpired toggles auto-removal of expired history entries.
 func (s *Service) SetRemoveExpired(on bool) {
 	s.mu.Lock()
@@ -530,13 +507,13 @@ func (s *Service) storedOnly(id uint32) (*Notification, bool) {
 	return n, ok
 }
 
-// addPopupLocked is handle_popup_added: outside DND the notification
-// goes to the front of the popup list (a replacement moves up) and
+// addPopupLocked is handle_popup_added: unless do-not-disturb holds it
+// back (Verdict), the notification goes to the front of the popup list (a replacement moves up) and
 // gets its countdown — the popup duration, capped by the sender's
 // positive expire_timeout; a zero timeout sticks until dismissed. The
 // caller holds mu.
 func (s *Service) addPopupLocked(n *Notification) {
-	if s.dnd {
+	if s.verdictLocked(n) != Popup {
 		return
 	}
 	s.dropPopupLocked(n.ID)

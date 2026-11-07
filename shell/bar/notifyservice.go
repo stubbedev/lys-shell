@@ -29,6 +29,7 @@ func applyNotificationConfig(svc *notifications.Service, cfg config.Notification
 		return
 	}
 	svc.SetBlocklist(cfg.Blocklist)
+	svc.SetFocusRules(cfg.Dnd.Rules())
 	svc.SetHistoryLimits(cfg.HistoryMemory.Limit(), cfg.HistoryStored.Limit())
 }
 

@@ -170,6 +170,7 @@ complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and not __fi
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help'
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and __fish_seen_subcommand_from dismiss" -s h -l help -d 'Print help'
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and __fish_seen_subcommand_from dismiss-all" -s h -l help -d 'Print help'
+complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and __fish_seen_subcommand_from dnd" -s u -l until -d 'Turn it on until a time of day (HH:MM) or for a while (30m, 1h)' -r
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and __fish_seen_subcommand_from dnd" -s h -l help -d 'Print help'
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and __fish_seen_subcommand_from status" -s h -l help -d 'Print help'
 complete -c lys-shell -n "__fish_lys_shell_using_subcommand notify; and __fish_seen_subcommand_from help" -f -a "list" -d 'List all notifications'

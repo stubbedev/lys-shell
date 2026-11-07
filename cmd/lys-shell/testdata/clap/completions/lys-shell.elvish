@@ -364,6 +364,8 @@ set edit:completion:arg-completer[lys-shell] = {|@words|
             cand --help 'Print help'
         }
         &'lys-shell;notify;dnd'= {
+            cand -u 'Turn it on until a time of day (HH:MM) or for a while (30m, 1h)'
+            cand --until 'Turn it on until a time of day (HH:MM) or for a while (30m, 1h)'
             cand -h 'Print help'
             cand --help 'Print help'
         }

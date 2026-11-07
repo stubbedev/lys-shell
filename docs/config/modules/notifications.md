@@ -31,6 +31,7 @@ bar:
 | `label-show` | bool | `true` | Display notification count label. |
 | `label-max-length` | u32 | `0` | Max label characters before truncation with ellipsis. Set to 0 to disable. |
 | `blocklist` | array of string | `[]` | Glob patterns for app names whose notifications are blocked entirely. |
+| `dnd` | [`NotificationDndConfig`](/config/types#notification-dnd-config) | `{...}` | Do-not-disturb rules: critical and allowed apps through, a schedule, and turning it on while sharing the screen or in fullscreen. |
 | `icon-source` | [`IconSource`](/config/types#icon-source) | `"automatic"` | How notification icons are resolved. |
 | `history-memory` | [`NotificationHistoryMemory`](/config/types#notification-history-memory) | `200` | How many of the newest notifications the history keeps in memory. Older ones stay on disk and load as the dropdown scrolls to them. |
 | `history-stored` | [`NotificationHistoryStored`](/config/types#notification-history-stored) | `10000` | How many notifications the history keeps on disk. The oldest are deleted past it. |
@@ -149,6 +150,12 @@ modules:
     scroll-up: ""
     scroll-down: ""
     blocklist: []
+    dnd:
+      allow-critical: true
+      allow-apps: []
+      schedule: []
+      while-sharing: true
+      while-fullscreen: false
     icon-source: automatic
     history-memory: 200
     history-stored: 10000

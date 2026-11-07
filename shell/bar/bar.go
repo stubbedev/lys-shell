@@ -605,6 +605,7 @@ func (s *shellStart) mount() {
 	if s.notifSvc != nil {
 		popupHost = popups.New(application, s.notifSvc, cfg, font, theme.Sheet, sess.Outputs)
 		go popupHost.Run()
+		s.down.add(followFocusInputs(application, s.notifSvc, s.ctx.Recorder))
 	}
 	host := &barHost{app: application, rt: rt, holder: holder}
 	bars := newSurfaceSet(host.open)

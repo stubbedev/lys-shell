@@ -51,6 +51,7 @@ type notificationView struct {
 	headerIcon, emptyIcon *widget.Icon
 	clearAll              *widget.Button
 	dnd                   *widget.Switch
+	dndItem               *widget.Item
 	syncing               bool
 	// body is the content: the empty state and the list swap by
 	// visibility, no Stack (the Rust tree sets visible in place).
@@ -90,6 +91,7 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 	dndCard, dndGroup := itemCard()
 	dndCard.AddClass("notification-dropdown-dnd-row")
 	dnd := widget.NewItem(font, i18n.T("notification-dropdown-dnd-label"), "")
+	v.dndItem = dnd
 	dnd.SetSmall(true)
 	v.dnd = widget.NewSwitch(false)
 	v.dnd.OnChanged = v.dndToggled
@@ -117,7 +119,12 @@ func notificationDropdown(ctx ModuleContext) widget.Widget {
 // syncDND is DndChanged: the switch (without writing back) and the
 // bell icons.
 func (v *notificationView) syncDND() {
-	on := v.svc != nil && v.svc.DND()
+	var focus notifications.Focus
+	if v.svc != nil {
+		focus = v.svc.Focus()
+	}
+	on := focus.On
+	v.dndItem.SetDescription(focusText(focus))
 	v.syncing = true
 	v.dnd.SetOn(on)
 	v.syncing = false

@@ -432,6 +432,17 @@ What identifies a workspace in the UI.
 | `"icon"` | Show icon from `workspace-map` (falls back to label if unmapped). |
 | `"none"` | Show nothing - only app icons visible. |
 
+## DndWindow {#dnd-window}
+
+A stretch of time on some days of the week: `days` (every day when
+left out), `from` and `to` as `HH:MM`.
+
+| Field | Description |
+|---|---|
+| `days` | Days the window starts on; every day when left out. |
+| `from` | When the window starts, as HH:MM. |
+| `to` | When the window ends, as HH:MM: the next day when not after `from`. |
+
 ## DockEdge {#dock-edge}
 
 Screen edge the dock sits on.
@@ -1029,6 +1040,19 @@ Number in `[0.0, 1.0]`.
 
 Serialises as `double`.
 
+## NotificationDndConfig {#notification-dnd-config}
+
+Do-not-disturb rules: what still pops up while it is on, and what turns
+it on by itself. Notifications held back still reach the history.
+
+| Field | Description |
+|---|---|
+| `allow-critical` | Critical notifications (a low battery, a failed backup, an alarm) |
+| `allow-apps` | App-name or desktop-entry globs whose notifications pop up even in |
+| `schedule` | Windows of the week do-not-disturb turns itself on in, in the local |
+| `while-sharing` | Turn do-not-disturb on while the screen is shared or recorded. |
+| `while-fullscreen` | Turn do-not-disturb on while a window is fullscreen. |
+
 ## NotificationHistoryMemory {#notification-history-memory}
 
 Notifications kept in memory.
@@ -1586,6 +1610,20 @@ Which day appears in the first column of the calendar dropdown.
 | `"friday"` | Week starts on Friday. |
 | `"saturday"` | Week starts on Saturday. |
 | `"sunday"` | Week starts on Sunday (default). |
+
+## Weekday {#weekday}
+
+Day of the week.
+
+| Value | Meaning |
+|---|---|
+| `"mon"` | Monday. |
+| `"tue"` | Tuesday. |
+| `"wed"` | Wednesday. |
+| `"thu"` | Thursday. |
+| `"fri"` | Friday. |
+| `"sat"` | Saturday. |
+| `"sun"` | Sunday. |
 
 ## WindowScope {#window-scope}
 

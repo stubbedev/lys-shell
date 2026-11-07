@@ -188,3 +188,21 @@ func TestRecorderCommands(t *testing.T) {
 	waitFor(t, func() bool { return !state.Snapshot().Active })
 	runSteps(t, []step{{[]string{"recorder", "stop"}, "Recording stopped\n"}})
 }
+
+func TestNotifyDndUntil(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dbustest.Session(t)
+	svc := notifications.NewService()
+	server, err := notifications.Serve(dbustest.SessionConn(t), svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = server.Release() }()
+	runSteps(t, []step{
+		{[]string{"notify", "dnd", "--until", "soon"}, "Error: until \"soon\": want a time of day as HH:MM or a duration such as 30m or 1h\n"},
+		{[]string{"notify", "dnd", "--until", "23:59"}, "Do Not Disturb: enabled until 23:59\n"},
+	})
+	if f := svc.Focus(); !f.On || f.Reason != notifications.FocusUntil || f.Until.Format("15:04") != "23:59" {
+		t.Errorf("focus after --until = %+v", f)
+	}
+}

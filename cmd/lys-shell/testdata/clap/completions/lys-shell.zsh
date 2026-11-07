@@ -558,6 +558,8 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (dnd)
 _arguments "${_arguments_options[@]}" : \
+'-u+[Turn it on until a time of day (HH\:MM) or for a while (30m, 1h)]:TIME:_default' \
+'--until=[Turn it on until a time of day (HH\:MM) or for a while (30m, 1h)]:TIME:_default' \
 '-h[Print help]' \
 '--help[Print help]' \
 && ret=0

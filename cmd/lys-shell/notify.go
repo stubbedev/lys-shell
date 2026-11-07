@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/service/notifications"
@@ -23,7 +24,14 @@ func notifyCommand() *cli.Command {
 				Run: withNotify(notifyDismiss),
 			},
 			{Name: "dismiss-all", About: "Dismiss all notifications", Run: withNotify(notifyDismissAll)},
-			{Name: "dnd", About: "Toggle Do Not Disturb mode", Run: withNotify(notifyDND)},
+			{
+				Name:  "dnd",
+				About: "Toggle Do Not Disturb mode",
+				Args: []*cli.Arg{
+					{ID: "until", Short: 'u', Long: "until", ValueName: "TIME", Value: cli.String, Help: "Turn it on until a time of day (HH:MM) or for a while (30m, 1h)"},
+				},
+				Run: withNotify(notifyDND),
+			},
 			{Name: "status", About: "Show notification status", Run: withNotify(notifyStatus)},
 		},
 	}
@@ -82,6 +90,17 @@ func notifyDismissAll(m *cli.Matches, p *daemonProxy) error {
 }
 
 func notifyDND(m *cli.Matches, p *daemonProxy) error {
+	if raw, ok := cli.Value[string](m, "until"); ok {
+		until, err := notifications.ParseUntil(raw, time.Now())
+		if err != nil {
+			return err
+		}
+		if err := p.call("set DND", "SetDndUntil", nil, until.Unix()); err != nil {
+			return err
+		}
+		fmt.Fprintf(m.Stdout(), "Do Not Disturb: enabled until %s\n", until.Format("15:04"))
+		return nil
+	}
 	if err := p.call("toggle DND", "ToggleDnd", nil); err != nil {
 		return err
 	}

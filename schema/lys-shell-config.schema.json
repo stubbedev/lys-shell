@@ -405,6 +405,12 @@
       },
       "type": "array"
     },
+    "Array_of_DndWindow": {
+      "items": {
+        "$ref": "#/$defs/DndWindow"
+      },
+      "type": "array"
+    },
     "Array_of_LauncherDrunField": {
       "items": {
         "$ref": "#/$defs/LauncherDrunField"
@@ -2531,6 +2537,30 @@
           "type": "string"
         }
       ]
+    },
+    "DndWindow": {
+      "description": "A stretch of time on some days of the week: `days` (every day when\nleft out), `from` and `to` as `HH:MM`.",
+      "properties": {
+        "days": {
+          "default": [],
+          "description": "Days the window starts on; every day when left out.",
+          "items": {
+            "$ref": "#/$defs/Weekday"
+          },
+          "type": "array"
+        },
+        "from": {
+          "default": "",
+          "description": "When the window starts, as HH:MM.",
+          "type": "string"
+        },
+        "to": {
+          "default": "",
+          "description": "When the window ends, as HH:MM: the next day when not after `from`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
     },
     "DockConfig": {
       "description": "A dock of pinned apps and open windows, on its own surface beside the bar.\n\nPinned apps launch on click. Open windows show under their app's icon\nwith a running indicator, dimmed while all of them are minimized; a click\nfocuses the app's window, bringing a minimized one back, and cycles\nthrough its windows. Windows minimize into their dock icon. Works on any\ncompositor with the wlr foreign-toplevel protocol; hiding when a window\ncovers the dock needs lys-wm.",
@@ -6292,6 +6322,13 @@
             "border-color": "green",
             "border-show": false,
             "button-bg-color": "bg-surface-elevated",
+            "dnd": {
+              "allow-apps": [],
+              "allow-critical": true,
+              "schedule": [],
+              "while-fullscreen": false,
+              "while-sharing": true
+            },
             "enabled": true,
             "history-memory": 200,
             "history-stored": 10000,
@@ -7382,6 +7419,17 @@
           "default": "bg-surface-elevated",
           "description": "Button background color token."
         },
+        "dnd": {
+          "$ref": "#/$defs/NotificationDndConfig",
+          "default": {
+            "allow-apps": [],
+            "allow-critical": true,
+            "schedule": [],
+            "while-fullscreen": false,
+            "while-sharing": true
+          },
+          "description": "Do-not-disturb rules: critical and allowed apps through, a schedule,\nand turning it on while sharing the screen or in fullscreen."
+        },
         "enabled": {
           "$ref": "#/$defs/boolean",
           "default": true,
@@ -7551,6 +7599,37 @@
           "$ref": "#/$defs/Array_of_ThresholdEntry",
           "default": [],
           "description": "Dynamic color thresholds based on notification count.\n\nEntries are checked in order; the last matching entry wins for each\ncolor slot. Use `above` for high-value warnings (e.g., many unread\nnotifications).\n\n## Example\n\n```yaml\nmodules:\n  notifications:\n    thresholds:\n      - above: 5\n        icon-color: status-warning\n        label-color: status-warning\n      - above: 20\n        icon-color: status-error\n        label-color: status-error\n```"
+        }
+      },
+      "type": "object"
+    },
+    "NotificationDndConfig": {
+      "description": "Do-not-disturb rules: what still pops up while it is on, and what turns\nit on by itself. Notifications held back still reach the history.",
+      "properties": {
+        "allow-apps": {
+          "$ref": "#/$defs/Array_of_string",
+          "default": [],
+          "description": "App-name or desktop-entry globs whose notifications pop up even in\ndo-not-disturb. Supports `*` and `?`.\n\nExamples: `[\"org.gnome.Calendar\", \"*alarm*\"]`"
+        },
+        "allow-critical": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Critical notifications (a low battery, a failed backup, an alarm)\npop up even in do-not-disturb."
+        },
+        "schedule": {
+          "$ref": "#/$defs/Array_of_DndWindow",
+          "default": [],
+          "description": "Windows of the week do-not-disturb turns itself on in, in the local\ntime zone. A window whose `to` is not after its `from` runs past\nmidnight into the next day. Toggling do-not-disturb by hand inside a\nwindow overrides it until the window ends.\n\n```yaml\nschedule:\n  - {days: [mon, tue, wed, thu, fri], from: \"22:00\", to: \"07:00\"}\n```"
+        },
+        "while-fullscreen": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Turn do-not-disturb on while a window is fullscreen."
+        },
+        "while-sharing": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Turn do-not-disturb on while the screen is shared or recorded."
         }
       },
       "type": "object"
@@ -10644,6 +10723,46 @@
         }
       ]
     },
+    "Weekday": {
+      "description": "Day of the week.",
+      "oneOf": [
+        {
+          "const": "mon",
+          "description": "Monday.",
+          "type": "string"
+        },
+        {
+          "const": "tue",
+          "description": "Tuesday.",
+          "type": "string"
+        },
+        {
+          "const": "wed",
+          "description": "Wednesday.",
+          "type": "string"
+        },
+        {
+          "const": "thu",
+          "description": "Thursday.",
+          "type": "string"
+        },
+        {
+          "const": "fri",
+          "description": "Friday.",
+          "type": "string"
+        },
+        {
+          "const": "sat",
+          "description": "Saturday.",
+          "type": "string"
+        },
+        {
+          "const": "sun",
+          "description": "Sunday.",
+          "type": "string"
+        }
+      ]
+    },
     "WindowScope": {
       "description": "Which outputs' windows the module lists.",
       "oneOf": [
@@ -11927,6 +12046,13 @@
           "border-color": "green",
           "border-show": false,
           "button-bg-color": "bg-surface-elevated",
+          "dnd": {
+            "allow-apps": [],
+            "allow-critical": true,
+            "schedule": [],
+            "while-fullscreen": false,
+            "while-sharing": true
+          },
           "enabled": true,
           "history-memory": 200,
           "history-stored": 10000,

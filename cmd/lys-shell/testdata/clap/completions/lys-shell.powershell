@@ -445,6 +445,8 @@ Register-ArgumentCompleter -Native -CommandName 'lys-shell' -ScriptBlock {
             break
         }
         'lys-shell;notify;dnd' {
+            [CompletionResult]::new('-u', '-u', [CompletionResultType]::ParameterName, 'Turn it on until a time of day (HH:MM) or for a while (30m, 1h)')
+            [CompletionResult]::new('--until', '--until', [CompletionResultType]::ParameterName, 'Turn it on until a time of day (HH:MM) or for a while (30m, 1h)')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
