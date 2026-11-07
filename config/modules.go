@@ -8,6 +8,8 @@ import "reflect"
 //
 // Configuration for all available lys-shell modules.
 type ModulesConfig struct {
+	// Background apps indicator module.
+	BackgroundApps BackgroundAppsConfig `cfg:"background-apps"`
 	// Battery status module.
 	Battery BatteryConfig `cfg:"battery"`
 	// Bluetooth connection module.
@@ -130,6 +132,7 @@ func (m *ModulesConfig) ModuleClicks(name string) (ClickConfig, bool) {
 // DefaultsModules returns every module's schema defaults.
 func DefaultsModules() ModulesConfig {
 	return ModulesConfig{
+		BackgroundApps:     DefaultsBackgroundApps(),
 		Battery:            DefaultsBattery(),
 		Bitwarden:          DefaultsBitwarden(),
 		Bluetooth:          DefaultsBluetooth(),

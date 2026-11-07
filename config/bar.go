@@ -220,6 +220,7 @@ func DefaultBarLayout() BarLayout {
 		Center:  []BarItem{{Module: ModuleClock}},
 		Right: []BarItem{
 			{Module: ModuleSystray},
+			{Module: ModuleBackgroundApps},
 			{Module: ModuleBattery},
 			{Module: ModuleBluetooth},
 			{Module: ModuleNetwork},

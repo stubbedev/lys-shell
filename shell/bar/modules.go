@@ -61,9 +61,12 @@ type ModuleContext struct {
 	Notifications *notifications.Service
 	Recorder      *recorder.State
 	Mail          *mail.Service
-	Bitwarden     *bitwardenHost
-	SNI           *sni.Store
-	Weather       *weather.Service
+	// BackgroundApps is the portal's background apps, nil without a
+	// session bus.
+	BackgroundApps backgroundAppSource
+	Bitwarden      *bitwardenHost
+	SNI            *sni.Store
+	Weather        *weather.Service
 	// Tasks is the window list the minimized-windows modules and the docks
 	// share; nil when the compositor offers no foreign-toplevel list.
 	Tasks *taskHub
@@ -324,6 +327,7 @@ var factories = map[string]Factory{
 	"lys-wm-workspaces":   newLysWMWorkspaces,
 	"workspaces":          newWorkspaces,
 	"screen-share":        newScreenShare,
+	"background-apps":     newBackgroundApps,
 	"screenshot":          newScreenshot,
 	"separator":           newSeparator,
 }

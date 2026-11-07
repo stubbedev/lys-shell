@@ -416,6 +416,7 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 		}
 	}
 	s.down.add(startMail(&s.ctx, s.session))
+	s.down.add(startBackgroundApps(&s.ctx, s.session))
 	sniHost, err := startTrayHost(s.session, sniStore)
 	if err == nil {
 		s.down.add(func() { _ = sniHost.Close() })

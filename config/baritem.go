@@ -165,6 +165,7 @@ type BarModule string
 
 // The built-in modules the layout accepts (BUILTIN_MODULES).
 const (
+	ModuleBackgroundApps     BarModule = "background-apps"
 	ModuleBattery            BarModule = "battery"
 	ModuleBluetooth          BarModule = "bluetooth"
 	ModuleBrightness         BarModule = "brightness"
@@ -209,7 +210,7 @@ const (
 
 // BuiltinModules is the built-in module list in schema order.
 var BuiltinModules = []BarModule{
-	ModuleBattery, ModuleBitwarden, ModuleBluetooth, ModuleBrightness, ModuleCava, ModuleClock,
+	ModuleBackgroundApps, ModuleBattery, ModuleBitwarden, ModuleBluetooth, ModuleBrightness, ModuleCava, ModuleClock,
 	ModuleCPU, ModuleDashboard, ModuleHyprlandWorkspaces,
 	ModuleIdleInhibit, ModuleKeybindMode, ModuleKeyboardInput, ModuleLysWMWorkspaces, ModuleMail,
 	ModuleMedia, ModuleMangoWorkspaces, ModuleMicrophone, ModuleMinimizedWindows, ModuleNetstat,

@@ -40,6 +40,7 @@ Modules appear inside the `bar.layout` list. Each row links to the full referenc
 
 | Module | Purpose |
 |---|---|
+| [`background-apps`](/config/modules/background-apps) | Background apps indicator. |
 | [`battery`](/config/modules/battery) | Battery level, charging state, and a dropdown with power-profile controls. |
 | [`bitwarden`](/config/modules/bitwarden) | Bitwarden vault: the bar shows whether it is locked; the dropdown logs |
 | [`bluetooth`](/config/modules/bluetooth) | Bluetooth connection status with a dropdown for pairing and managing devices. |

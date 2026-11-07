@@ -12,6 +12,7 @@ import (
 var i18nPrefixes = map[string]string{
 	"AnimationsConfig":          "settings-animations",
 	"BarConfig":                 "settings-bar",
+	"BackgroundAppsConfig":      "settings-modules-background-apps",
 	"BatteryConfig":             "settings-modules-battery",
 	"BitwardenConfig":           "settings-modules-bitwarden",
 	"BluetoothConfig":           "settings-modules-bluetooth",

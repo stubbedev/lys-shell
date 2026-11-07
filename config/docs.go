@@ -145,6 +145,7 @@ func docSpecs() []docSpec {
 			name: "dropdown-dashboard-user-session", layout: "user-session", groups: docBarButton(),
 			value: field(func(c *Config) any { return &c.Dashboard.UserSession }),
 		},
+		m("background-apps", bar, func(c *Config) any { return &c.BackgroundApps }),
 		m("battery", bar, func(c *Config) any { return &c.Battery }),
 		m("bitwarden", func() []DocGroup { return append(docBarButton(), docPrefix("Generator", "generator-")) },
 			func(c *Config) any { return &c.Bitwarden }),

@@ -490,6 +490,87 @@
         "auto"
       ]
     },
+    "BackgroundAppsConfig": {
+      "description": "Background apps indicator.\n\nShows while a sandboxed app keeps running without a window, as the\ndesktop portal's background monitor lists them; its dropdown names each\napp with the status it reports and a button that stops it.",
+      "properties": {
+        "border-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Border color token."
+        },
+        "border-show": {
+          "$ref": "#/$defs/boolean",
+          "default": false,
+          "description": "Display border around button."
+        },
+        "button-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "bg-surface-elevated",
+          "description": "Button background color token."
+        },
+        "icon": {
+          "$ref": "#/$defs/string",
+          "default": "ld-layers-symbolic",
+          "description": "Bar button icon."
+        },
+        "icon-bg-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "blue",
+          "description": "Icon container background color token."
+        },
+        "icon-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "auto",
+          "description": "Icon foreground color. Auto selects based on variant for contrast."
+        },
+        "icon-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display module icon."
+        },
+        "label-color": {
+          "$ref": "#/$defs/ColorValue",
+          "default": "fg-default",
+          "description": "Label text color token."
+        },
+        "label-max-length": {
+          "$ref": "#/$defs/uint32",
+          "default": 0,
+          "description": "Max label characters before truncation with ellipsis. Set to 0 to disable."
+        },
+        "label-show": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Display the number of background apps beside the icon."
+        },
+        "left-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "dropdown:background-apps",
+          "description": "Action on left click. Default opens the dropdown."
+        },
+        "middle-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on middle click."
+        },
+        "right-click": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on right click."
+        },
+        "scroll-down": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll down."
+        },
+        "scroll-up": {
+          "$ref": "#/$defs/ClickAction",
+          "default": "",
+          "description": "Action on scroll up."
+        }
+      },
+      "type": "object"
+    },
     "BarButtonVariant": {
       "description": "Visual style variants for bar buttons.",
       "oneOf": [
@@ -698,6 +779,7 @@
               "monitor": "*",
               "right": [
                 "systray",
+                "background-apps",
                 "battery",
                 "bluetooth",
                 "network",
@@ -830,6 +912,7 @@
         "right": {
           "default": [
             "systray",
+            "background-apps",
             "battery",
             "bluetooth",
             "network",
@@ -856,6 +939,7 @@
       "anyOf": [
         {
           "enum": [
+            "background-apps",
             "battery",
             "bitwarden",
             "bluetooth",
@@ -5676,6 +5760,27 @@
     "ModulesConfig": {
       "description": "Configuration for all available lys-shell modules.",
       "properties": {
+        "background-apps": {
+          "$ref": "#/$defs/BackgroundAppsConfig",
+          "default": {
+            "border-color": "blue",
+            "border-show": false,
+            "button-bg-color": "bg-surface-elevated",
+            "icon": "ld-layers-symbolic",
+            "icon-bg-color": "blue",
+            "icon-color": "auto",
+            "icon-show": true,
+            "label-color": "fg-default",
+            "label-max-length": 0,
+            "label-show": true,
+            "left-click": "dropdown:background-apps",
+            "middle-click": "",
+            "right-click": "",
+            "scroll-down": "",
+            "scroll-up": ""
+          },
+          "description": "Background apps indicator module."
+        },
         "battery": {
           "$ref": "#/$defs/BatteryConfig",
           "default": {
@@ -11224,6 +11329,7 @@
             "monitor": "*",
             "right": [
               "systray",
+              "background-apps",
               "battery",
               "bluetooth",
               "network",
@@ -11523,6 +11629,23 @@
     "modules": {
       "$ref": "#/$defs/ModulesConfig",
       "default": {
+        "background-apps": {
+          "border-color": "blue",
+          "border-show": false,
+          "button-bg-color": "bg-surface-elevated",
+          "icon": "ld-layers-symbolic",
+          "icon-bg-color": "blue",
+          "icon-color": "auto",
+          "icon-show": true,
+          "label-color": "fg-default",
+          "label-max-length": 0,
+          "label-show": true,
+          "left-click": "dropdown:background-apps",
+          "middle-click": "",
+          "right-click": "",
+          "scroll-down": "",
+          "scroll-up": ""
+        },
         "battery": {
           "alert-icon": "ld-battery-warning-symbolic",
           "border-color": "yellow",
