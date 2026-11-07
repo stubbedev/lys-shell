@@ -493,3 +493,48 @@ func TestWatchTicksOnStackEvents(t *testing.T) {
 	f.Events <- `{"event":"stack","window":3,"stack":null}`
 	awaitTick(t, w)
 }
+
+func TestVirtualOutputsAreCreatedAndRemoved(t *testing.T) {
+	f := lyswmtest.Start(t)
+	f.Result("createoutput", `{"name":"VIRT-1"}`)
+	f.Answer("removeoutput", `{"version":1}`)
+	name, err := lyswm.CreateOutput(lyswm.Mode{Width: 1920, Height: 1080, RefreshMHz: 60000}, 1)
+	if err != nil || name != "VIRT-1" {
+		t.Fatalf("CreateOutput = %q, %v", name, err)
+	}
+	if err := lyswm.RemoveOutput(name); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{`{"request":"createoutput","mode":{"width":1920,"height":1080,"refresh_mhz":60000},"scale":1}`, `{"request":"removeoutput","name":"VIRT-1"}`}
+	if got := f.Requests(); !slices.Equal(got, want) {
+		t.Fatalf("requests = %q", got)
+	}
+	f.Result("createoutput", `{}`)
+	if _, err := lyswm.CreateOutput(lyswm.Mode{Width: 1, Height: 1, RefreshMHz: 1}, 0); err == nil {
+		t.Fatal("an answer without a name gave an output")
+	}
+	f.Answer("removeoutput", `{"version":1,"error":"compositor: remove output DP-1: only virtual outputs can be removed"}`)
+	var rejected *lyswm.RejectedError
+	if err := lyswm.RemoveOutput("DP-1"); !errors.As(err, &rejected) || !strings.Contains(rejected.Message, "only virtual outputs") {
+		t.Fatalf("removing a monitor: %v", err)
+	}
+}
+
+func TestVirtualOutputsAreOfferedByALysWMThatKnowsThem(t *testing.T) {
+	f := lyswmtest.Start(t)
+	if offered, err := lyswm.OffersVirtualOutputs(); err != nil || offered {
+		t.Fatalf("a lys-wm without createoutput offers virtual outputs: %v, %v", offered, err)
+	}
+	f.Answer("createoutput", `{"version":1,"error":"ipc: bad request: createoutput needs a mode with a width, a height and a refresh_mhz above 0"}`)
+	if offered, err := lyswm.OffersVirtualOutputs(); err != nil || !offered {
+		t.Fatalf("a lys-wm with createoutput does not offer virtual outputs: %v, %v", offered, err)
+	}
+	f.Result("createoutput", `{"name":"VIRT-1"}`)
+	if _, err := lyswm.OffersVirtualOutputs(); err == nil {
+		t.Fatal("a probe that made an output passed")
+	}
+	t.Setenv(lyswm.SocketEnv, "")
+	if offered, err := lyswm.OffersVirtualOutputs(); !errors.Is(err, lyswm.ErrNotRunning) || offered {
+		t.Fatalf("without lys-wm: %v, %v", offered, err)
+	}
+}

@@ -13,6 +13,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/stubbedev/lys-shell/internal/ipcsock"
@@ -92,6 +93,14 @@ type Locks struct {
 	Scroll bool `json:"scroll"`
 }
 
+// Mode is an output mode: its size in pixels and its refresh rate in
+// millihertz.
+type Mode struct {
+	Width      int   `json:"width"`
+	Height     int   `json:"height"`
+	RefreshMHz int32 `json:"refresh_mhz"`
+}
+
 // RejectedError is a request lys-wm answered with an error.
 type RejectedError struct {
 	Request string
@@ -103,8 +112,11 @@ func (e *RejectedError) Error() string {
 }
 
 type request struct {
-	Request string `json:"request"`
-	Action  string `json:"action,omitempty"`
+	Request string  `json:"request"`
+	Action  string  `json:"action,omitempty"`
+	Name    string  `json:"name,omitempty"`
+	Mode    *Mode   `json:"mode,omitempty"`
+	Scale   float64 `json:"scale,omitempty"`
 }
 
 type response struct {
@@ -454,4 +466,43 @@ func (w *Watcher) Ticks() <-chan struct{} { return w.ticks }
 // Close ends the stream.
 func (w *Watcher) Close() {
 	w.once.Do(func() { _ = w.conn.Close() })
+}
+
+// createOutput is the request that adds a virtual output.
+const createOutput = "createoutput"
+
+// CreateOutput adds a virtual output of the mode, at the scale (0 leaves
+// it to lys-wm's output rules), and returns its name.
+func CreateOutput(mode Mode, scale float64) (string, error) {
+	var out struct {
+		Name string `json:"name"`
+	}
+	if err := call(request{Request: createOutput, Mode: &mode, Scale: scale}, &out); err != nil {
+		return "", err
+	}
+	if out.Name == "" {
+		return "", fmt.Errorf("lys-wm: %s answered no output name", createOutput)
+	}
+	return out.Name, nil
+}
+
+// RemoveOutput removes the virtual output name; its workspaces move as
+// on an unplug.
+func RemoveOutput(name string) error {
+	return call(request{Request: "removeoutput", Name: name}, nil)
+}
+
+// OffersVirtualOutputs reports whether the running lys-wm makes virtual
+// outputs: it asks for one without a mode, which a lys-wm that knows the
+// request refuses for the mode and an older one refuses as unknown.
+func OffersVirtualOutputs() (bool, error) {
+	err := call(request{Request: createOutput}, nil)
+	var rejected *RejectedError
+	switch {
+	case err == nil:
+		return false, fmt.Errorf("lys-wm: %s without a mode succeeded", createOutput)
+	case !errors.As(err, &rejected):
+		return false, err
+	}
+	return !strings.Contains(rejected.Message, "unknown request"), nil
 }
