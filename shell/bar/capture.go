@@ -61,7 +61,7 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		}
 		return mons
 	}
-	put := clipboardCopier(application, clip)
+	put := func(content transfer.Content) (func(), error) { return putOnClipboard(application, clip, content) }
 	copyImage := func(img image.Image) (func(), error) {
 		content, err := transfer.Image(img)
 		if err != nil {
@@ -69,6 +69,7 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		}
 		return put(content)
 	}
+	putOffLoop := awaitLoop(application, put)
 	s := &captureServices{host: &screenshot.Host{
 		Config:   func() config.ScreenshotConfig { return current().Screenshot },
 		Monitors: monitors,
@@ -76,9 +77,9 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		Region:   region,
 		Picker:   colorpicker.New(application, gate, outputs, font, colorpicker.HistoryPath(), func() config.ColorFormat { return current().ColorPicker.Format }),
 		Focus:    focus,
-		Copy:     copyImage,
+		Copy:     awaitLoop(application, copyImage),
 		CopyText: func(text string) error {
-			_, err := put(transfer.Text(text))
+			_, err := putOffLoop(transfer.Text(text))
 			return err
 		},
 		Forget: func(ids []render.ImageID) {
@@ -194,22 +195,21 @@ func logicalOutputSize(application *app.Application, outputs func() []*app.Outpu
 	}
 }
 
-// clipboardCopier puts content on the clipboard from any goroutine but
-// the loop's, waiting for the loop to have done it, and returns what
-// takes that copy back, nil when nothing can.
-func clipboardCopier(application *app.Application, clip *clipboard.Clipboard) func(transfer.Content) (func(), error) {
-	return func(content transfer.Content) (func(), error) {
-		type put struct {
+// awaitLoop runs fn on the loop for any goroutine but the loop's, which
+// would wait on itself forever, and returns fn's result.
+func awaitLoop[T any](application *app.Application, fn func(T) (func(), error)) func(T) (func(), error) {
+	return func(v T) (func(), error) {
+		type result struct {
 			retract func()
 			err     error
 		}
-		done := make(chan put, 1)
+		done := make(chan result, 1)
 		application.Invoke(func() {
-			retract, err := putOnClipboard(application, clip, content)
-			done <- put{retract, err}
+			retract, err := fn(v)
+			done <- result{retract, err}
 		})
-		p := <-done
-		return p.retract, p.err
+		r := <-done
+		return r.retract, r.err
 	}
 }
 

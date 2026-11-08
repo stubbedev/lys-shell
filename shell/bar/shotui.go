@@ -33,9 +33,11 @@ type shotUI struct {
 	saved   map[render.ImageID]screenshot.Saved
 }
 
-func newShotUI(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, copyImage func(image.Image) (func(), error)) *shotUI {
+// newShotUI shows saved captures; copyOnLoop puts an image on the
+// clipboard and is called on the loop.
+func newShotUI(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, copyOnLoop func(image.Image) (func(), error)) *shotUI {
 	u := &shotUI{
-		app: application, outputs: outputs, current: current, focused: focused, font: font, copy: copyImage,
+		app: application, outputs: outputs, current: current, focused: focused, font: font, copy: copyOnLoop,
 		holders: map[render.ImageID]int{}, saved: map[render.ImageID]screenshot.Saved{},
 	}
 	u.thumb = shotthumb.New(shotthumb.Deps{
