@@ -10,6 +10,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/swaytest"
 )
 
@@ -19,6 +20,15 @@ import (
 // after the pointer leaves.
 func TestHeadlessAutoHidingDockRevealsAtTheEdgeOnSway(t *testing.T) {
 	swaytest.Start(t)
+	autoHidingDockRevealsAtTheEdge(t)
+}
+
+// lys-wm re-picks the surface under the pointer on every layer commit, so
+// a pointer parked on the screen's last row must be on the dock's input
+// region: the panel's margin up to the edge counts, and the dock stays
+// revealed under a still pointer instead of hiding again.
+func TestHeadlessAutoHidingDockRevealsAtTheEdgeOnLysWM(t *testing.T) {
+	lyswmtest.Headless(t)
 	autoHidingDockRevealsAtTheEdge(t)
 }
 

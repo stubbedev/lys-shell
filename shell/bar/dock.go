@@ -134,10 +134,13 @@ type dock struct {
 	output  *app.Output
 	surface *dockSurface
 	panel   *arrangedBox
-	reveal  *widget.DrawingArea
-	axis    widget.Axis
-	px      int
-	zoom    dockZoom
+	// slot holds the panel and nothing else: its bounds are the panel's
+	// margin box, the room the resting dock takes from its edge.
+	slot   *widget.Box
+	reveal *widget.DrawingArea
+	axis   widget.Axis
+	px     int
+	zoom   dockZoom
 	// hovered is the app whose entry is under the pointer, empty for none.
 	hovered string
 	entries map[string]*dockEntry
@@ -192,9 +195,11 @@ func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output, after
 		across = widget.Row
 	}
 	d.surface = &dockSurface{Box: widget.NewBox(across, 0, 0), d: d}
-	edgeAlign(d.panel.Box, cfg.Edge)
+	d.slot = widget.NewBox(d.axis, 0, 0)
+	d.slot.Append(d.panel, true)
+	edgeAlign(d.slot, cfg.Edge)
 	d.surface.AddClass("dock-surface")
-	d.surface.Append(d.panel, true)
+	d.surface.Append(d.slot, true)
 	d.surface.Append(d.reveal, false)
 	d.hide = &autoHide{
 		mode:       dockMode(cfg),
@@ -346,7 +351,7 @@ func (d *dock) claim() {
 		return
 	}
 	if d.hovered == "" {
-		d.measured(widget.Size{W: d.panel.Bounds().W, H: d.panel.Bounds().H})
+		d.measured(widget.Size{W: d.slot.Bounds().W, H: d.slot.Bounds().H})
 	}
 	if d.host == nil {
 		return
@@ -391,7 +396,7 @@ func (d *dock) applyHidden(hide bool) {
 	} else {
 		d.reveal.SetContentSize(revealPx, d.size.H)
 	}
-	d.panel.SetVisible(!hide)
+	d.slot.SetVisible(!hide)
 	d.reveal.SetVisible(hide)
 	d.fitHeadroom()
 }
@@ -455,7 +460,7 @@ func (d *dock) applyZoom() {
 // measure sizes the resting panel as its styles lay it out, before the
 // first frame, so the surface reserves its edge from the start.
 func (d *dock) measure() {
-	d.measured(widget.SizeWithin(d.panel, widget.Size{W: int(d.output.LogicalW), H: int(d.output.LogicalH)}))
+	d.measured(widget.SizeWithin(d.slot, widget.Size{W: int(d.output.LogicalW), H: int(d.output.LogicalH)}))
 }
 
 // measured takes the resting size of the laid-out panel, settling the
@@ -512,19 +517,21 @@ func edgeAlign(w *widget.Box, edge config.DockEdge) {
 	}
 }
 
-// dockSurface is the dock's root: it takes pointer input on the entries
+// dockSurface is the dock's root: it takes pointer input on the panel
 // alone, so the headroom kept for zoom passes clicks to what is beneath.
 type dockSurface struct {
 	*widget.Box
 	d *dock
 }
 
-// InputRegion is the shown panel, or all of a hidden dock's strip.
+// InputRegion is the shown panel with its margins, which reach the
+// screen edge so a pointer pushed against it is on the dock, or all of
+// a hidden dock's strip.
 func (s *dockSurface) InputRegion() []render.Rect {
 	if s.d.hide.hidden {
 		return nil
 	}
-	return []render.Rect{s.d.panel.Bounds()}
+	return []render.Rect{s.d.slot.Bounds()}
 }
 
 // dockHost opens the docks of the shell's mount generation.

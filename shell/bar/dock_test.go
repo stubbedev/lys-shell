@@ -157,7 +157,7 @@ func TestAnAutoHidingDockHidesUnderAWindowAndRevealsAtTheEdge(t *testing.T) {
 		t.Fatal("the dock hid as soon as a window covered it, before its delay")
 	}
 	r.fire()
-	if !r.d.hide.hidden || r.d.panel.Visible() || !r.d.reveal.Visible() || r.d.hide.hides != 1 {
+	if !r.d.hide.hidden || r.d.slot.Visible() || !r.d.reveal.Visible() || r.d.hide.hides != 1 {
 		t.Fatalf("covered: hidden %v, hides %d", r.d.hide.hidden, r.d.hide.hides)
 	}
 	r.d.surface.Measure(widget.Column, widget.Unknown)
@@ -369,10 +369,10 @@ func TestAZoomingDockKeepsHeadroomAndTakesInputOnItsPanel(t *testing.T) {
 	if got := r.d.surface.SizeRequest(); got != (widget.Size{W: rest.W + along, H: rest.H + across}) {
 		t.Fatalf("the shown dock requests %v, want its %v rest plus %dx%d headroom", got, rest, along, across)
 	}
-	if got := r.d.surface.InputRegion(); len(got) != 1 || got[0] != r.d.panel.Bounds() {
-		t.Fatalf("the shown dock takes input on %v, want only its panel %v", got, r.d.panel.Bounds())
+	if got := r.d.surface.InputRegion(); len(got) != 1 || got[0] != r.d.slot.Bounds() {
+		t.Fatalf("the shown dock takes input on %v, want only its panel %v", got, r.d.slot.Bounds())
 	}
-	if got := r.d.panel.Bounds(); got.Y+got.H != 200 || got.X+got.W/2 != 500 {
+	if got := r.d.slot.Bounds(); got.Y+got.H != 200 || got.X+got.W/2 != 500 {
 		t.Fatalf("the panel sits at %v, want centered on the bottom edge of 1000x200", got)
 	}
 
