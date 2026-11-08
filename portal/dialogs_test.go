@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/user"
 	"path"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
