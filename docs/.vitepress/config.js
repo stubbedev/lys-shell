@@ -22,17 +22,8 @@ export default lysConfig({
       {
         text: 'Guide',
         items: [
-          {
-            text: 'Getting started',
-            link: '/guide/getting-started',
-            collapsed: false,
-            items: [
-              { text: 'Arch Linux', link: '/guide/getting-started-arch' },
-              { text: 'Debian / Ubuntu', link: '/guide/getting-started-debian' },
-              { text: 'Fedora', link: '/guide/getting-started-fedora' },
-              { text: 'NixOS', link: '/guide/getting-started-nixos' },
-            ],
-          },
+          { text: 'Getting started', link: '/guide/getting-started' },
+          { text: 'NixOS', link: '/guide/getting-started-nixos' },
           { text: 'Editing config', link: '/guide/editing-config' },
           { text: 'Bars and layouts', link: '/guide/bars-and-layouts' },
           { text: 'Themes', link: '/guide/themes' },

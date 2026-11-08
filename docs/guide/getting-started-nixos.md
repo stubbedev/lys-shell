@@ -1,14 +1,10 @@
 ---
-title: Getting started on NixOS
+title: NixOS
 ---
 
-# Getting started on NixOS
+# NixOS
 
-lys-shell is not packaged in nixpkgs; install it from this repository's flake.
-
-## Install from this flake
-
-Add the flake as an input and use the modules it exports.
+lys-shell is installed from this repository's flake. It exports `nixosModules.default`, `homeManagerModules.default`, `packages.${system}.default` and `overlays.default` (which adds `pkgs.lys-shell`).
 
 ```nix
 # flake.nix
@@ -17,147 +13,78 @@ Add the flake as an input and use the modules it exports.
 }
 ```
 
-NixOS:
+## NixOS module
 
 ```nix
 { inputs, ... }:
 {
   imports = [ inputs.lys-shell.nixosModules.default ];
   programs.lys-shell.enable = true;
-  # optional: run `lys-shell shell` as a user service in the graphical session
-  programs.lys-shell.systemd.enable = true;
-  # optional: enable backing services (UPower, BlueZ, GeoClue) + wl-clipboard/xdg-utils
-  programs.lys-shell.autoInstallDependencies = true;
 }
 ```
 
-home-manager:
+| Option | Default | Effect |
+| --- | --- | --- |
+| `programs.lys-shell.enable` | `false` | Install lys-shell. |
+| `programs.lys-shell.package` | the flake's package | Package to install. |
+| `programs.lys-shell.settingsApp.enable` | `true` | Also install lys-settings. Without it, `panel settings`, the dashboard and the launcher have no settings app to open. |
+| `programs.lys-shell.settingsApp.package` | lys-settings' flake package | Package to install. |
+| `programs.lys-shell.systemd.enable` | `false` | Run `lys-shell shell` as a systemd user service. |
+| `programs.lys-shell.systemd.target` | `"graphical-session.target"` | Target the service binds to. |
+| `programs.lys-shell.portal.enable` | `true` | Make lys-shell the xdg-desktop-portal backend for every interface (through `xdg.portal`, with `mkDefault` routing). |
+| `programs.lys-shell.autoInstallDependencies` | `false` | Enable UPower, BlueZ and GeoClue (allowing lys-shell to locate the night light schedule), and install wl-clipboard and xdg-utils. NetworkManager, power-profiles-daemon and PipeWire are left to you. |
+
+## home-manager module
 
 ```nix
 { inputs, ... }:
 {
   imports = [ inputs.lys-shell.homeManagerModules.default ];
   programs.lys-shell = {
-    enable = true; # installs lys-shell + lys-settings (settingsApp.enable = false leaves it out), runs it as a user service
-    # install user-space soft deps implied by the config (theme-provider tool,
-    # wl-clipboard, xdg-utils)
+    enable = true;
     autoInstallDependencies = true;
     settings = {
-      # written to ~/.config/lys-shell/config.yaml
       bar.layout = [
         {
           monitor = "*";
+          left = [ "dashboard" ];
           center = [ "clock" ];
           right = [ "battery" "volume" "systray" ];
         }
       ];
+      modules.weather = {
+        location = "Denver";
+        units = "imperial";
+      };
+      styling.theme-provider = "wallust";
     };
   };
 }
 ```
 
-You can also use the package directly
-(`inputs.lys-shell.packages.${system}.default`) or apply
-`inputs.lys-shell.overlays.default` to get `pkgs.lys-shell`.
+| Option | Default | Effect |
+| --- | --- | --- |
+| `enable`, `package`, `settingsApp.*`, `systemd.target` | as above | As in the NixOS module. |
+| `systemd.enable` | `true` | Run `lys-shell shell` as a systemd user service. Turn off if your compositor starts the shell. |
+| `settings` | `{}` | Written to `$XDG_CONFIG_HOME/lys-shell/config.yaml`. Empty leaves the file unmanaged. |
+| `autoInstallDependencies` | `false` | Install the user-space tools the config needs: the `styling.theme-provider` tool (matugen, wallust or pywal), wl-clipboard, xdg-utils, and notmuch when `mail` is in the layout. |
+| `portal.enable` | `false` | Install the portal backend at user level (portal and D-Bus files, a user service, a `portals.conf` routing every interface to lys-shell). Use this outside NixOS; on NixOS use the system option. |
 
-> Soft dependencies (NetworkManager, bluez, upower, power-profiles-daemon,
-> pipewire/wireplumber, and theming tools like wallust/matugen) are not pulled
-> in automatically — enable the ones your config uses.
+System services (NetworkManager, BlueZ, UPower, power-profiles-daemon, GeoClue, PipeWire) are not installed by home-manager.
 
 ## Lock screen
 
-The lock screen is [lys-login](https://github.com/stubbedev/lys-login), with a flake and NixOS module of its own. `programs.lys-login.enable` puts it on the PATH, where lys-shell looks for it. `programs.lys-login.lock.enable` declares the PAM service the unlock authenticates against, which NixOS does not provide by default; point [`login.lock.pam-service`](/config/login) at that service.
+[lys-login](https://github.com/stubbedev/lys-login) has its own flake and NixOS module. `programs.lys-login.enable` puts it on the `PATH`. `programs.lys-login.lock.enable` declares a PAM service for the unlock; point [`login.lock.pam-service`](/config/login) at it.
 
-## home-manager usage
+## Converting settings to Nix
 
-```nix
-# put this directly into your home-manager config or into a home-manager import
-{
-  programs.lys-shell = {
-    enable = true;
+lys-settings and `lys-shell config set` write to `~/.config/lys-shell/runtime.yaml`. To turn `config.yaml` and `runtime.yaml` into a Nix expression for `settings`, using [yq](https://github.com/mikefarah/yq) (`nixpkgs#yq-go`):
 
-    # Whether to automatically install soft dependencies used by lys-shell that
-    # will be required based on your config (theme-provider tool, wl-clipboard,
-    # xdg-utils, and notmuch when the mail module is used).
-    autoInstallDependencies = true;
-
-    # tip: you can automatically translate your YAML config to Nix by running
-    # nix-instantiate --eval --strict --argstr json "$(yq -o json config.yaml)" --expr '{ json }: builtins.fromJSON json' | nixfmt
-    settings = {
-      bar = {
-        layout = [
-          # add more attribute sets with different monitors if lys-shell should
-          # have different layouts on each
-          {
-            monitor = "DP-1"; # replace "DP-1" with "*" for all monitors
-            show = true;
-            center = [
-              "clock"
-              "weather"
-            ];
-            left = [ "dashboard" ];
-            right = [ "volume" ];
-          } # this is a 'list' of 'attribute sets', no semi-colons after the closing braces needed
-        ];
-      };
-      modules = {
-        clock = {
-          format = "%H:%M:%S";
-          dropdown-show-seconds = false;
-        };
-        weather = {
-          location = "Denver";
-          units = "imperial";
-        };
-      };
-      osd = {
-        monitor = "DP-1";
-      };
-      styling = {
-        palette = {
-          bg = "#282a36";
-          blue = "#8be9fd";
-          # ...
-        };
-        # wallust is installed automatically when this is set and
-        # autoInstallDependencies = true (likewise matugen / pywal)
-        theme-provider = "wallust";
-      };
-      # the following wallpaper options can be omitted if you're not using
-      # lys-shell's built-in wallpaper engine. Setting cycling-directory enables
-      # cycling through that folder.
-      wallpaper = {
-        cycling-directory = "/home/horsey/Pictures/Backgrounds/1/";
-        cycling-mode = "shuffle";
-      };
-    };
-  };
-}
-```
-
-## Settings GUI
-
-```sh
-lys-shell panel settings
-```
-
-This launches [`lys-settings`](https://github.com/stubbedev/lys-settings), a package of its own, which edits the same config the shell reads. Changes apply live. Anything the GUI doesn't cover can still be edited by hand in `config.yaml`.
-
-> [!WARNING]
-> If you configured theming using matugen/wallust/pywal, do not forget to install these dependencies! With `autoInstallDependencies = true` the home-manager module installs the matching theme-provider tool for you.
-
-After configuring lys-shell using GUI, there should be a new `.config/lys-shell/runtime.yaml` file. To automatically convert it to Nix, merge it over `config.yaml` with [yq](https://github.com/mikefarah/yq) (`nixpkgs#yq-go`) and run
 ```sh
 cd ~/.config/lys-shell
-nix-instantiate --eval --strict --argstr json "$(yq eval-all -o json '. as $f ireduce ({}; . * $f)' config.yaml runtime.yaml)" --expr '{ json }: builtins.fromJSON json' | nixfmt
-```
-If one of those files does not exist run the following command, replacing `config.yaml` with `runtime.yaml` if appropriate.
-```sh
-nix-instantiate --eval --strict --argstr json "$(yq -o json config.yaml)" --expr '{ json }: builtins.fromJSON json' | nixfmt
+nix-instantiate --eval --strict \
+  --argstr json "$(yq eval-all -o json '. as $f ireduce ({}; . * $f)' config.yaml runtime.yaml)" \
+  --expr '{ json }: builtins.fromJSON json' | nixfmt
 ```
 
-Then you can copy-paste this into the `programs.lys-shell.settings` option provided by the home-manager module.
-
-## Configuration
-
-If you want to edit the raw `config.yaml`, refer to the [Editing config](/guide/editing-config) page.
+With only one of the files, use `yq -o json config.yaml` in its place.

@@ -7,7 +7,7 @@ outline: [2, 3]
 
 <div v-pre>
 
-A custom module runs a shell command and renders its output in the bar. Define one as an entry of the `modules.custom` list in `config.yaml` with a unique `id` and a `command`, then reference it in a layout as `custom-<id>`.
+A custom module shows a command's output in the bar. Define it in `modules.custom` with a unique `id` and place it as `custom-<id>`. Every field is listed in [`modules.custom`](/config/modules/custom).
 
 ```yaml
 bar:
@@ -20,81 +20,62 @@ modules:
       command: sensors | awk '/^Tctl:/ {sub(/\+/,"",$2); print $2}'
       interval-ms: 5000
       icon-name: ld-thermometer-symbolic
-      format: "{{ output }}"
 ```
 
-The command runs through `sh -c`. Stderr is discarded and any single run is killed after 30 seconds.
+The command runs through `sh -c`. Stderr is discarded; a run is killed after 30 seconds. Without a `command`, the module shows a static icon and label and only reacts to clicks.
 
 ## Modes
 
-`mode` controls how the command runs. Default is `poll`.
+| `mode` | Behaviour |
+| --- | --- |
+| `poll` (default) | Runs every `interval-ms` (default 5000). `0` runs it once at startup only. |
+| `watch` | Runs once; each stdout line replaces the output. |
 
-### Poll
+When a `watch` command exits, `restart-policy` decides what follows, after `restart-interval-ms` (default 1000):
 
-The command runs every `interval-ms` milliseconds (default 5000). Use it for commands that print a value and exit. Setting `interval-ms: 0` disables polling entirely; the command never runs on a schedule, so the module only updates from [`on-action`](#on-action) (paired with a `command` for the initial render, set a reasonable interval instead).
-
-### Watch
-
-`mode: watch` spawns the command once and reads its stdout line by line. Each line replaces the displayed value. Use it for long-running commands that stream updates (IPC subscribers, `tail -F`, log followers).
-
-When the command exits, `restart-policy` decides what happens:
-
-| Policy       | Behavior                                |
-| ------------ | --------------------------------------- |
-| `never`      | Leave the module with its last value    |
-| `on-exit`    | Restart after any exit                  |
-| `on-failure` | Restart only on non-zero exit or signal |
-
-`restart-interval-ms` is the base delay. Successive rapid failures back off exponentially, capped at 30 seconds.
-
-### No command
-
-`command` is optional. A module without one renders a static icon and label and only reacts to clicks, which is useful for launcher-style buttons.
+| `restart-policy` | Behaviour |
+| --- | --- |
+| `never` (default) | Keep the last output |
+| `on-exit` | Restart after any exit |
+| `on-failure` | Restart after a non-zero exit or a signal |
 
 ## Output
 
-Plain-text output is bound to `{{ output }}`.
+Plain text is available as `{{ output }}`. Output starting with `{` or `[` is parsed as JSON: each top-level field becomes a template variable, and `{{ output }}` stays the raw text. These fields have a meaning of their own:
 
-Output that starts with `{` or `[` is parsed as JSON. Every top-level field of a JSON object becomes a template variable, and `{{ output }}` stays available as the raw text. Array outputs are not unpacked; reach into them with `{{ items.0 }}`.
+| Field | Effect |
+| --- | --- |
+| `text` | Replaces `format` |
+| `tooltip` | Replaces `tooltip-format` |
+| `percentage` | 0-100, picks from `icon-names` |
+| `alt` | Key into `icon-map` and `color-map` |
+| `class` | Whitespace-separated CSS classes |
 
-A handful of top-level JSON keys are reserved:
+## Templates
 
-| Field        | Effect                                               |
-| ------------ | ---------------------------------------------------- |
-| `text`       | Overrides `format` entirely for this run             |
-| `tooltip`    | Overrides `tooltip-format` for this run              |
-| `percentage` | Integer 0-100 used to pick from `icon-names`         |
-| `alt`        | Key used to pick from `icon-map` and `color-map`, beats `percentage` |
-| `class`      | Whitespace-separated CSS classes added to the widget |
-
-## Format templates
-
-`format` and `tooltip-format` use lys-shell's built-in Jinja2-compatible template engine, tested to render the same as [MiniJinja](https://docs.rs/minijinja).
+`format`, `tooltip-format` and `class-format` use a Jinja2-compatible engine:
 
 ```
-{{ field }}                 read a top-level variable
-{{ nested.field }}          dotted access into JSON objects
-{{ items.0 }}               array index access
-{{ val | default("?") }}    fallback for missing values
+{{ field }}                 a top-level variable
+{{ nested.field }}          a field of an object
+{{ items.0 }}               an array element
+{{ val | default("?") }}    fallback for a missing value
 {{ val | upper }}           also: lower, trim, replace, length, round
 ```
 
-`class-format` uses the same syntax. Its rendered output is split on whitespace, and each token becomes a CSS class on the module, in addition to any classes from the JSON `class` field.
+`class-format` is split on whitespace into CSS classes, added to those from `class`.
 
-## Icons
+## Icons and colors
 
-Three fields control the icon. In priority order:
+The icon is the first that matches:
 
-1. `icon-map` matches on the JSON `alt` field.
-2. `icon-names` is an array indexed by `percentage`. The range is split evenly:
-   with four icons, 0-24% uses the first, 25-49% the second, and so on.
-3. `icon-name` is the static fallback.
+1. `icon-map[alt]`, with `"default"` as a fallback key;
+2. `icon-names[percentage]`, the list split evenly over 0-100 (four icons: 0-24, 25-49, 50-74, 75-100);
+3. `icon-name`.
 
-Set `icon-show: false` to hide the icon entirely.
+`icon-show: false` hides it.
 
-## State colors
-
-`color-map` cycles the module's colors by state, mirroring `icon-map`. It is keyed by the JSON `alt` value; the matched state's colors override the module's static colors, and any color left unset falls back to the static value. Use `"default"` as a fallback key.
+`color-map` is keyed by `alt` like `icon-map`. The matched entry's colors (`icon-color`, `icon-bg-color`, `label-color`, `button-bg-color`, `border-color`) replace the module's; colors it leaves unset keep the module's.
 
 ```yaml
 icon-map: {muted: ld-volume-x-symbolic}
@@ -103,35 +84,29 @@ color-map:
   default: {icon-color: green}
 ```
 
-Each state entry accepts `icon-color`, `icon-bg-color`, `label-color`, `button-bg-color`, and `border-color`. With `alt` driving both `icon-map` and `color-map`, one widget swaps its icon *and* its colors as its state changes.
+## Clicks
 
-## Click and scroll
+`left-click`, `right-click`, `middle-click`, `scroll-up` and `scroll-down` each take a [click action](/guide/bars-and-layouts#click-actions): a shell command, `dropdown:<name>`, or a brightness step.
 
-Each event has its own shell command: `left-click`, `right-click`, `middle-click`, `scroll-up`, `scroll-down`. Scroll events are debounced over 50ms so a fast scroll coalesces into one action.
+`on-action` is a command run after each click or scroll binding; its output replaces the module's at once, so the bar does not wait for the next poll. Scrolls are coalesced: it runs 50 ms after the last one.
 
-### on-action
+`hide-if-empty: true` hides the module, and its gap, when the output is empty, `0` or `false` (any case).
 
-If `on-action` is set, it runs after a click or scroll command finishes, and its output replaces the displayed value immediately. This is the pattern for interactive modules (volume, brightness, workspace switchers) where the user expects the bar to update before the next poll tick.
+## Pushing updates
 
-## Hiding the module
-
-With `hide-if-empty: true`, the module and its gap in the layout disappear when the output is an empty string, `"0"`, or `"false"` (case-insensitive). Useful for notification-count badges and VPN indicators that should vanish when there is nothing to show.
-
-## Pushing updates over the socket
-
-A module does not have to poll or watch a command — any external program can push an output to it by `id` over the running shell's socket:
+Another program can push output to a module by `id`, parsed exactly like command output:
 
 ```sh
 lys-shell widget update gpu '{"text":"72°C","alt":"hot","percentage":90}'
 ```
 
-The payload is interpreted exactly like command output (plain text or the same reserved JSON fields), so it drives the label, icon, percentage, and state colors immediately. This is ideal for event-driven sources that already have their own daemon: have it call `lys-shell widget update <id> …` instead of running under lys-shell's poll/watch supervisor. A module can mix both — a `watch` command for the common case and socket pushes for out-of-band updates.
+This works alongside `poll` and `watch`.
 
 ## Examples
 
-### Poll Mode: Disk usage with state icons
+### Disk usage
 
-Emit JSON so the module can drive `icon-names` from `percentage` and still show a human-readable string in the label.
+JSON output drives `icon-names` from `percentage` and fills the label from other fields.
 
 ```yaml
 modules:
@@ -152,13 +127,9 @@ modules:
         - ld-triangle-alert-symbolic
 ```
 
-The command prints `{"percentage":71,"used":"603G","total":"899G"}`. `percentage` picks the icon (71% lands in the third bucket, the "download" icon). `{{ used }}` and `{{ total }}` fill the label. `tooltip-format` shows the percentage on hover.
+### Event-driven volume
 
-### Watch Mode: Event-driven volume control
-
-lys-shell ships a built-in `volume` module that talks to PulseAudio directly. This custom-module version exists as an illustration of the watch-mode + `on-action` + `icon-map` pattern; in real life, use the built-in.
-
-The command subscribes to PulseAudio events via `pactl subscribe`. Every time a sink changes, the script re-queries state and emits a JSON line. Watch mode keeps the command alive and reads one update per line, so the bar redraws the instant PulseAudio reports a change, no polling involved.
+A `watch` command that prints a line whenever PulseAudio reports a change. (The built-in `volume` module does this natively.)
 
 ```yaml
 modules:
@@ -189,11 +160,5 @@ modules:
         - ld-volume-2-symbolic
       icon-map: {muted: ld-volume-x-symbolic}
 ```
-
-No `on-action` needed: the scroll and click commands change PulseAudio state, PulseAudio publishes the event, the subscribe loop picks it up, and the bar updates. This is the general shape to reach for whenever the underlying system can stream changes (D-Bus signals, `inotifywait`, Hyprland's `socat` stream, and similar).
-
-For state with no event source (CPU temp, disk usage, weather), poll mode is the only option. Built-in modules cover most of the common event-driven surfaces: `battery`, `network`, `bluetooth`, `volume`, `microphone`, `media`, `hyprland-workspaces`. Use custom modules for the gaps.
-
-Every field of a `modules.custom` entry is listed at [`/config/modules/custom`](/config/modules/custom).
 
 </div>

@@ -4,28 +4,17 @@ title: Bars and layouts
 
 # Bars and layouts
 
-A bar layout is an entry in the `bar.layout` list. Each entry targets a monitor (or all of them) and describes what the bar renders there. Fields:
+`bar.layout` is a list of entries, each describing the bar on one monitor. Spacing, colors and button styling are in [`bar`](/config/bar); the full entry type is [`BarLayout`](/config/types#bar-layout).
 
-| Field                     | Role                                                                                      |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `monitor`                 | Connector name like `"DP-1"`, or `"*"` to match any monitor without a more specific entry |
-| `left`, `center`, `right` | Module lists for the three sections                                                       |
-| `extends`                 | Optional. Inherit from another entry by its `monitor` value                               |
-| `show`                    | Optional. Set to `false` to hide the bar on that monitor                                  |
+| Field | Meaning |
+| --- | --- |
+| `monitor` | Connector name (`"DP-1"`, `"HDMI-A-1"`) or `"*"` |
+| `left`, `center`, `right` | Module lists |
+| `extends` | Inherit from the entry with this `monitor` value |
+| `show` | `false` hides the bar on this monitor |
+| `auto-hide` | Overrides `bar.auto-hide` on this monitor |
 
-Inside `left`, `center`, and `right`, a module slot accepts three shapes, mixable within the same section:
-
-| Shape          | YAML                                               |
-| -------------- | -------------------------------------------------- |
-| Plain module   | `clock`                                            |
-| Classed module | `{module: clock, class: primary}`                  |
-| Named group    | `{name: status, modules: [battery, network]}`      |
-
-See [`BarLayout`](/config/types#bar-layout) for the full variant examples and [`/config/bar`](/config/bar) for spacing, colors, and button styling.
-
-## Minimal layout
-
-One entry matching every monitor, filled with built-in modules:
+An output uses the entry whose `monitor` equals its connector name, else the `"*"` entry. With neither, it gets no bar.
 
 ```yaml
 bar:
@@ -36,52 +25,46 @@ bar:
       right: [battery, network, volume, systray]
 ```
 
-`monitor` takes a connector name like `"DP-1"` or `"HDMI-A-1"`, or `"*"` to match any monitor without a more specific entry.
+## Inheritance
 
-## Per-monitor overrides
-
-A second entry with `extends` inherits from another layout. Any section the child omits (or leaves as an empty list) is filled in from the parent; any section the child sets replaces the parent's.
+An entry with `extends` takes every section it leaves empty (and `auto-hide`, if unset) from its parent. Chains are followed; a cycle or a missing parent stops the walk.
 
 ```yaml
 bar:
   layout:
+    - monitor: "*"
+      left: [dashboard]
+      center: [clock]
+      right: [battery, network, volume, systray]
     - monitor: HDMI-1
-      left: [dashboard]
-      center: [clock]
-      right: [battery, network, volume, systray]
-    - monitor: "*"
-      extends: HDMI-1
+      extends: "*"
       right: [volume, systray]
-```
-
-On `*`, `left` and `center` come from the `"HDMI-1"` layout; `right` is this entry's list. `extends` can point at any other monitor value, not only `"HDMI-1"`.
-
-## Groups and classes
-
-A **group** renders its modules inside a shared container. The group's `name` becomes the container's CSS ID, addressable as `#name` in a stylesheet (see [custom styles](/guide/custom-styles)). Use groups when several modules should share a visual container (padding, background, border radius) targetable by one selector.
-
-A **class** attaches to a single module instance. Use it when the same module appears twice on a bar and each instance needs different styling, or when one instance should diverge from the module's default look.
-
-```yaml
-bar:
-  layout:
-    - monitor: DP-1
-      left: [dashboard]
-      center:
-        - {module: clock, class: primary}
-      right:
-        - {name: status, modules: [battery, network, volume]}
-```
-
-Custom modules slot in the same way, referenced as `custom-<id>` where `<id>` matches an entry in `modules.custom`. See [custom modules](/guide/custom-modules).
-
-## Hiding a bar
-
-Set `show: false` on an entry to hide the bar on that monitor. No other fields are required.
-
-```yaml
-bar:
-  layout:
     - monitor: HDMI-2
       show: false
 ```
+
+## Module slots
+
+A slot in `left`, `center` or `right` is one of:
+
+| Form | Example |
+| --- | --- |
+| Module | `clock` |
+| Module with a CSS class | `{module: clock, class: primary}` |
+| Group | `{name: status, modules: [battery, network]}` |
+
+A group draws its modules in one container whose CSS ID is its `name` (`#status`). Its modules may carry classes. A class goes on that one module instance, so two instances of a module can be [styled](/guide/custom-styles) apart.
+
+Custom modules are referenced as `custom-<id>`; see [Custom modules](/guide/custom-modules).
+
+## Click actions
+
+Module fields such as `left-click`, `right-click`, `middle-click`, `scroll-up` and `scroll-down` take a click action string:
+
+| Value | Does |
+| --- | --- |
+| `""` | Nothing |
+| `dropdown:<name>` | Toggle a dropdown under this module: `audio`, `background-apps`, `battery`, `bitwarden`, `bluetooth`, `brightness`, `calendar`, `dashboard`, `mail`, `media`, `network`, `notification`, `privacy`, `recorder`, `screen-share`, `treeman`, `weather` |
+| `brightness:<N>` | Change every backlight by `N` percent (`+5`, `-5`), never below `modules.brightness.min-brightness` |
+| `brightness:toggle` | Turn all backlights off, or back to 100% when all are off |
+| anything else | Run as a shell command |

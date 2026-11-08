@@ -1,94 +1,56 @@
 # Custom icons
 
-Config fields like `icon-name: tb-home-symbolic` resolve against the lys-shell icon theme installed at `~/.local/share/lys-shell/icons/`. The `lys-shell icons` subcommand populates that directory from CDN sources or local SVG files.
+Icon fields such as `icon-name: tb-home-symbolic` resolve against lys-shell's icon theme in `~/.local/share/lys-shell/icons/` (`$XDG_DATA_HOME`), then `lys-shell/icons` under each `$XDG_DATA_DIRS` entry and `/usr/share/lys-shell/icons`. Icons installed while the shell runs resolve without a restart.
 
-## List available sources
+The bundled icons are [Lucide](https://lucide.dev/icons) (`ld-`) and [Simple Icons](https://simpleicons.org) (`si-`). Everything else is installed with `lys-shell icons`.
 
-```sh
-lys-shell icons sources
-```
+## Sources
 
-Five sources ship in-tree. Slug names come directly from the upstream catalogues, linked below.
+`lys-shell icons sources` lists them. Slugs are the names on the upstream site.
 
 | Source | Prefix | Contents | Browse |
 |---|---|---|---|
 | `tabler` | `tb-` | Outline UI icons | [tabler.io/icons](https://tabler.io/icons) |
-| `tabler-filled` | `tbf-` | Solid UI icons | [tabler.io/icons](https://tabler.io/icons) |
-| `simple-icons` | `si-` | Brand and app logos | [simpleicons.org](https://simpleicons.org) |
-| `material` | `md-` | Google Material Design | [fonts.google.com/icons](https://fonts.google.com/icons) |
-| `lucide` | `ld-` | Alternative UI icons (Feather fork) | [lucide.dev/icons](https://lucide.dev/icons) |
+| `tabler-filled` | `tbf-` | Filled UI icons | [tabler.io/icons](https://tabler.io/icons) |
+| `simple-icons` | `si-` | Brand logos | [simpleicons.org](https://simpleicons.org) |
+| `material` | `md-` | Material Symbols (outlined) | [fonts.google.com/icons](https://fonts.google.com/icons) |
+| `lucide` | `ld-` | UI icons | [lucide.dev/icons](https://lucide.dev/icons) |
 
-## Install from a CDN source
-
-```sh
-lys-shell icons install <source> <slug> [<slug>...]
-```
-
-Example:
+An installed icon is named `<prefix>-<slug>-symbolic`:
 
 ```sh
-lys-shell icons install tabler home settings bell
+lys-shell icons install tabler home settings bell   # tb-home-symbolic, ...
+lys-shell icons install simple-icons firefox        # si-firefox-symbolic
 ```
 
-This downloads the three Tabler icons and installs them as `tb-home-symbolic`, `tb-settings-symbolic`, and `tb-bell-symbolic`. The source name determines the prefix; the slug is the icon's name on the upstream site.
-
-Brand logos work the same way:
+## Local SVGs
 
 ```sh
-lys-shell icons install simple-icons firefox spotify
+lys-shell icons import ~/Downloads/my-logo.svg my-logo   # cm-my-logo-symbolic
+lys-shell icons import ~/exported-icons/                  # every SVG in the folder
 ```
 
-Produces `si-firefox-symbolic` and `si-spotify-symbolic`.
+A single file needs a name and gets the `cm-` prefix. In a folder, files already named with a known prefix (`tb-`, `tbf-`, `si-`, `md-`, `ld-`, `cm-`) keep their name; the rest get `cm-`. Imported SVGs are converted to symbolic icons so they take the theme's colors.
 
-## Import a local SVG
+## Managing
 
-```sh
-lys-shell icons import <path> [name]
-```
+| Command | Does |
+| --- | --- |
+| `icons list [--source tb] [--interactive]` | List installed icons, by prefix; `--interactive` searches with `fzf` |
+| `icons remove tb-home-symbolic ...` | Remove icons by full name |
+| `icons sync [--dry-run]` | Install every CDN icon the config names that is missing |
+| `icons export <dir>` | Copy all installed icons to a folder |
+| `icons open` | Open the icons folder in the file manager |
+| `icons setup` | Install the bundled icons (needed for source builds) |
 
-For a single file, pass a name. The icon is installed with the `cm-` prefix:
+## Using icons
 
-```sh
-lys-shell icons import ~/Downloads/my-logo.svg my-logo
-```
-
-Installs as `cm-my-logo-symbolic`.
-
-For a directory, omit the name. Every SVG is imported; files already starting with a known prefix (`tb-`, `tbf-`, `si-`, `md-`, `ld-`, `cm-`) keep their name, and anything else gets `cm-` added.
-
-```sh
-lys-shell icons import ~/exported-icons/
-```
-
-Imported SVGs are transformed into symbolic icons so they pick up theme colours.
-
-## List and remove
-
-```sh
-lys-shell icons list
-lys-shell icons list --source tb
-```
-
-`--source` filters by prefix. Add `--interactive` for an fzf-backed search if `fzf` is on `$PATH`.
-
-To remove icons, pass their full names:
-
-```sh
-lys-shell icons remove tb-home-symbolic si-firefox-symbolic
-```
-
-## Referencing icons in config
-
-Any module field that takes an icon name accepts installed icons directly:
+Give the full name, prefix and suffix included:
 
 ```yaml
 modules:
   clock:
     icon-name: ld-clock-symbolic
-  network:
-    icon-name: tb-wifi-symbolic
 ```
 
-The value is the full icon name, prefix included. An icon no theme provides draws nothing, so the shell warns about each one at startup and on every config reload, naming the icon and how to get it: `lys-shell icons sync` for a CDN prefix, `lys-shell icons import` for a `cm-` icon.
-
-lys-shell bundles [Lucide](https://lucide.dev/icons) (`ld-`) for its own glyphs and [Simple Icons](https://simpleicons.org) (`si-`) for brand logos. A config written against an older release may name Tabler (`tb-`) or Material (`md-`) icons that are no longer bundled; `lys-shell icons sync` fetches them, or switch to the `ld-` equivalent.
+At startup and on every reload, the shell logs each icon the config names that is not installed, with the command that gets it: `icons sync` for a CDN icon, `icons import` for a `cm-` icon.

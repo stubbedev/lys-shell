@@ -4,15 +4,20 @@ title: Editing config
 
 # Editing config
 
-lys-shell reads configuration from `~/.config/lys-shell/config.yaml` (`config.yml` is accepted too). All fields have defaults, so the config file may be empty; declare only the fields that should override a default.
+## Files and layers
 
-The `lys-shell config` CLI and the settings GUI write to `~/.config/lys-shell/runtime.yaml` rather than `config.yaml`. For each field, lys-shell uses the first value defined among these sources:
+All files live in `$XDG_CONFIG_HOME/lys-shell/` (default `~/.config/lys-shell/`).
 
-1. `runtime.yaml` - overrides written by `lys-shell config` or the settings GUI.
-2. `config.yaml` - values declared by hand.
-3. The built-in default.
+| File | Written by | Role |
+| --- | --- | --- |
+| `config.yaml` (or `config.yml`) | you | Your settings. Created with only the schema modeline when missing. |
+| `runtime.yaml` | `lys-shell config`, lys-settings | Overrides on top of `config.yaml`. |
+| `schema.json` | the shell, at startup | JSON Schema for editor completion. |
+| `.env`, `.*.env` | you | Environment variables for `$NAME` secrets. |
+| `themes/*.yaml` | you | Custom [themes](/guide/themes). |
+| `styles/index.css` | you | [Custom CSS](/guide/custom-styles). |
 
-A minimal override:
+Each field takes the first value found in `runtime.yaml`, then `config.yaml`, then the built-in default. Every field has a default, so declare only what you change:
 
 ```yaml
 bar:
@@ -22,61 +27,27 @@ modules:
     format: "%H:%M"
 ```
 
-Every supported key is documented in the [config reference](/config/).
+Every key is in the [config reference](/config/). lys-shell does not read TOML: a `config.toml` without a `config.yaml` (or a `runtime.toml` without a `runtime.yaml`) is reported as an error until converted.
 
-## The default look
+## Live reload
 
-An empty config looks finished: a floating bar of frosted glass, ink-colored
-buttons with the workspaces on the left, a built-in wallpaper, and panels, OSD and
-notifications in one material. Where the compositor offers no blur, as lys-wm on a
-CPU renderer, those surfaces rest on their opaque colors instead.
+The config directory is watched; saving a file applies it to the running shell. A file that fails to load (bad YAML, a missing or circular import) keeps the running config, or the defaults at startup. A field with an invalid value keeps its default while the rest of the file applies. Both are reported in the log.
 
-**A config you already have changes.** Keys you did not set take these defaults,
-so a file that set only some of the bar now gets the rest of the new look. What
-changed, and how to have the old look back:
+## Sizes
+
+Every size field takes either a scale multiplier (a number; on the bar it is multiplied by `bar.scale`) or logical pixels as a string:
 
 ```yaml
 bar:
-  inset-edge: 0
-  inset-ends: 0
-  background-opacity: 100
-  border-location: none
-  border-color: border-accent
-  rounding: none
-  button-variant: block-prefix
-  button-bg-opacity: 100
-modules:
-  notifications:
-    popup-urgency-bar: low
+  button-icon-size: "20px"   # pixels, ignores bar.scale
+  button-gap: 1.5            # multiplier
 ```
 
-Also changed, and set per module: `label-color` is now `fg-default` on every module
-that had a color of its own, and an `auto` icon color under the `basic` variant is
-the same ink; set `label-color` and `icon-color` on a module to color it. The
-default layout adds `workspaces` (whichever compositor is running), `systray`,
-`notifications` and `power`. The media button hides while no player is active, the
-notification count hides at zero and is no longer zero-padded, and a monitor with
-no wallpaper shows the built-in one instead of an empty background.
-
-## Migrating from TOML
-
-Earlier releases read `config.toml`. It is no longer read: when a `config.toml` exists without a `config.yaml`, lys-shell reports an error asking for it to be converted. The keys are unchanged, so converting is a matter of syntax: `[section]` tables become nested mappings, `[[bar.layout]]` arrays of tables become a list under `bar: layout:`, and `key = value` becomes `key: value`. Quote strings YAML would otherwise misread, such as `"*"`, hex colors like `"#1e1e2e"` and anything starting with `%` or `{`. Imported files and `themes/*.toml` need the same conversion.
-
-## Pixel sizes
-
-Any size field — bar insets and padding, the module gap, button icon/label sizes and paddings, and per-module icon, label, gap, and padding sizes — accepts either a scale multiplier (a bare number, multiplied by the bar scale) or an absolute pixel length written as a string:
-
-```yaml
-bar:
-  button-icon-size: "20px"   # absolute pixels, ignores bar scale
-  button-gap: 1.5            # scale multiplier (default form)
-```
-
-Pixel values are logical pixels: lys-ui scales them for HiDPI displays automatically, so `"20px"` renders at the correct physical size on a 2× monitor while ignoring the configurable `bar.scale` multiplier.
+Logical pixels are scaled for HiDPI outputs.
 
 ## Imports
 
-`config.yaml` may declare a top-level `imports` list to load additional YAML files. Files referenced through `imports` may themselves declare `imports`, forming a chain:
+A top-level `imports` list loads other YAML files first:
 
 ```yaml
 imports: [themes/nord.yaml, modules/clock.yaml]
@@ -84,40 +55,36 @@ bar:
   scale: 1.25
 ```
 
-Paths are resolved relative to the importing file's directory; the extension may be omitted, in which case `.yaml` is tried, then `.yml`. Imports are merged in declaration order, then the importing file is overlaid on top. Mappings merge key by key; scalars and lists in the overlay replace the corresponding value in the base. The merged result becomes the `config.yaml` layer described above.
+- Paths are relative to the importing file. Without an extension, `.yaml` is used, or `.yml` when only that exists.
+- Imports merge in order, then the importing file on top. Mappings merge key by key; scalars and lists replace.
+- Imported files may import others. A cycle is an error.
+- `runtime.yaml` does not resolve imports.
 
-`runtime.yaml` does not resolve imports. Circular chains are rejected at load; the previous valid configuration remains active and the error is recorded in the log.
+## Secrets
+
+A field of type [`Secret`](/config/types#secret) (API keys, for example) takes `$NAME` to read the environment variable `NAME`. `.env` and `.*.env` files in the config directory are loaded into the environment at startup and on change; a variable already set in the environment is kept.
 
 ## Editor setup
 
-On startup, lys-shell writes a JSON Schema for the configuration to `~/.config/lys-shell/schema.json`. The schema is generated from the installed binary and matches the version of lys-shell on disk. Any YAML language server with JSON Schema support can use it for completion, hover documentation, and validation.
-
-The [YAML extension by Red Hat](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) provides this in VS Code; Neovim, Helix, and Zed use [`yaml-language-server`](https://github.com/redhat-developer/yaml-language-server). The stub `config.yaml` lys-shell creates starts with a modeline pointing the server at the schema; add the same line to the top of your own file:
+Point a YAML language server at `schema.json` with this first line (the created `config.yaml` has it):
 
 ```yaml
 # yaml-language-server: $schema=./schema.json
 ```
 
-The same schema is published in the repository at [`schema/lys-shell-config.schema.json`](https://github.com/stubbedev/lys-shell/blob/master/schema/lys-shell-config.schema.json) for files outside the config directory. You can regenerate the schema for the exact version you run with `lys-shell config schema --stdout`.
+VS Code needs the [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml); Neovim, Helix and Zed use [`yaml-language-server`](https://github.com/redhat-developer/yaml-language-server). The repository carries the same schema at [`schema/lys-shell-config.schema.json`](https://github.com/stubbedev/lys-shell/blob/master/schema/lys-shell-config.schema.json).
 
-## Live reload
+## CLI
 
-lys-shell watches the configuration directory. Changes to `config.yaml` trigger an in-process reload; a shell restart is not required. Invalid configuration is rejected, the previous valid state is retained, and parse or validation errors are recorded in the log.
-
-## Editing from the CLI
-
-The `lys-shell config` subcommand reads and writes individual fields by dotted path:
-
-```bash
+```sh
 lys-shell config get bar.scale
 lys-shell config set modules.clock.format "%H:%M"
 lys-shell config reset modules.clock.format
+lys-shell config default --stdout   # every key with its default
+lys-shell config schema --stdout    # the JSON Schema
 ```
 
-`set` writes to `~/.config/lys-shell/runtime.yaml`; `config.yaml` is never modified by the CLI or GUI Settings dialog. `reset` removes the runtime override for the given path, reverting the field to the value declared in `config.yaml` or to the built-in default.
-
-`VALUE` is parsed as a YAML value, so `true`, `5`, `[a, b]` and `{module: clock}` set a boolean, a number, a list and a mapping; anything that does not parse as YAML is stored as a plain string.
-
-## Printing the default configuration
-
-`lys-shell config default --stdout` prints every key with its default value to standard output. Without `--stdout`, the command writes `config.yaml.example` to the configuration directory; `config.yaml` is not modified. The output is YAML. `lys-shell config schema --stdout` prints the JSON Schema in the same manner.
+- `set` writes `runtime.yaml`. The value is parsed as YAML (`true`, `5`, `[a, b]`, `{module: clock}`); anything that does not parse is a string.
+- `reset` removes the override from `runtime.yaml`.
+- `default` and `schema` without `--stdout` write `config.yaml.example` and `schema.json` into the config directory.
+- `config.yaml` is never written by the CLI or lys-settings.

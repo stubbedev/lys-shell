@@ -1,291 +1,203 @@
 # CLI
 
-Every command and subcommand takes `--help`.
+Every command takes `--help`. Commands that act on the shell need it running. A `MONITOR` or `NAME` argument is a connector name such as `DP-1`.
 
-Panel lifecycle and visibility:
+## panel
 
-```sh
-lys-shell panel start
-lys-shell panel stop
-lys-shell panel restart
-lys-shell panel status
-lys-shell panel settings
-lys-shell panel inspect
+| Command | Does |
+| --- | --- |
+| `panel start` / `stop` / `restart` / `status` | Manage the shell process (`start` runs `lys-shell shell` in the background) |
+| `panel settings` | Open lys-settings |
+| `panel inspect` | Open the widget inspector (see [Custom styles](/guide/custom-styles#finding-selectors)) |
+| `panel hide` / `show` / `toggle [MONITOR]` | Bar visibility; all monitors when omitted |
+| `panel reveal [MONITOR]` | Show an auto-hiding bar for a few seconds |
+| `panel dashboard [MONITOR]` | Toggle the dashboard; focused monitor when omitted |
+| `panel focus [MONITOR]` | Move the keyboard into the bar: arrows walk modules, Enter or Space opens one, Esc leaves |
 
-# Per-monitor visibility (omit the connector to affect all monitors)
-lys-shell panel hide DP-1
-lys-shell panel show DP-1
-lys-shell panel toggle
-lys-shell panel reveal DP-1     # an auto-hiding bar shows for a few seconds
+## config
 
-# Open or close the dashboard, on the focused monitor or the one named
-lys-shell panel dashboard
-lys-shell panel dashboard DP-1
+| Command | Does |
+| --- | --- |
+| `config get PATH` | Print a value (`bar.scale`) |
+| `config set PATH VALUE` | Write an override to `runtime.yaml`; `VALUE` is YAML |
+| `config reset PATH` | Remove the override |
+| `config schema [--stdout]` | Write `schema.json` to the config directory, or print it |
+| `config default [--stdout]` | Write `config.yaml.example`, or print it |
+| `config docs [--out DIR] [--only MODULE]` | Generate the config reference pages (default `docs/config`) |
 
-# Move the keyboard into the bar: the arrows walk its modules, Enter or
-# Space opens one (its dropdown takes the keys), Esc leaves
-lys-shell panel focus
-lys-shell panel focus DP-1
-```
+See [Editing config](/guide/editing-config).
 
-Read and edit config values from the command line:
+## audio
 
-```sh
-lys-shell config get bar.scale
-lys-shell config set bar.scale 1.25
-lys-shell config reset bar.scale
+| Command | Does |
+| --- | --- |
+| `audio output-volume [LEVEL]` / `input-volume [LEVEL]` | Print, or set: `50` absolute, `+5` / `-10` relative |
+| `audio output-mute` / `input-mute` | Toggle mute |
+| `audio sinks` / `sources` / `status` | List outputs, inputs, current state |
 
-# Emit the JSON schema, default YAML, or markdown docs
-lys-shell config schema --stdout
-lys-shell config default --stdout
-lys-shell config docs --out docs/config
-```
-
-Audio controls. Volume takes an absolute level (`0-100`) or a relative
-adjustment (`+5`, `-10`):
-
-```sh
-lys-shell audio output-volume +5
-lys-shell audio output-mute
-lys-shell audio input-volume 50
-lys-shell audio input-mute
-lys-shell audio sinks
-lys-shell audio sources
-lys-shell audio status
-```
-
-Brightness, for binding brightness keys. It takes a level in percent (`50`) or a
-step (`+10`, `-10`) and acts on the focused output, or on the one `--output`
-names. Laptop panels change through logind, so no root or udev rule is needed.
-External monitors change over DDC/CI when `modules.brightness.enable-external`
-is on. A change never drops below `modules.brightness.min-brightness` (5% by
-default), so a key cannot black the screen out. The running shell applies the
-change, so the brightness OSD and the bar module follow it:
+## brightness
 
 ```sh
 lys-shell brightness +10
-lys-shell brightness -10 --output DP-1
-lys-shell brightness 50
+lys-shell brightness 50 --output DP-1
 ```
 
-Media player control. Most subcommands take an optional player id (a number or
-partial name match); omit it to target the active player:
+`N` sets, `+N` raises, `-N` lowers, in percent, on the focused output or `--output`/`-o`. Never below `modules.brightness.min-brightness`. Laptop panels change through logind (no root needed); external monitors over DDC/CI when `modules.brightness.enable-external` is on. The shell applies the change, so the OSD and the bar module follow.
+
+## media
+
+| Command | Does |
+| --- | --- |
+| `media list` | List players |
+| `media play-pause` / `next` / `previous [PLAYER]` | Control a player |
+| `media shuffle [on\|off\|toggle] [PLAYER]` | Shuffle; toggles when omitted |
+| `media loop none\|track\|playlist [PLAYER]` | Loop mode |
+| `media active [PLAYER]` | Print or set the active player |
+| `media info [PLAYER]` | Show player details |
+
+`PLAYER` is a number or part of a name; the active player when omitted. `next` and `previous` show the now-playing OSD (see [`osd.media`](/config/osd)).
+
+## idle
+
+| Command | Does |
+| --- | --- |
+| `idle on [MINUTES] [-i]` | Inhibit idle for `MINUTES`, the default duration, or indefinitely with `--indefinite` |
+| `idle off` | Stop inhibiting |
+| `idle toggle [-i]` | Toggle |
+| `idle duration VALUE` | Adjust the timer's upper limit: `N`, `+N`, `-N` |
+| `idle remaining VALUE` | Adjust the running timer: `N`, `+N`, `-N` |
+| `idle status` | Print the state |
+
+## power, notify, systray
+
+| Command | Does |
+| --- | --- |
+| `power status` / `list` / `cycle` | Current profile, available profiles, next profile |
+| `power set PROFILE` | `power-saver`, `balanced` or `performance` |
+| `notify list` / `status` | List notifications, print state |
+| `notify dismiss ID` / `dismiss-all` | Dismiss |
+| `notify dnd [--until TIME]` | Toggle Do Not Disturb; `--until` turns it on until `HH:MM` or for `30m`, `1h` |
+| `systray list` / `status` | List tray items, print state |
+| `systray activate ID` | Activate a tray item |
+
+## wallpaper
+
+| Command | Does |
+| --- | --- |
+| `wallpaper set PATH [--fit MODE] [--monitor NAME]` | Set an image; `MODE` is `fill`, `fit`, `center`, `tile` or `stretch`; all monitors when omitted |
+| `wallpaper cycle DIR [-i SECONDS] [-m MODE]` | Cycle a folder every `SECONDS` (default 300), `sequential` (default) or `shuffle` |
+| `wallpaper next` / `previous` / `stop` | Control cycling |
+| `wallpaper info [--monitor NAME]` | Print the current state |
+| `wallpaper theming-monitor NAME` | Monitor whose wallpaper drives color extraction; `""` for the default |
+
+`lys-shell launcher -show wallpaper` opens the [wallpaper picker](/guide/launcher#wallpaper-picker). Wallpapers resampled for an output are cached in `$XDG_CACHE_HOME/lys-shell/wallpaper` (up to 256 MiB). An image that fails to decode, or takes over a second, shows the built-in wallpaper meanwhile and is logged.
+
+## recorder
+
+| Command | Does |
+| --- | --- |
+| `recorder start` / `stop` / `toggle` | Record |
+| `recorder pause` / `resume` | Pause a recording |
+| `recorder status` | Print the state |
+| `recorder replay start` | Arm the instant replay |
+| `recorder replay save` | Save the buffered seconds; prints the file |
+| `recorder replay stop` | Disarm it and free its memory |
+
+The instant replay keeps the last `modules.recorder.replay.seconds` (default 30) of an output encoded in memory, with keyframes every 2 s. `replay save` writes from the oldest keyframe to now as `lys-shell-replay-<time>.<format>` in the output directory, without interrupting the capture. Memory use is the bitrate times the seconds plus one keyframe interval; the recorder dropdown shows it. A normal recording can run at the same time on its own encoder. See [`modules.recorder`](/config/modules/recorder).
+
+## screenshot
+
+| Command | Does |
+| --- | --- |
+| `screenshot region` | Drag a region or click a window, adjust, Enter |
+| `screenshot output [NAME]` | A whole output; the focused one when omitted |
+| `screenshot window` | The active window |
+| `screenshot text` | Copy the text in a dragged region (OCR with tesseract) |
+| `screenshot qr` | Decode the QR code in a dragged region |
+
+`text` and `qr` save no image and print what they read. `text` uses the languages in `modules.screenshot.ocr-languages` (the session language when empty), copies the text and shows its first line in a toast; Esc stops it. It fails if tesseract is missing. `qr` offers Copy, and Open for a link; with no code found nothing is copied.
+
+## colorpicker
 
 ```sh
-lys-shell media list
-lys-shell media play-pause
-lys-shell media next
-lys-shell media previous
-lys-shell media shuffle on
-lys-shell media loop track
-lys-shell media active spotify
-lys-shell media info
+lys-shell colorpicker                        # print and copy, in colorpicker.format
+lys-shell colorpicker --format oklch         # hex, rgb, hsl, hsv, oklch or cmyk
+lys-shell colorpicker --no-copy --no-loupe   # print only; crosshair instead of the magnifier
 ```
 
-Skipping a track with `media next` or `media previous` (which is what media keys
-should be bound to) flashes the now-playing OSD with the new track's art, title
-and artist. Tracks the player moves to on its own do not, unless `osd.media` is
-`always`; `never` turns it off. The media dropdown can show synced lyrics from
-[LRCLIB](https://lrclib.net) once `modules.media.lyrics` is `true`: off by
-default, since every track's artist, title, album and length is sent there.
+Tab cycles the readout format; the format shown at the click is printed and copied, and the next pick starts in it. The recent swatches at the bottom can be picked again. Esc prints nothing and exits with status 1.
 
-Idle inhibition:
+## icons
 
-```sh
-lys-shell idle on            # use the default duration
-lys-shell idle on 30         # inhibit for 30 minutes
-lys-shell idle on --indefinite
-lys-shell idle off
-lys-shell idle toggle
-lys-shell idle duration +15  # +N / -N / N adjusts the upper limit
-lys-shell idle remaining -5  # +N / -N / N adjusts the active timer
-lys-shell idle status
-```
+See [Custom icons](/guide/custom-icons).
 
-Power profiles:
+## widget, toast
 
 ```sh
-lys-shell power status
-lys-shell power set balanced  # power-saver, balanced, performance
-lys-shell power cycle
-lys-shell power list
-```
-
-Notifications:
-
-```sh
-lys-shell notify list
-lys-shell notify dismiss 42
-lys-shell notify dismiss-all
-lys-shell notify dnd          # toggle Do Not Disturb
-lys-shell notify status
-```
-
-System tray:
-
-```sh
-lys-shell systray list
-lys-shell systray activate <id>
-lys-shell systray status
-```
-
-Wallpapers. Set a single image, or cycle through a directory:
-
-```sh
-lys-shell wallpaper set ~/Pictures/wall.png --fit fill --monitor DP-1
-lys-shell wallpaper cycle ~/Pictures/walls --interval 300 --mode sequential
-lys-shell wallpaper stop
-lys-shell wallpaper next
-lys-shell wallpaper previous
-lys-shell wallpaper info --monitor DP-1
-lys-shell wallpaper theming-monitor DP-1
-```
-
-At login the wallpaper lands before the bars, on every output. A wallpaper resampled for an output is kept in `$XDG_CACHE_HOME/lys-shell/wallpaper` (256 MiB at most, oldest out first), so a later login with the same file and output size shows it without decoding it. An image that cannot be decoded, or is not ready after a second, shows the built-in wallpaper until it is, says why in the log, and does not hold up the bars.
-
-`--fit` accepts `fill`, `fit`, `center`, `tile`, `stretch`; `--mode` accepts
-`sequential` or `shuffle`.
-
-Screen recorder:
-
-```sh
-lys-shell recorder start
-lys-shell recorder stop
-lys-shell recorder toggle
-lys-shell recorder pause
-lys-shell recorder resume
-lys-shell recorder status
-lys-shell recorder replay start    # arm the instant replay
-lys-shell recorder replay save     # write the last seconds, print the file
-lys-shell recorder replay stop     # disarm it and free its memory
-```
-
-The instant replay keeps the last `modules.recorder.replay.seconds` (30 by
-default) of an output encoded in memory: video cut on its keyframes, which come
-every 2 s, and the configured audio. `replay save` writes from the oldest
-keyframe to now into `lys-shell-replay-<time>.<format>` in the output directory,
-through a temporary file renamed into place, and the capture goes on without
-losing a frame. The memory is the encoded bitrate times the seconds plus one
-keyframe interval; the recorder dropdown shows it, and the bar icon turns to
-`icon-replay` while only the replay runs. `replay.enable: true` arms it when
-the shell starts; `replay.output` is `focused` or an output name. A normal
-recording runs beside it on its own encoder session, so it keeps the output or
-region picked for it and can pause without cutting the replay.
-
-Screenshots:
-
-```sh
-lys-shell screenshot region        # drag a region or click a window, adjust, Enter
-lys-shell screenshot output DP-1   # whole output (focused output if omitted)
-lys-shell screenshot window        # the active window
-lys-shell screenshot text          # copy the text in a dragged region (needs tesseract)
-lys-shell screenshot qr            # decode the QR code in a dragged region
-```
-
-`text` and `qr` save nothing. `text` reads the region with tesseract in the
-languages `screenshot.ocr-languages` names (the session language when empty),
-copies the text and shows its first line in a toast; Esc while it reads stops
-tesseract. Without tesseract it fails naming it, and the launcher offers no
-"Copy Text from Screen" row. `qr` decodes in-process and announces the code
-with Copy, and Open for a link; a region without a code reports "no code
-found" and copies nothing. Both print what they read.
-
-The color picker, over the running shell's own overlay (bind it to a key, or use it in a
-script):
-
-```sh
-lys-shell colorpicker                         # print and copy, in colorpicker.format
-lys-shell colorpicker --format oklch          # hex, rgb, hsl, hsv, oklch or cmyk
-lys-shell colorpicker --no-copy --no-loupe    # print only, crosshair instead of the magnifier
-```
-
-Tab in the picker cycles the readout through the formats; what it shows at the click is
-printed and copied, and the next pick starts in it. The recent swatches along the bottom
-of the screen can be clicked to pick one again. Escape prints nothing and exits with
-status 1.
-
-Icons. Install bundled assets, pull from a CDN source, import local SVGs, or
-sync everything referenced in your config:
-
-```sh
-lys-shell icons setup
-lys-shell icons sources
-lys-shell icons install tabler home settings bell
-lys-shell icons import ~/Downloads/my-icon.svg my-icon
-lys-shell icons list --source tb --interactive
-lys-shell icons remove tb-home-symbolic
-lys-shell icons export ~/exported-icons
-lys-shell icons open
-lys-shell icons sync --dry-run
-```
-
-Push a runtime update to a custom module by its `id`. The payload is parsed
-exactly like the module's own command output, so it drives the label, icon, and
-colors (see [custom modules](/guide/custom-modules)):
-
-```sh
-lys-shell widget update gpu '{"text":"72°C","alt":"hot","percentage":90}'
-```
-
-Show a custom on-screen toast. It reuses the OSD styling and position; add
-`--percentage` for a progress bar, `--icon` for a leading icon, `--duration`
-to override the OSD dismiss time, `--preset` to base it on a configured preset,
-and `--class` for a custom CSS class:
-
-```sh
-lys-shell toast "Build finished"
+lys-shell widget update gpu '{"text":"72°C","alt":"hot"}'
 lys-shell toast "Volume" --icon audio-volume-high-symbolic --percentage 65
-lys-shell toast "Syncing…" --duration 5000
 ```
 
-Application launcher and dmenu, with rofi-compatible flags. Invoked through a
-symlink named `rofi`, the binary takes the same flags directly.
-`lys-shell launcher --help` lists them:
+`widget update ID OUTPUT` pushes output to a [custom module](/guide/custom-modules#pushing-updates). `toast [LABEL]` shows an on-screen toast styled and placed like the OSD:
+
+| Flag | Effect |
+| --- | --- |
+| `--icon NAME` | Icon beside the text |
+| `--percentage N` | Progress bar, 0-100 |
+| `--duration MS` | Display time; the OSD's when unset |
+| `--preset ID` | Start from an [`osd.presets`](/config/toast-preset) entry, which may supply the label |
+| `--class NAME` | Extra CSS class |
+
+## launcher
+
+`lys-shell launcher` opens the search panel; with rofi flags it is a rofi-compatible launcher and dmenu. See [Launcher](/guide/launcher).
+
+## lock, logout
+
+| Command | Does |
+| --- | --- |
+| `lock` | Ask the shell to start the lock screen. `lys-lock` does the same as a single executable, for configs that take one word |
+| `logout` | End the session through lys-wm when running, otherwise logind |
+
+## portal
+
+| Command | Does |
+| --- | --- |
+| `portal` / `portal run` | Run the xdg-desktop-portal backend (what the D-Bus and systemd units start) |
+| `portal show DIALOG` | Preview a portal dialog: `file-chooser`, `screenshot`, `color`, `print`, `screen-cast`, `access`, `account`, `app-chooser`, `dynamic-launcher`, `authenticate`, `wallpaper` |
+| `portal permissions list` | List what each app was granted |
+| `portal permissions revoke APP TABLE [ENTRY]` | Revoke a table of grants, or one entry |
+
+Permission tables: `background`, `devices`, `gamemode`, `global-shortcuts`, `inhibit`, `input-capture`, `location`, `notifications`, `realtime`, `remote-desktop`, `screencast`, `screenshot`, `usb`, `wallpaper`.
+
+`portal share-picker` and `vpn sso-callback` are started by xdg-desktop-portal and by the browser after a VPN sign-in, not by hand.
+
+## shell, completions
+
+| Command | Does |
+| --- | --- |
+| `shell` | Run the shell in the foreground |
+| `completions SHELL` | Print completions for `bash`, `elvish`, `fish`, `powershell` or `zsh` |
+
+## IPC
+
+The CLI talks to the running shell over these interfaces, which scripts can use directly.
+
+**D-Bus** (session bus):
+
+| Name | Object | Interface |
+| --- | --- | --- |
+| `dev.stubbe.lys.shell` | `/dev/stubbe/lys/shell` | `org.gtk.Actions` with the actions `quit` and `inspector` |
+| `dev.stubbe.lys.Shell1` | `/dev/stubbe/lys/Shell` | `dev.stubbe.lys.Shell1`: `BarHide`, `BarShow`, `BarToggle`, `BarReveal`, `BarFocus`, `DashboardToggle` (each takes a monitor name, `""` for all or focused), `Lock`, `VpnSsoCallback` |
+
+**Widget socket**: `$XDG_RUNTIME_DIR/lys-shell/widget.sock`, newline-delimited JSON-RPC 2.0. Methods:
+
+| Method | Params |
+| --- | --- |
+| `widget.update` | `{"id": "<module id>", "output": "<text or JSON>"}` |
+| `toast.show` | `{"label", "icon", "percentage", "duration_ms", "preset", "class"}`, all optional |
 
 ```sh
-lys-shell launcher            # the search panel, see the Launcher guide
-lys-shell launcher -show drun
-lys-shell launcher -show wallpaper   # the wallpaper picker
-printf 'a\nb\n' | lys-shell launcher -dmenu
-lys-shell launcher -e "Build finished"
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"widget.update","params":{"id":"gpu","output":"72°C"}}' \
+  | socat - UNIX-CONNECT:"$XDG_RUNTIME_DIR/lys-shell/widget.sock"
 ```
-
-End or lock the session. `lock` asks the running shell to start the lock screen;
-`lys-lock` is the same command as a single executable, for places that exec one
-token without splitting on whitespace. `logout` goes through lys-wm when it runs,
-otherwise logind:
-
-```sh
-lys-shell lock
-lys-lock
-lys-shell logout
-```
-
-The desktop portal backend. Without a subcommand `portal` runs the backend, which
-is what the installed D-Bus and systemd units exec. `portal show` previews a
-dialog without an application request. `portal permissions` lists what apps
-were granted (persistent screen-share tokens, camera and microphone, location,
-background, USB devices, global shortcuts) and revokes a table or one entry of it:
-
-```sh
-lys-shell portal
-lys-shell portal show file-chooser
-lys-shell portal permissions list
-lys-shell portal permissions revoke org.example.App devices camera
-```
-
-Run the desktop shell in the foreground:
-
-```sh
-lys-shell shell
-```
-
-Shell completions for bash, elvish, fish, powershell or zsh:
-
-```sh
-lys-shell completions fish > ~/.config/fish/completions/lys-shell.fish
-```
-
-> `lys-shell portal share-picker` exists for the xdg-desktop-portal screencast flow
-> and `lys-shell vpn sso-callback` receives a browser's VPN sign-in. The portal and
-> the browser invoke them, not you.

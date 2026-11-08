@@ -5,7 +5,7 @@
 <h1 align="center">lys-shell</h1>
 
 <p align="center">
-  A complete Wayland desktop shell in pure Go: bar, notifications, OSD, launcher, wallpaper, and a desktop portal.
+  A Wayland desktop shell in pure Go: bar, notifications, OSD, launcher, wallpaper, and a desktop portal.
 </p>
 
 <p align="center">
@@ -18,13 +18,13 @@
   <img src="docs/public/lys-shell-preview.png" alt="lys-shell on a desktop">
 </p>
 
-lys-shell runs on any compositor with `wlr-layer-shell`. It is built on [lys-ui](https://github.com/stubbedev/lys-ui), and does not need [lys-wm](https://github.com/stubbedev/lys-wm).
+lys-shell runs on any compositor with `wlr-layer-shell`, including but not limited to [lys-wm](https://github.com/stubbedev/lys-wm). It is built on [lys-ui](https://github.com/stubbedev/lys-ui).
 
 ## Install
 
-[Releases](https://github.com/stubbedev/lys-shell/releases) carry a `.deb`, a Fedora `.rpm` and a tarball, for x86_64 and aarch64. The flake ships the package, a NixOS module and a home-manager module; see the [NixOS guide](https://stubbedev.github.io/lys-shell/guide/getting-started-nixos).
+[Releases](https://github.com/stubbedev/lys-shell/releases) have a `.deb`, a Fedora `.rpm` and a tarball, for x86_64 and aarch64. The flake provides the package, a NixOS module and a home-manager module; see [NixOS](https://stubbedev.github.io/lys-shell/guide/getting-started-nixos).
 
-To build from source, with Go and [just](https://github.com/casey/just) installed:
+From source, with Go and [just](https://github.com/casey/just):
 
 ```sh
 git clone https://github.com/stubbedev/lys-shell
@@ -34,16 +34,16 @@ sudo install -Dm755 dist/lys-shell dist/lys-lock -t /usr/local/bin
 lys-shell icons setup
 ```
 
-[Getting started](https://stubbedev.github.io/lys-shell/guide/getting-started) lists the runtime dependencies for each distribution.
+Runtime dependencies are listed in [Getting started](https://stubbedev.github.io/lys-shell/guide/getting-started).
 
 ## Usage
 
 ```sh
 lys-shell panel start     # run the shell in the background
-lys-shell panel settings  # open the settings GUI, https://github.com/stubbedev/lys-settings
+lys-shell panel settings  # open lys-settings, https://github.com/stubbedev/lys-settings
 ```
 
-lys-shell reads `~/.config/lys-shell/config.yaml` and applies changes on save:
+The config is `~/.config/lys-shell/config.yaml`; changes apply on save:
 
 ```yaml
 bar:
@@ -64,7 +64,7 @@ The guides, the CLI and the config reference are at <https://stubbedev.github.io
 
 ## Credits
 
-lys-shell began as a fork of [wayle-rs/wayle](https://github.com/wayle-rs/wayle) and is now an independent Go implementation that shares none of its code; its configuration format and much of its design come from there.
+The configuration format and much of the design come from [wayle-rs/wayle](https://github.com/wayle-rs/wayle). lys-shell shares no code with it.
 
 ## License
 

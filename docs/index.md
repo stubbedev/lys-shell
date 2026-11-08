@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: lys-shell
-  text: A complete Wayland desktop shell in pure Go
+  text: A Wayland desktop shell in pure Go
   tagline: Bar, notifications, OSD, launcher, wallpaper and a desktop portal, on any compositor with wlr-layer-shell.
   image:
     src: /lys-shell.svg

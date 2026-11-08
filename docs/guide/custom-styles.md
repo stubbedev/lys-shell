@@ -1,15 +1,14 @@
 # Custom styles
 
-`~/.config/lys-shell/styles/index.css` is an escape hatch for CSS tweaks that aren't exposed through `config.yaml` or the settings GUI. The file is created with a starter comment the first time lys-shell runs. Anything written into it is layered on top of the built-in stylesheet, and saved changes apply to the running shell automatically.
+`~/.config/lys-shell/styles/index.css` is layered over the built-in stylesheet and applies on save. It is created with a starter comment on first run; emptying it restores the defaults. Use it for what the config does not cover: per-instance styling, spacing, hover and focus states, animations.
 
-For things the config already covers (palette, fonts, global scale, rounding, bar layout, module visibility), use the normal config or the settings GUI. This file is for the rest: per-instance module styling, animation behavior, padding and spacing tweaks, hover and focus state changes, custom keyframe animations.
+The file is plain CSS in lys-ui's dialect, which follows [GTK4 CSS](https://docs.gtk.org/gtk4/css-overview.html). Nesting (`&`) works; `@import` does not. `styles/index.scss` is not read; while one exists, the log reports it.
 
-## Per-instance module styling
+## Styling one module instance
 
-Two clock modules on the same bar share every config-level styling option. To style them differently, give one of them a CSS class in the layout entry by writing it as a mapping instead of a bare string:
+Give the instance a class in the layout:
 
 ```yaml
-# config.yaml
 bar:
   layout:
     - monitor: "*"
@@ -18,12 +17,9 @@ bar:
         - clock
 ```
 
-The class is added to the box around that module. The selector to target its button from `index.css` is `.primary-clock button.bar-button` (every module button is a `button.bar-button` inside its module box).
-
-The robust way to change appearance on that one instance is to override the CSS variables it consumes. The built-in rules read from variables like `--bar-btn-label-color`, `--bar-btn-icon-color`, `--bar-btn-icon-size`, and `--bar-btn-label-weight`. The config sets a button's color variables on the button itself, so redefine them on its content, the `box` inside it, and set the button's own background directly:
+The class goes on the module's box; its button is `button.bar-button` inside it. Built-in rules read CSS variables such as `--bar-btn-label-color`, `--bar-btn-icon-color`, `--bar-btn-icon-size` and `--bar-btn-label-weight`. The config sets the color variables on the button, so override them on the button's content box:
 
 ```css
-/* ~/.config/lys-shell/styles/index.css */
 .primary-clock button.bar-button {
   background-color: var(--palette-primary);
 }
@@ -33,39 +29,19 @@ The robust way to change appearance on that one instance is to override the CSS 
 }
 ```
 
-Other modules continue to use the defaults.
+Classes work on any slot, including modules inside groups. A group is addressed by its name as an ID (`#status`).
 
-The same `class` field can be applied to any item in `left`, `center`, or `right`, and to items nested inside groups.
+## Finding selectors
 
-## Finding selectors and variables
+The built-in rules are in [`styling/css`](https://github.com/stubbedev/lys-shell/tree/master/styling/css), grouped into modules, components and primitives. They read colors, sizes and spacing from variables; overriding a variable under a narrower selector is the most robust change.
 
-The built-in stylesheet is the reference for selectors and variables: its sources live in [`styling/css`](https://github.com/stubbedev/lys-shell/tree/master/styling/css), one plain CSS file per bar module and dropdown. Every rule there reads its colors, sizes and spacing from CSS variables, and overriding a variable inside a narrower selector is the robust way to change one thing.
+`lys-shell panel inspect` draws the widget tree over every bar and dropdown. While it is armed:
 
-To see which widget sits where, open the inspector on the running shell:
+| Key | Does |
+| --- | --- |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> | Toggle the overlay |
+| <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> | Print the focused surface's tree (bounds, role, hover, focus and press state) to the shell's stdout |
 
-```sh
-lys-shell panel inspect
-```
+Under systemd, stdout is in `journalctl --user -u lys-shell`. `LYS_UI_INSPECT=1` arms the inspector at startup.
 
-It draws the widget tree over every bar and dropdown. While it is open, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>I</kbd> toggles the overlay and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd> prints the focused surface's tree, with each widget's bounds, role and hover, focus and press state, to the shell's stdout (`journalctl --user -u lys-shell` when it runs as a service). Starting the shell with `LYS_UI_INSPECT=1` arms the inspector from the start.
-
-### Inspecting dropdowns
-
-Dropdowns close as soon as focus leaves the bar. To keep one open while inspecting it, disable autohide first. Either toggle **Bar → Dropdown → Dropdown Autohide** in the settings GUI, or set this in `config.yaml`:
-
-```yaml
-bar:
-  dropdown-autohide: false
-```
-
-Open the dropdown, then run `lys-shell panel inspect`. Re-enable autohide afterwards.
-
-lys-shell renders with [lys-ui](https://github.com/stubbedev/lys-ui), which implements GTK4's CSS dialect: a subset of web CSS. See [docs.gtk.org/gtk4/css-overview.html](https://docs.gtk.org/gtk4/css-overview.html) for the reference.
-
-## Plain CSS
-
-The file is plain CSS, read as written, with no preprocessor. CSS nesting (`&`) works; `@import` does not, so everything goes in `index.css`. Saving the file applies the change. A `styles/index.scss` left from earlier versions is no longer read; lys-shell logs an error naming it until its rules move to `index.css` and the file is deleted.
-
-## Disable user styles
-
-Empty the contents of `~/.config/lys-shell/styles/index.css` to revert to defaults.
+A dropdown closes on a click outside it. Set `bar.dropdown-autohide: false` to keep one open while inspecting it.
