@@ -1,6 +1,0 @@
-.cava {
-  opacity: var(--bar-button-opacity);
-}
-.cava:hover > .bar-container {
-  filter: brightness(1.15);
-}

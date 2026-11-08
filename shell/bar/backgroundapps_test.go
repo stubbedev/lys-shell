@@ -9,14 +9,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/backgroundapps"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeMonitor is xdg-desktop-portal's org.freedesktop.background.Monitor.

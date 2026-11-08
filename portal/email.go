@@ -3,10 +3,9 @@ package portal
 import (
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // email is org.freedesktop.impl.portal.Email: the user's mail client

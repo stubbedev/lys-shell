@@ -14,9 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestParseProcStat(t *testing.T) {

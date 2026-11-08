@@ -12,10 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/media/mux"
 	"github.com/stubbedev/lys-lib/media/opus"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // ringFeed writes a stream into a ring in arrival order: fps video

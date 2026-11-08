@@ -7,15 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/fakeclock"
+	"github.com/stubbedev/lys-desktop/i18n"
+	shelllocales "github.com/stubbedev/lys-desktop/i18n/locales/shell"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
+	"github.com/stubbedev/lys-desktop/strftime"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	shelllocales "github.com/stubbedev/lys-shell/i18n/locales/shell"
-	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/calendar"
-	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/strftime"
 )
 
 func icsEvent(uid, summary, start, end string) string {

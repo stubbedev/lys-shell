@@ -5,9 +5,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/service/mpris"
+
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/internal/rustparse"
-	"github.com/stubbedev/lys-shell/service/mpris"
 )
 
 // mediaCommand is lys-shell/src/cli/media/commands.rs.

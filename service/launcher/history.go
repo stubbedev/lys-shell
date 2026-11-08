@@ -9,10 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-lib/xdg"
 	_ "modernc.org/sqlite" // the pure-Go sqlite driver: launcher.db stays the Rust file
-
-	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 const day = 86_400
@@ -33,7 +32,7 @@ var errHistoryClosed = errors.New("history database: closed")
 // DataDir resolves lys-shell's data directory, $XDG_DATA_HOME/lys-shell or
 // ~/.local/share/lys-shell, creating it (wayle-core ConfigPaths::data_dir).
 func DataDir() (string, error) {
-	dir, ok := xdg.OS.DataDir(version.Name)
+	dir, ok := xdg.OS.DataDir(identity.Name)
 	if !ok {
 		return "", errors.New("launcher: neither XDG_DATA_HOME nor HOME is an absolute path")
 	}

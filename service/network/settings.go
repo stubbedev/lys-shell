@@ -9,9 +9,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/feed"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // Profile is one saved NetworkManager connection, the fields of

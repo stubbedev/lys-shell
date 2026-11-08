@@ -15,15 +15,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/ipp/ipptest"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
-	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 type gtkWindow struct{}

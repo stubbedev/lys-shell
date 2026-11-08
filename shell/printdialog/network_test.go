@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
@@ -20,7 +21,6 @@ import (
 	"github.com/stubbedev/lys-shell/internal/ipp/ipptest"
 	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/service/dnssd/dnssdtest"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 const laserUUID = "6e0a8f10-1234-4abc-9def-00a0c0ffee01"

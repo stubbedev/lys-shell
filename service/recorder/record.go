@@ -10,12 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/audiomix"
 	"github.com/stubbedev/lys-lib/gpu"
 	"github.com/stubbedev/lys-lib/media/mux"
 	"github.com/stubbedev/lys-lib/media/opus"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // minFrameGap is the least time between two video frames: the muxers

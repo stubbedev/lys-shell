@@ -9,6 +9,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/shell/apptheme"
+	"github.com/stubbedev/lys-desktop/shell/reveal"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
@@ -16,14 +22,8 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
-	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
-	"github.com/stubbedev/lys-shell/shell/reveal"
-	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // testPicker is a picker without an application: the loop marshal is a

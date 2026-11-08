@@ -16,11 +16,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"golang.org/x/image/draw"
-
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // photoFolder is a folder of n small PNG photos in the harness's tree,

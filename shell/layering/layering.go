@@ -7,9 +7,8 @@ package layering
 import (
 	"log"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-ui/app"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // For is the stack layer a surface configured with layer takes, with

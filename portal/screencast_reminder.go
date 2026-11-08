@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/stubbedev/lys-shell/settingspage"
+	"github.com/stubbedev/lys-desktop/settingspage"
 )
 
 // persistPermanent is persist_mode 2: the grant outlives the app, kept

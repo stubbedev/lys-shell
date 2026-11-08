@@ -10,10 +10,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/feed"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/service/network/openconnect"
 	"github.com/stubbedev/lys-shell/service/network/secrets"
 )

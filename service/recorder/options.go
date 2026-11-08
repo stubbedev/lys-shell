@@ -3,7 +3,7 @@ package recorder
 import (
 	"image"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 // Webcam is the picture-in-picture overlay.

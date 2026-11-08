@@ -10,12 +10,13 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shlex"
+
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/launcher"
-	"github.com/stubbedev/lys-shell/shlex"
 )
 
 // launcherHelp is lys-shell/src/cli/launcher/mod.rs HELP, verbatim.

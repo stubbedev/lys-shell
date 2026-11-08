@@ -15,9 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/feed"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // Source is the UI's seam onto the service: the live state, change

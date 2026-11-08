@@ -7,7 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
+
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 )

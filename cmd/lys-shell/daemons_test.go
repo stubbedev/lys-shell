@@ -6,13 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
+	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-lib/dbustest"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
-	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/recorder/recordertest"
 )

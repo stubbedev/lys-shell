@@ -12,12 +12,12 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -126,7 +126,7 @@ type soundCache struct {
 
 func newSoundCache() *soundCache {
 	return &soundCache{dir: func() (string, bool) {
-		dir, ok := xdg.OS.RuntimeDir(version.Name)
+		dir, ok := xdg.OS.RuntimeDir(identity.Name)
 		return filepath.Join(dir, "sounds"), ok
 	}}
 }

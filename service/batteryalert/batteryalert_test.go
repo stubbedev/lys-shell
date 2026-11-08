@@ -3,8 +3,9 @@ package batteryalert
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/service/upower"
+
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
-	"github.com/stubbedev/lys-shell/service/upower"
 )
 
 func discharging(pct float64, w upower.WarningLevel) Reading {

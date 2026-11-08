@@ -6,14 +6,15 @@ import (
 	"log"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/glob"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/hyprland"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -199,7 +200,7 @@ func lysWMFocusSource() focusSource {
 			return focusedWindow{title: w.Title, appID: w.AppID}, ok, err
 		},
 		subscribe: func(ModuleContext) (<-chan struct{}, func(), error) {
-			w, err := lyswm.Watch(lyswm.EventFocus, lyswm.EventTitle, lyswm.EventClose)
+			w, err := lyswm.Watch(wmipc.EventFocus, wmipc.EventTitle, wmipc.EventClose)
 			if err != nil {
 				return nil, nil, err
 			}

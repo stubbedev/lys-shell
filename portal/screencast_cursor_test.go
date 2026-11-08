@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	"github.com/stubbedev/lys-lib/vinput"
 	"github.com/stubbedev/lys-lib/wltest"
 
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 

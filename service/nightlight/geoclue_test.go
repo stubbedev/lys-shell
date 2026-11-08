@@ -10,12 +10,11 @@ import (
 	"testing"
 	"time"
 
+	desktopidentity "github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
-
-	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 const geoclueDropIn = "resources/geoclue-lys-shell.conf"
@@ -176,8 +175,8 @@ func TestQueryLocationRegistersAsTheAgentWhenNoneAnswers(t *testing.T) {
 		t.Errorf("location = %+v", loc)
 	}
 	reg := <-g.agents
-	if reg.id != version.Name {
-		t.Errorf("registered as %q, want %q", reg.id, version.Name)
+	if reg.id != desktopidentity.Name {
+		t.Errorf("registered as %q, want %q", reg.id, desktopidentity.Name)
 	}
 	if string(reg.sender) != conn.Names()[0] {
 		t.Errorf("registered from %s, want %s", reg.sender, conn.Names()[0])
@@ -196,8 +195,8 @@ func TestQueryLocationRegistersAsTheAgentWhenNoneAnswers(t *testing.T) {
 		allowed   bool
 		level     uint32
 	}{
-		{version.Name, accuracyCity, true, accuracyCity},
-		{version.Name, 8, true, accuracyCity},
+		{desktopidentity.Name, accuracyCity, true, accuracyCity},
+		{desktopidentity.Name, 8, true, accuracyCity},
 		{"org.example.SandboxedApp", accuracyCity, false, 0},
 	} {
 		var allowed bool
@@ -326,9 +325,9 @@ func TestGeoClueDropInMatchesTheClient(t *testing.T) {
 			groups[group][key] = value
 		}
 	}
-	entry, ok := groups[version.Name]
+	entry, ok := groups[desktopidentity.Name]
 	if !ok {
-		t.Fatalf("no [%s] entry: %v", version.Name, groups)
+		t.Fatalf("no [%s] entry: %v", desktopidentity.Name, groups)
 	}
 	if entry["allowed"] != "true" || entry["system"] != "true" {
 		t.Errorf("entry = %v, want allowed and system", entry)
@@ -337,7 +336,7 @@ func TestGeoClueDropInMatchesTheClient(t *testing.T) {
 		t.Errorf("entry = %v, want a users key: geoclue drops an entry without one", entry)
 	}
 	agents := strings.Split(groups["agent"]["whitelist"], ";")
-	for _, want := range []string{version.Name, "geoclue-demo-agent", "gnome-shell", "io.elementary.desktop.agent-geoclue2", "sm.puri.Phosh", "lipstick"} {
+	for _, want := range []string{desktopidentity.Name, "geoclue-demo-agent", "gnome-shell", "io.elementary.desktop.agent-geoclue2", "sm.puri.Phosh", "lipstick"} {
 		if !slices.Contains(agents, want) {
 			t.Errorf("whitelist = %v, want %q", agents, want)
 		}

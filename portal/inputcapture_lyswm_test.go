@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/eis/eistest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/vinput"
-
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-lib/wmipc"
 )
 
 func TestInputCaptureOnLysWM(t *testing.T) {
@@ -43,7 +43,7 @@ func TestInputCaptureOnLysWM(t *testing.T) {
 	if len(zones) != 1 {
 		t.Fatalf("zones %v, want the headless output", zones)
 	}
-	if _, err := lyswm.CreateOutput(lyswm.Mode{Width: 800, Height: 600, RefreshMHz: 60000}, 1); err != nil {
+	if _, err := lyswm.CreateOutput(wmipc.Mode{Width: 800, Height: 600, RefreshMHz: 60000}, 1); err != nil {
 		t.Fatal(err)
 	}
 	if got := signalOptions(r.signal(t, "ZonesChanged"))["zone_set"].Value(); got != set {

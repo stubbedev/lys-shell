@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/pulse"
 )
 
 func source(index uint32, name string, monitor bool) pulse.InputDevice {

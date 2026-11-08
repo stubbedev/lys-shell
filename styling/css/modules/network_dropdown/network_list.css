@@ -1,9 +1,0 @@
-.network-ap.stale .media,
-.network-ap.stale .title,
-.network-ap.stale .description {
-  opacity: 0.55;
-}
-
-button.network-item-forget:hover {
-  color: var(--status-error);
-}

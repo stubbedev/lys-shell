@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 // Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the

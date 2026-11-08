@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dmabufprobe"
 	"github.com/stubbedev/lys-lib/fourcc"
@@ -16,7 +17,6 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )

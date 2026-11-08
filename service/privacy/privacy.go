@@ -18,11 +18,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/fswatch"
+	"github.com/stubbedev/lys-desktop/service/pulse"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/internal/fswatch"
-	"github.com/stubbedev/lys-shell/service/pulse"
 )
 
 // MicUser is one application recording a microphone.

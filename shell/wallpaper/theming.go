@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
-	"github.com/stubbedev/lys-shell/styling/material"
+	"github.com/stubbedev/lys-desktop/service/wallpaper/extract"
+	"github.com/stubbedev/lys-desktop/styling/material"
 )
 
 // sample reads the wallpaper monitor shows for the material extraction:

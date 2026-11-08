@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
 	"github.com/stubbedev/lys-secrets/vault"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 )
 
 func collectButtons(w widget.Widget, out []*widget.Button) []*widget.Button {

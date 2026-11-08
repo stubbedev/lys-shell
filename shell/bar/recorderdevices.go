@@ -1,8 +1,8 @@
 package bar
 
 import (
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/recorder/devicechoice"
 )
 
 // microphoneSources is microphone_sources over the in-process audio

@@ -5,8 +5,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/stubbedev/lys-lib/wmipc"
+
 	"github.com/stubbedev/lys-shell/service/hyprland"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
 )
@@ -89,9 +90,9 @@ func TestSwayWindows(t *testing.T) {
 }
 
 func TestLysWMWindows(t *testing.T) {
-	rect := func(x, y, w, h int) lyswm.Rect { return lyswm.Rect{X: x, Y: y, Width: w, Height: h} }
-	workspaces := []lyswm.Workspace{{ID: 1, Visible: true}, {ID: 2}, {ID: 3, Visible: true}}
-	wins := []lyswm.Window{
+	rect := func(x, y, w, h int) wmipc.Rect { return wmipc.Rect{X: x, Y: y, Width: w, Height: h} }
+	workspaces := []wmipc.Workspace{{ID: 1, Visible: true}, {ID: 2}, {ID: 3, Visible: true}}
+	wins := []wmipc.Window{
 		{ID: 1, Workspace: 1, Rect: rect(0, 0, 100, 100)},
 		{ID: 2, Workspace: 1, Floating: true, Rect: rect(10, 10, 20, 20)},
 		{ID: 3, Workspace: 2, Rect: rect(0, 0, 5, 5)},

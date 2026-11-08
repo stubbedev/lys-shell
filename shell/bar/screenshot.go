@@ -4,9 +4,8 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // screenshotModule is the screenshot capture button

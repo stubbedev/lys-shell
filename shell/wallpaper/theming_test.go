@@ -3,9 +3,9 @@ package wallpaper
 import (
 	"testing"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
-	"github.com/stubbedev/lys-shell/styling/material"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/wallpaper/extract"
+	"github.com/stubbedev/lys-desktop/styling/material"
 )
 
 func (h *harness) sample(monitor string) ([]material.ARGB, error) {

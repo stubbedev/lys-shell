@@ -1,8 +1,8 @@
 package batteryalert
 
 import (
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/service/upower"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/upower"
 )
 
 type kindDisplay struct {

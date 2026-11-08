@@ -4,11 +4,10 @@ import (
 	"errors"
 	"log"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/service/clipboard"
 	"github.com/stubbedev/lys-lib/xdg"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/service/clipboard"
 )
 
 var errNoDataDir = errors.New("neither XDG_DATA_HOME nor HOME is an absolute path")
@@ -64,7 +63,7 @@ func historyStore() *clipboard.Store {
 }
 
 func openClipboardStore(open func(dataDir string) (*clipboard.Store, error)) (*clipboard.Store, error) {
-	dir, ok := xdg.OS.DataDir(version.Name)
+	dir, ok := xdg.OS.DataDir(identity.Name)
 	if !ok {
 		return nil, errNoDataDir
 	}

@@ -12,16 +12,16 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/portal"
 	"github.com/stubbedev/lys-shell/service/network"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // This file is the network dropdown's VPNs: the section listing NM's

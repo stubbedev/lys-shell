@@ -9,10 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // nineTags is methods.rs's nine_tags as a mango frame fragment.

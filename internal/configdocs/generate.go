@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 // Generate writes every page under dir: one per section (bar modules

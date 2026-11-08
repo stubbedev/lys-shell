@@ -3,14 +3,14 @@ package filechooser
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // The chooser's keys on a real compositor, read through the keymap the

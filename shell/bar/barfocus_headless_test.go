@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/vinput"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // walkKeymap numbers the keys a bar walk uses as evdev does.

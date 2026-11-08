@@ -1,6 +1,0 @@
-run
-/walls/my image.png
--C
-@ROOT@/data/lys-shell/wallust/wallust.toml
---templates-dir
-@ROOT@/data/lys-shell/wallust/templates

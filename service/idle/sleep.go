@@ -7,9 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/service/logind"
 )
 
 // sleepWho is the inhibitor's owner as `systemd-inhibit --list` shows it.

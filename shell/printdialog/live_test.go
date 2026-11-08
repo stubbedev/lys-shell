@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/ipp/ipptest"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // idlePrinter is an idle, accepting queue's attributes.

@@ -3,11 +3,11 @@ package portal
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 

@@ -7,11 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/identity"
+	login1 "github.com/stubbedev/lys-desktop/service/logind"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/version"
-	login1 "github.com/stubbedev/lys-shell/service/logind"
 )
 
 // logindTimeout bounds every call to logind.
@@ -53,7 +52,7 @@ func (l *logind) lock(what, why string) (*os.File, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), logindTimeout)
 	defer cancel()
 	var fd dbus.UnixFD
-	err = conn.Object(login1.Service, login1.ManagerPath).CallWithContext(ctx, login1.ManagerIf+".Inhibit", 0, what, version.Name+" portal", why, "block").Store(&fd)
+	err = conn.Object(login1.Service, login1.ManagerPath).CallWithContext(ctx, login1.ManagerIf+".Inhibit", 0, what, identity.Name+" portal", why, "block").Store(&fd)
 	if err != nil {
 		return nil, fmt.Errorf("logind Inhibit %s: %w", what, err)
 	}

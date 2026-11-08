@@ -13,7 +13,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	"github.com/stubbedev/lys-shell/internal/fakeclock"
+	"github.com/stubbedev/lys-desktop/fakeclock"
 )
 
 func vevent(lines ...string) string {

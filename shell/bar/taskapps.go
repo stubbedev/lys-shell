@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/desktopentry"
+	"github.com/stubbedev/lys-desktop/desktopentry"
 )
 
 // taskApp is what an app's desktop entry says: its name and icon, and

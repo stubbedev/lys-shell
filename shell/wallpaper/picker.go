@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"image"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/imagedecode"
 	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/imagedecode"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )

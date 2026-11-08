@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/service/pulse"
 	"github.com/stubbedev/lys-lib/intconv"
-
-	"github.com/stubbedev/lys-shell/service/pulse"
 )
 
 // sampleRate is cava's fixed capture rate (service.rs's

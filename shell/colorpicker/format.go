@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/third_party/gomath"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // Format writes the color in f.

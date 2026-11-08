@@ -6,14 +6,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/screenshare"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeShares is the portal's dev.stubbe.lys.ScreenShares1.

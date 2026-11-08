@@ -8,15 +8,15 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/upower"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/batteryalert"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
-	"github.com/stubbedev/lys-shell/service/upower"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // batteryCharging is battery_section/methods.rs's is_charging.

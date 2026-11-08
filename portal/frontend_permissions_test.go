@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/portal/permissions"
+	"github.com/stubbedev/lys-desktop/portal/permissions/permstoretest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/portal/permissions"
-	"github.com/stubbedev/lys-shell/portal/permissions/permstoretest"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 

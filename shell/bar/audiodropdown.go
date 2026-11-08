@@ -9,15 +9,15 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/appicons"
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // PulseAudio property keys the dropdown reads (helpers.rs).

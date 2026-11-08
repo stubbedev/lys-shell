@@ -15,22 +15,23 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/glob"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/internal/clock"
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 // D-Bus identity and server information.
 const (
 	Interface     = "org.freedesktop.Notifications"
 	ObjPath       = "/org/freedesktop/Notifications"
-	ServerName    = version.Name
-	ServerVendor  = version.Name
+	ServerName    = identity.Name
+	ServerVendor  = identity.Name
 	ServerVersion = version.Version
 	SpecVersion   = "1.2"
 )
@@ -862,7 +863,7 @@ func globMatch(pattern, name string) bool {
 
 // loadDND restores the sticky flag; anything but "on" reads off.
 func loadDND() bool {
-	dir, ok := xdg.OS.StateDir(version.Name)
+	dir, ok := xdg.OS.StateDir(identity.Name)
 	if !ok {
 		return false
 	}
@@ -875,7 +876,7 @@ func loadDND() bool {
 
 // saveDND mirrors the flag into the state dir; failures are quiet.
 func saveDND(on bool) {
-	dir, ok := xdg.OS.StateDir(version.Name)
+	dir, ok := xdg.OS.StateDir(identity.Name)
 	if !ok {
 		return
 	}

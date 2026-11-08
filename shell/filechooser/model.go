@@ -18,10 +18,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
+	"github.com/stubbedev/lys-desktop/glob"
 	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/mime"
 )
 

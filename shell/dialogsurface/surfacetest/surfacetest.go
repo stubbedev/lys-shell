@@ -17,12 +17,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/toplevels"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 )
 
 // The app ids of the windows the rig maps.
@@ -138,14 +139,14 @@ func (r *Rig) mapWindow(t *testing.T, appID string) *window {
 }
 
 // lysWMWindow is lys-wm's window of appID.
-func lysWMWindow(appID string) (lyswm.Window, error) {
+func lysWMWindow(appID string) (wmipc.Window, error) {
 	windows, err := lyswm.Windows()
 	if err != nil {
-		return lyswm.Window{}, err
+		return wmipc.Window{}, err
 	}
-	i := slices.IndexFunc(windows, func(w lyswm.Window) bool { return w.AppID == appID })
+	i := slices.IndexFunc(windows, func(w wmipc.Window) bool { return w.AppID == appID })
 	if i < 0 {
-		return lyswm.Window{}, fmt.Errorf("lys-wm shows no %s window", appID)
+		return wmipc.Window{}, fmt.Errorf("lys-wm shows no %s window", appID)
 	}
 	return windows[i], nil
 }

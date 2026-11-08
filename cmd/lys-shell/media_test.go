@@ -6,11 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/mpris"
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
-
-	"github.com/stubbedev/lys-shell/service/mpris"
 )
 
 // fakePlayer is one MPRIS player on the private bus.

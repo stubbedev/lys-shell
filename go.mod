@@ -5,11 +5,11 @@ go 1.27.3
 require (
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-lib v0.3.15-0.20261108163854-5a73eeab2d2c
+	github.com/stubbedev/lys-desktop v0.0.0-20261108172414-4fb847c24b62
+	github.com/stubbedev/lys-lib v0.3.15-0.20261108170839-b9361bb635d5
 	github.com/stubbedev/lys-secrets v0.3.16-0.20261108170907-e6e5dc236295
-	github.com/stubbedev/lys-ui v0.2.19-0.20261108170000-3a25e8c18505
+	github.com/stubbedev/lys-ui v0.2.19-0.20261108170851-7a09fc304065
 	github.com/stubbedev/memory-go v0.5.0
-	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.47.0
 	golang.org/x/sys v0.49.0
@@ -26,6 +26,7 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	modernc.org/libc v1.80.0 // indirect

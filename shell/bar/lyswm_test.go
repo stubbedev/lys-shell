@@ -9,12 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func newFakeLysWM(t *testing.T) *lyswmtest.WM {
@@ -32,8 +31,8 @@ const lysWMWindows = `[{"id":4,"app_id":"foot","title":"~","workspace":1,"output
 	`{"id":9,"app_id":"","title":"","workspace":3,"output":"HDMI-A-1","urgent":false}]`
 
 func TestLysWMModels(t *testing.T) {
-	var replies []lyswm.Workspace
-	var wins []lyswm.Window
+	var replies []wmipc.Workspace
+	var wins []wmipc.Window
 	if err := json.Unmarshal([]byte(lysWMTwoOutputs), &replies); err != nil {
 		t.Fatal(err)
 	}

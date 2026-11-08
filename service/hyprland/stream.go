@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/stubbedev/lys-shell/internal/ipcsock"
+	"github.com/stubbedev/lys-desktop/ipcsock"
 )
 
 // Events subscribes to the event socket and returns a stream of parsed

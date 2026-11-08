@@ -15,14 +15,13 @@ import (
 	"slices"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/offheap"
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/memory-go"
-
-	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/offheap"
 )
 
 const (
@@ -49,7 +48,7 @@ type rasterCache struct {
 }
 
 func openRasterCache() *rasterCache {
-	base, ok := xdg.OS.CacheDir(version.Name)
+	base, ok := xdg.OS.CacheDir(identity.Name)
 	if !ok {
 		log.Print("wallpaper: no cache directory: neither XDG_CACHE_HOME nor HOME is an absolute path; every login decodes the wallpaper")
 		return nil

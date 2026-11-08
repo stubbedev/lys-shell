@@ -7,11 +7,11 @@ import (
 	"log"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/strftime"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/internal/walltimer"
-	"github.com/stubbedev/lys-shell/strftime"
 )
 
 // worldClockTemplate is helpers.rs's format_world_clock over one format:

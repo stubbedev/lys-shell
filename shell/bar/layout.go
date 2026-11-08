@@ -3,7 +3,7 @@
 package bar
 
 import (
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 // FindLayout resolves the layout for one output's connector name: the

@@ -4,14 +4,14 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/desktopentry"
+	"github.com/stubbedev/lys-desktop/glob"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/mpris"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/desktopentry"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/jinja"
-	"github.com/stubbedev/lys-shell/service/mpris"
 )
 
 // The status glyphs helpers.rs embeds (Nerd Font media icons).

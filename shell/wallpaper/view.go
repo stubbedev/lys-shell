@@ -5,10 +5,9 @@ import (
 	"math"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // TransitionKind is how one wallpaper replaces the previous one: the

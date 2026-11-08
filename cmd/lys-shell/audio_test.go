@@ -8,12 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/pulse/native"
+	"github.com/stubbedev/lys-desktop/service/pulse/pulsetest"
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/service/pulse/native"
-	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 )
 
 // audioFixture serves dev.stubbe.lys.Audio1 on a private session bus over a

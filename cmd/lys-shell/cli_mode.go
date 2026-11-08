@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/logging"
+
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/logging"
 )
 
 // selfManaged are the commands main.rs runs outside the shared CLI
@@ -18,7 +19,7 @@ var selfManaged = map[string]bool{"shell": true, "portal": true, "completions": 
 // The daily log prefixes: the running shell and the one-shot CLI
 // commands keep separate files, so neither prunes the other's.
 const (
-	shellLogPrefix = version.Name
+	shellLogPrefix = identity.Name
 	cliLogPrefix   = "lys-shell-cli"
 )
 

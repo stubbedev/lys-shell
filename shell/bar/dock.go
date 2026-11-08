@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/layering"
 )
 
@@ -91,8 +91,8 @@ func dockAnchor(edge config.DockEdge) app.Anchor {
 
 // dockArea is where a dock of size sits on an output at out, in the
 // compositor's global logical pixels: centered along its edge.
-func dockArea(edge config.DockEdge, out lyswm.Rect, size widget.Size) lyswm.Rect {
-	r := lyswm.Rect{Width: size.W, Height: size.H}
+func dockArea(edge config.DockEdge, out wmipc.Rect, size widget.Size) wmipc.Rect {
+	r := wmipc.Rect{Width: size.W, Height: size.H}
 	switch edge {
 	case config.DockEdgeBottom:
 		r.X, r.Y = out.X+(out.Width-size.W)/2, out.Y+out.Height-size.H
@@ -105,13 +105,13 @@ func dockArea(edge config.DockEdge, out lyswm.Rect, size widget.Size) lyswm.Rect
 }
 
 // covered reports whether a window shown on output overlaps area.
-func covered(windows []lyswm.Window, output string, area lyswm.Rect) bool {
-	return slices.ContainsFunc(windows, func(w lyswm.Window) bool {
+func covered(windows []wmipc.Window, output string, area wmipc.Rect) bool {
+	return slices.ContainsFunc(windows, func(w wmipc.Window) bool {
 		return w.Output == output && w.Stack != nil && !w.Minimized && overlap(w.Rect, area)
 	})
 }
 
-func overlap(a, b lyswm.Rect) bool {
+func overlap(a, b wmipc.Rect) bool {
 	return a.X < b.X+b.Width && b.X < a.X+a.Width && a.Y < b.Y+b.Height && b.Y < a.Y+a.Height
 }
 
@@ -379,7 +379,7 @@ func dockMode(cfg config.DockConfig) config.BarAutoHide {
 // filling its output; known is false without lys-wm's window geometry,
 // so an auto-hiding dock shows only under the pointer.
 func (d *dock) windows() (covering, fullscreen, known bool) {
-	out := lyswm.Rect{X: int(d.output.LogicalX), Y: int(d.output.LogicalY), Width: int(d.output.LogicalW), Height: int(d.output.LogicalH)}
+	out := wmipc.Rect{X: int(d.output.LogicalX), Y: int(d.output.LogicalY), Width: int(d.output.LogicalW), Height: int(d.output.LogicalH)}
 	return windowsOn(d.hub, d.output.Name, dockArea(d.cfg.Edge, out, d.size))
 }
 

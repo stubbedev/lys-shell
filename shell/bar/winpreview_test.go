@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 )
 
 type previewRig struct {
@@ -82,9 +82,9 @@ func (r *previewRig) work() {
 
 func threeWindows() []previewWindow {
 	return []previewWindow{
-		{id: "1", title: "editor", appID: "code", rect: lyswm.Rect{X: 0, Y: 0, Width: 960, Height: 1080}, hasRect: true},
-		{id: "2", title: "browser", appID: "firefox", rect: lyswm.Rect{X: 960, Y: 0, Width: 960, Height: 540}, hasRect: true},
-		{id: "3", title: "terminal", appID: "foot", rect: lyswm.Rect{X: 960, Y: 540, Width: 960, Height: 540}, hasRect: true},
+		{id: "1", title: "editor", appID: "code", rect: wmipc.Rect{X: 0, Y: 0, Width: 960, Height: 1080}, hasRect: true},
+		{id: "2", title: "browser", appID: "firefox", rect: wmipc.Rect{X: 960, Y: 0, Width: 960, Height: 540}, hasRect: true},
+		{id: "3", title: "terminal", appID: "foot", rect: wmipc.Rect{X: 960, Y: 540, Width: 960, Height: 540}, hasRect: true},
 	}
 }
 
@@ -237,7 +237,7 @@ func TestWindowPreviewFocusesAndCapturesOnLysWM(t *testing.T) {
 	}
 	startProbeProcess(t, "org.example.First", "first")
 	startProbeProcess(t, "org.example.Second", "second")
-	var first, second lyswm.Window
+	var first, second wmipc.Window
 	until(t, "both probes on lys-wm", func() error {
 		var err error
 		if first, err = lysWMWindow("org.example.First"); err != nil {

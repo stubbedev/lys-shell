@@ -17,11 +17,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/fswatch"
+	"github.com/stubbedev/lys-desktop/ipcsock"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/internal/fswatch"
-	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // Bucket is the coarse worktree state, mirroring treeman's bucket

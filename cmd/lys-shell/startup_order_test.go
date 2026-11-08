@@ -18,16 +18,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/logind/logindtest"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/sockdir"
+	"github.com/stubbedev/lys-lib/wmipc"
 
-	"github.com/stubbedev/lys-shell/service/logind/logindtest"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 const startupBound = 30 * time.Second
@@ -190,7 +190,7 @@ func isBlack(c color.RGBA) bool { return c.R == 0 && c.G == 0 && c.B == 0 }
 
 func startBareSession(t *testing.T) (loginCalls string) {
 	t.Helper()
-	for _, name := range []string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK", "XDG_SESSION_ID"} {
+	for _, name := range []string{wmipc.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK", "XDG_SESSION_ID"} {
 		t.Setenv(name, "")
 	}
 	swaytest.Start(t)

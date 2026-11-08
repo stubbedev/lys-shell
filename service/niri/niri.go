@@ -13,7 +13,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/stubbedev/lys-shell/internal/ipcsock"
+	"github.com/stubbedev/lys-desktop/ipcsock"
 )
 
 // SocketEnv is niri_ipc::socket::SOCKET_PATH_ENV.

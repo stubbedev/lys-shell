@@ -3,13 +3,13 @@ package bar
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 func TestAFullscreenWindowTurnsDoNotDisturbOnWhileItIs(t *testing.T) {

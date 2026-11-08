@@ -7,22 +7,22 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/desktopentry"
+	"github.com/stubbedev/lys-desktop/fileuri"
+	"github.com/stubbedev/lys-desktop/imagedecode"
+	"github.com/stubbedev/lys-desktop/shell/reveal"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/desktopentry"
-	"github.com/stubbedev/lys-shell/imagedecode"
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/keys"
-	"github.com/stubbedev/lys-shell/shell/reveal"
-	"github.com/stubbedev/lys-shell/shell/widgets"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // The surface's sizes (shell/portal_dialogs: set_width_request,

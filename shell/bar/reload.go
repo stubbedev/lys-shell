@@ -3,7 +3,7 @@ package bar
 import (
 	"sync"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 // reloadQueue hands config snapshots to the loop, coalescing the ones

@@ -8,14 +8,14 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/clipboard"
+	"github.com/stubbedev/lys-desktop/service/clipboard/historybudget"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
-	"github.com/stubbedev/lys-shell/service/clipboard"
-	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // picturedMode lists rows that preview as pictures, counting the captures

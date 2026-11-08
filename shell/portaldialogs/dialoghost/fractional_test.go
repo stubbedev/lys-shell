@@ -3,9 +3,8 @@ package dialoghost
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestADialogFileIconPaintsExactlyAtAFractionalScale(t *testing.T) {

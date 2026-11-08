@@ -11,13 +11,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/glob"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/appicons"
-	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/service/hyprland"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 // The hyprland-workspaces module (hyprland_workspaces/): the filter
@@ -851,7 +851,7 @@ func (m *hyprlandWorkspaces) workspaceWindows(ws cwsWorkspace) []previewWindow {
 		}
 		out = append(out, previewWindow{
 			id: c.Address, title: c.Title, appID: c.Class,
-			rect: lyswm.Rect{X: c.At[0], Y: c.At[1], Width: c.Size[0], Height: c.Size[1]}, hasRect: true,
+			rect: wmipc.Rect{X: c.At[0], Y: c.At[1], Width: c.Size[0], Height: c.Size[1]}, hasRect: true,
 		})
 	}
 	return out

@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/eis"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
-
-	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 // InputCaptureIface hands an app the local keyboard and pointer once
@@ -65,7 +65,7 @@ func newInputCapture(conn *dbus.Conn, s *sessions, dial func() (*lyswm.Capture, 
 }
 
 func watchLysWMOutputs() (<-chan struct{}, func(), error) {
-	w, err := lyswm.Watch(lyswm.EventOutput)
+	w, err := lyswm.Watch(wmipc.EventOutput)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -220,7 +220,7 @@ func (ic *inputCapture) pump(cs *captureSession, link *lyswm.Capture) {
 	}
 }
 
-func capturePosition(p *lyswm.CapturePoint) dbus.Variant {
+func capturePosition(p *wmipc.CapturePoint) dbus.Variant {
 	if p == nil {
 		return dbus.MakeVariant(struct{ X, Y float64 }{})
 	}
@@ -515,7 +515,7 @@ func (o inputCaptureObject) Disable(session dbus.ObjectPath, appID string, _ Var
 	return ResponseSuccess, Vardict{}, nil
 }
 
-func cursorPosition(options Vardict) (*lyswm.CapturePoint, bool) {
+func cursorPosition(options Vardict) (*wmipc.CapturePoint, bool) {
 	v, ok := options["cursor_position"]
 	if !ok {
 		return nil, true
@@ -526,7 +526,7 @@ func cursorPosition(options Vardict) (*lyswm.CapturePoint, bool) {
 	}
 	x, okX := pos[0].(float64)
 	y, okY := pos[1].(float64)
-	return &lyswm.CapturePoint{X: x, Y: y}, okX && okY
+	return &wmipc.CapturePoint{X: x, Y: y}, okX && okY
 }
 
 // Release ends the session's capture, warping the pointer to

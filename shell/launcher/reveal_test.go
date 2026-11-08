@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/reveal"
 	"github.com/stubbedev/lys-lib/motion"
 	"github.com/stubbedev/lys-ui/anim"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/shell/reveal"
 )
 
 // openingOpacities are the opacities an opening panel commits, its map

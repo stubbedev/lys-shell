@@ -12,9 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/service/clipboard"
-	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/clipboard"
+	"github.com/stubbedev/lys-desktop/service/clipboard/historybudget"
+
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/charnames"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"

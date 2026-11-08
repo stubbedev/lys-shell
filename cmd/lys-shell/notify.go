@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
+
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 // notifyCommand is lys-shell/src/cli/notify/commands.rs.

@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/eis/eistest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-lib/wmipc"
 )
 
 const captureKeymap = "xkb_keymap { xkb_keycodes { include \"evdev\" }; };"
@@ -360,7 +360,7 @@ func mountsInputCapture(t *testing.T) bool {
 }
 
 func TestInputCaptureIsNotMountedWithoutLysWM(t *testing.T) {
-	t.Setenv(lyswm.SocketEnv, "")
+	t.Setenv(wmipc.SocketEnv, "")
 	if mountsInputCapture(t) {
 		t.Error("InputCapture mounted without lys-wm")
 	}

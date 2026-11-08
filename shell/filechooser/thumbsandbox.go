@@ -11,10 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-lib/intconv"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // systemPaths are what a sandboxed thumbnailer sees of the system,

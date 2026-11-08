@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/portaldialogs"
+	"github.com/stubbedev/lys-lib/wmipc"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 	"github.com/stubbedev/lys-shell/shell/filechooser"
 	"github.com/stubbedev/lys-shell/shell/printdialog"
@@ -28,7 +28,7 @@ var pendingInterfaces []string
 // serves; the shell's own (screen shares) are not the frontend's.
 func mounted(t *testing.T) []string {
 	t.Helper()
-	t.Setenv(lyswm.SocketEnv, "")
+	t.Setenv(wmipc.SocketEnv, "")
 	var names []string
 	for _, iface := range New(nil, config.Load("", config.DiscardDiagnostics)).interfaces() {
 		if name, ok := strings.CutPrefix(iface.Name, implPrefix); ok {
@@ -146,7 +146,7 @@ func TestInputCaptureIsDeclaredForLysWMAlone(t *testing.T) {
 // the others must not export one the frontend never reads.
 func TestVersionOnlyWhereTheSpecDefinesOne(t *testing.T) {
 	versioned := []string{"Clipboard", "DynamicLauncher", "GlobalShortcuts", "InputCapture", "Notification", "RemoteDesktop", "ScreenCast", "Screenshot", "Secret", "Settings", "Usb"}
-	t.Setenv(lyswm.SocketEnv, "")
+	t.Setenv(wmipc.SocketEnv, "")
 	b := New(nil, config.Load("", config.DiscardDiagnostics))
 	b.input = newInputCapture(nil, b.sessions, nil, nil, nil)
 	for _, iface := range b.interfaces() {

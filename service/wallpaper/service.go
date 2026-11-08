@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
-	"github.com/stubbedev/lys-shell/styling/material"
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/service/wallpaper/extract"
+	"github.com/stubbedev/lys-desktop/styling/material"
 )
 
 // Options configure a Service (WallpaperServiceBuilder).

@@ -15,6 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/clipboard"
+	"github.com/stubbedev/lys-desktop/service/clipboard/historybudget"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
@@ -23,12 +27,8 @@ import (
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/clipboard"
-	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 func runLoop(t *testing.T, application *app.Application) func(func()) {

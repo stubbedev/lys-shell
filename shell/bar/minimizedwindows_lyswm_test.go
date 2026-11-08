@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 )
 
 const liveTimeout = 10 * time.Second
@@ -95,17 +95,17 @@ func until(t *testing.T, what string, cond func() error) {
 }
 
 // lysWMWindow is the lys-wm window with appID.
-func lysWMWindow(appID string) (lyswm.Window, error) {
+func lysWMWindow(appID string) (wmipc.Window, error) {
 	windows, err := lyswm.Windows()
 	if err != nil {
-		return lyswm.Window{}, err
+		return wmipc.Window{}, err
 	}
 	for _, w := range windows {
 		if w.AppID == appID {
 			return w, nil
 		}
 	}
-	return lyswm.Window{}, fmt.Errorf("lys-wm lists no %s window in %+v", appID, windows)
+	return wmipc.Window{}, fmt.Errorf("lys-wm lists no %s window in %+v", appID, windows)
 }
 
 // On a real lys-wm, a window minimized through lys-wm shows in the

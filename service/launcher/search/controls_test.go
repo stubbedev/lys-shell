@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 func controlAction(t *testing.T, ctl Control) Action {

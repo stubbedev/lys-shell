@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-lib/wmipc"
+
 	"github.com/stubbedev/lys-shell/service/hyprland"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -234,12 +236,12 @@ func hyprlandWindows(mons []hyprland.Monitor, clients []hyprland.Client) []image
 	return rects
 }
 
-func lysWMWindows(workspaces []lyswm.Workspace, wins []lyswm.Window) []image.Rectangle {
+func lysWMWindows(workspaces []wmipc.Workspace, wins []wmipc.Window) []image.Rectangle {
 	shown := map[int]bool{}
 	for _, ws := range workspaces {
 		shown[ws.ID] = ws.Visible
 	}
-	rank := func(w lyswm.Window) int {
+	rank := func(w wmipc.Window) int {
 		switch {
 		case w.Fullscreen:
 			return 0
@@ -248,11 +250,11 @@ func lysWMWindows(workspaces []lyswm.Workspace, wins []lyswm.Window) []image.Rec
 		}
 		return 2
 	}
-	visible := slices.DeleteFunc(slices.Clone(wins), func(w lyswm.Window) bool {
+	visible := slices.DeleteFunc(slices.Clone(wins), func(w wmipc.Window) bool {
 		return !shown[w.Workspace] || w.Rect.Width <= 0 || w.Rect.Height <= 0
 	})
 	slices.Reverse(visible)
-	slices.SortStableFunc(visible, func(a, b lyswm.Window) int { return cmp.Compare(rank(a), rank(b)) })
+	slices.SortStableFunc(visible, func(a, b wmipc.Window) int { return cmp.Compare(rank(a), rank(b)) })
 	rects := make([]image.Rectangle, len(visible))
 	for i, w := range visible {
 		rects[i] = image.Rect(w.Rect.X, w.Rect.Y, w.Rect.X+w.Rect.Width, w.Rect.Y+w.Rect.Height)

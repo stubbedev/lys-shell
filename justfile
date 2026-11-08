@@ -26,6 +26,7 @@ fhs_interpreter := if arch() == "aarch64" { "/lib/ld-linux-aarch64.so.1" } else 
 # runs a binary made for another system's loader.
 build:
     CGO_ENABLED=0 {{go}} build -trimpath -ldflags "-s -w -I {{fhs_interpreter}}" -o {{dist}}/ ./cmd/lys-shell ./cmd/lys-lock
+    install -m 0644 "$({{go}} list -m -f '{{{{.Dir}}' github.com/stubbedev/lys-desktop)/service/bitwarden/generator/eff_large_wordlist.NOTICE" {{dist}}/
     {{go}} run ./internal/tools/distcheck {{dist}}/lys-shell {{dist}}/lys-lock
     mkdir -p {{dist}}/completions
     {{go}} run ./cmd/lys-shell completions bash > {{dist}}/completions/completions.bash
@@ -196,12 +197,12 @@ update:
     {{go}} mod tidy
     just vendor-hash
 
-# Move lys-ui, lys-lib and lys-secrets to the heads of their main
+# Move lys-desktop, lys-ui, lys-lib and lys-secrets to the heads of their main
 # branches: go.mod's pins straight from GitHub (the module proxy lags
 # fresh commits), the flake's lys-lib input for the dev shell's drivers,
 # then the vendor hash.
 bump-lys:
-    GOPROXY=direct GOPRIVATE=github.com/stubbedev/* {{go}} get github.com/stubbedev/lys-ui@main github.com/stubbedev/lys-lib@main github.com/stubbedev/lys-secrets@main
+    GOPROXY=direct GOPRIVATE=github.com/stubbedev/* {{go}} get github.com/stubbedev/lys-desktop@main github.com/stubbedev/lys-ui@main github.com/stubbedev/lys-lib@main github.com/stubbedev/lys-secrets@main
     {{go}} mod tidy
     nix flake update lys-lib lys-secrets
     just vendor-hash

@@ -14,10 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/internal/fswatch"
-	"github.com/stubbedev/lys-shell/internal/icons"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/fswatch"
+	"github.com/stubbedev/lys-desktop/icons"
+
 	"github.com/stubbedev/lys-shell/internal/jinja"
 )
 

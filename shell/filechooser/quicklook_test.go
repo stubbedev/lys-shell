@@ -13,11 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/shell/treetest"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
 	"github.com/stubbedev/lys-lib/xkb"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // loadWatch counts the preview loads started, the goroutines they ran

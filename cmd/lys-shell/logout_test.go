@@ -5,12 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/logind/logindtest"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/logind/logindtest"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-lib/wmipc"
 )
 
 func defaultLogoutCommands() []struct{ name, command string } {
@@ -36,7 +35,7 @@ func TestDefaultLogoutCommandsEndTheDisplaySession(t *testing.T) {
 	for _, c := range defaultLogoutCommands() {
 		command := c.command
 		t.Run(c.name, func(t *testing.T) {
-			t.Setenv(lyswm.SocketEnv, "")
+			t.Setenv(wmipc.SocketEnv, "")
 			fake := logindtest.StartUnit(t, display)
 			stdout, stderr, code := runLysShellCommand(t, command)
 			if code != 0 || stdout != "" || stderr != "" {
@@ -51,7 +50,7 @@ func TestDefaultLogoutCommandsEndTheDisplaySession(t *testing.T) {
 
 // With no session to resolve, logout fails loudly and ends nothing.
 func TestLogoutWithoutASessionIsAnError(t *testing.T) {
-	t.Setenv(lyswm.SocketEnv, "")
+	t.Setenv(wmipc.SocketEnv, "")
 	fake := logindtest.StartUnit(t, "")
 	stdout, stderr, code := runCaptured(t, false, "logout")
 	want := "Error: log out: logind GetSession \"auto\": no session auto\n"

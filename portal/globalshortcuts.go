@@ -9,12 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/portal/permissions"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/portal/permissions"
 )
 
 // GlobalShortcutsIface bridges org.freedesktop.impl.portal.GlobalShortcuts

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
+	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
 )
 
 func utc(y int, m time.Month, d, h, min int) time.Time {

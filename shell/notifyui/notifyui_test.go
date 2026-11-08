@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestIconString(t *testing.T) {
@@ -213,7 +213,7 @@ func TestDeliverersShowAsTheSystem(t *testing.T) {
 	if system == "" || system == "notification-source-system" {
 		t.Fatalf("the system's name is not translated: %q", system)
 	}
-	for _, name := range []string{"notify-send", version.Name} {
+	for _, name := range []string{"notify-send", identity.Name} {
 		if got := AppLabel(name); got != system {
 			t.Errorf("AppLabel(%q) = %q, want %q", name, got, system)
 		}
@@ -221,7 +221,7 @@ func TestDeliverersShowAsTheSystem(t *testing.T) {
 	base := time.Unix(1000, 0)
 	groups := GroupBy([]*notifications.Notification{
 		{ID: 1, AppName: "notify-send", Added: base},
-		{ID: 2, AppName: version.Name, Added: base.Add(time.Second)},
+		{ID: 2, AppName: identity.Name, Added: base.Add(time.Second)},
 	}, AppKey)
 	if len(groups) != 1 || groups[0].Key != system || len(groups[0].Notifs) != 2 {
 		t.Errorf("groups %+v, want both under %q", groups, system)

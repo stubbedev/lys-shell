@@ -5,9 +5,8 @@ import (
 	"image"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/offheap"
 	"github.com/stubbedev/memory-go"
-
-	"github.com/stubbedev/lys-shell/offheap"
 )
 
 func paintedBuiltin(t testing.TB, w, h int) *image.RGBA {

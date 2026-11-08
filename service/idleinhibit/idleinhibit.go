@@ -9,10 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-lib/intconv"
-
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 // D-Bus identity.

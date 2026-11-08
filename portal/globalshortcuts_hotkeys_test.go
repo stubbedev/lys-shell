@@ -9,12 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/portal/permissions"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
-
-	"github.com/stubbedev/lys-shell/portal/permissions"
 )
 
 // fakeHotkeys is a compositor offering xx_hotkey_v1: it binds any

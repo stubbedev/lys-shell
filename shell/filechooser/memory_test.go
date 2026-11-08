@@ -6,13 +6,12 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/internal/fileuri"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // A save dialog selects its name's stem, so typing keeps the

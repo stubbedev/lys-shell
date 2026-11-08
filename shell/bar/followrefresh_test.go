@@ -9,9 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 func tickSource(ticks chan struct{}) func(context.Context) (<-chan struct{}, func(), error) {

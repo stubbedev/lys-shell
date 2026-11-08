@@ -1,7 +1,0 @@
-.media-source-option.selected .media {
-  background: var(--accent-subtle);
-}
-.media-source-option.selected image,
-image.media-source-option-check {
-  color: var(--accent);
-}

@@ -1,9 +1,0 @@
-button.bar-button.icon-square {
-  padding: calc(var(--bar-btn-label-padding) * 0.75);
-}
-button.bar-button.icon-square .bar-button-icon {
-  padding: calc(var(--bar-btn-icon-padding) * 0.3);
-  background-color: var(--bar-btn-icon-bg);
-  border-radius: var(--bar-button-rounding-element);
-  transition: background-color var(--duration-fast);
-}

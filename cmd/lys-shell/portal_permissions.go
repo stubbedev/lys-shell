@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"text/tabwriter"
 
+	"github.com/stubbedev/lys-desktop/portal/permissions"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/portal/permissions"
 )
 
 // portalPermissionsCommand is `lys-shell portal permissions`: what apps

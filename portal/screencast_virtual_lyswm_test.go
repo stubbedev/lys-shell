@@ -4,11 +4,11 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-lib/pipewire/pwtest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-lib/wmipc"
 )
 
 // lysWMGeometry is the outputs' logical geometry as lys-wm reports it.
@@ -21,15 +21,15 @@ func lysWMGeometry() ([]outputGeometry, error) {
 	return geometry, err
 }
 
-func lysWMOutput(t *testing.T, name string) (lyswm.Output, bool) {
+func lysWMOutput(t *testing.T, name string) (wmipc.Output, bool) {
 	t.Helper()
 	outputs, err := lyswm.Outputs()
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := slices.IndexFunc(outputs, func(o lyswm.Output) bool { return o.Name == name })
+	i := slices.IndexFunc(outputs, func(o wmipc.Output) bool { return o.Name == name })
 	if i < 0 {
-		return lyswm.Output{}, false
+		return wmipc.Output{}, false
 	}
 	return outputs[i], true
 }
@@ -52,7 +52,7 @@ func TestScreenCastVirtualOnLysWM(t *testing.T) {
 		t.Fatalf("Start = %d", code)
 	}
 	out, ok := lysWMOutput(t, "VIRT-1")
-	if !ok || out.Mode != (lyswm.Mode{Width: 1920, Height: 1080, RefreshMHz: virtualRefreshMHz}) || out.Scale != virtualScale {
+	if !ok || out.Mode != (wmipc.Mode{Width: 1920, Height: 1080, RefreshMHz: virtualRefreshMHz}) || out.Scale != virtualScale {
 		t.Fatalf("lys-wm lists the virtual output as %+v (%v)", out, ok)
 	}
 	streams := castStreams(t, res)

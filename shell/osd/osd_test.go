@@ -8,18 +8,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/shell/reveal"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/keytoggles"
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/shell/reveal"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // fakeWindow records what the OSD asks of its surface.

@@ -14,15 +14,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/glob"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/service/sni"
-	"github.com/stubbedev/lys-shell/shell/widgets"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // errSystrayNoStore guards the wiring: the module needs the shared

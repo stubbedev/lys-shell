@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/logind"
-	"github.com/stubbedev/lys-shell/service/logind/logindtest"
+	"github.com/stubbedev/lys-desktop/service/logind"
+	"github.com/stubbedev/lys-desktop/service/logind/logindtest"
 )
 
 const display = "/org/freedesktop/login1/session/c1"

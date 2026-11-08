@@ -13,13 +13,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/stubbedev/lys-desktop/imagedecode"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	xdraw "golang.org/x/image/draw"
 
-	"github.com/stubbedev/lys-shell/imagedecode"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-desktop/i18n"
 )
 
 // ReplayStatus is the instant replay's lifecycle.

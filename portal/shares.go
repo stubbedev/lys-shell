@@ -1,10 +1,10 @@
 package portal
 
 import (
+	"github.com/stubbedev/lys-desktop/service/lyswm"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/screenshare"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )

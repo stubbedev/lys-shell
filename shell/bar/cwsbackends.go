@@ -9,10 +9,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
 	"github.com/stubbedev/lys-lib/intconv"
+	"github.com/stubbedev/lys-lib/wmipc"
 
 	"github.com/stubbedev/lys-shell/internal/appicons"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"
@@ -389,9 +390,9 @@ func newLysWMWorkspaces(ctx ModuleContext) (Module, error) {
 	return newCwsModule(ctx, "lys-wm", cwsWorkspaces, cfg, lysWMBackend{titles: titles}), nil
 }
 
-var lysWMWorkspaceEvents = []lyswm.EventKind{
-	lyswm.EventOutput, lyswm.EventWorkspace, lyswm.EventFocusedOutput,
-	lyswm.EventOpen, lyswm.EventClose, lyswm.EventMove, lyswm.EventUrgent,
+var lysWMWorkspaceEvents = []wmipc.EventKind{
+	wmipc.EventOutput, wmipc.EventWorkspace, wmipc.EventFocusedOutput,
+	wmipc.EventOpen, wmipc.EventClose, wmipc.EventMove, wmipc.EventUrgent,
 }
 
 var errNoPreviousWorkspace = errors.New("lys-wm has no action that returns to the previous workspace")
@@ -431,7 +432,7 @@ func (lysWMBackend) snapshot() ([]cwsWorkspace, []cwsWindow, error) {
 	return workspaces, windows, nil
 }
 
-func lysWMModels(replies []lyswm.Workspace, all []lyswm.Window) ([]cwsWorkspace, []cwsWindow) {
+func lysWMModels(replies []wmipc.Workspace, all []wmipc.Window) ([]cwsWorkspace, []cwsWindow) {
 	urgent := map[int]bool{}
 	windows := make([]cwsWindow, 0, len(all))
 	for _, w := range all {

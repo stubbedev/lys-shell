@@ -5,15 +5,15 @@ import (
 	"errors"
 	"log"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/backgroundapps"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // genericAppIcon stands in for an app whose desktop entry names no icon

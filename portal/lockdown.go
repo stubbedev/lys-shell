@@ -1,10 +1,9 @@
 package portal
 
 import (
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // LockdownIface is the policy the frontend consults before allowing

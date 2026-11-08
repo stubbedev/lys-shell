@@ -1,7 +1,0 @@
-.nightlight-refused .bar-button-icon {
-  color: var(--status-error);
-}
-
-.nightlight-no-location .bar-button-icon {
-  color: var(--status-warning);
-}

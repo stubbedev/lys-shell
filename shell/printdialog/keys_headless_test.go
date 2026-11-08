@@ -4,15 +4,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // Escape cancels the print dialog on a real compositor by the symbol

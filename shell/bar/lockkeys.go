@@ -1,8 +1,10 @@
 package bar
 
 import (
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-lib/wmipc"
+
 	"github.com/stubbedev/lys-shell/service/keytoggles"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/osd"
 )
 
@@ -40,7 +42,7 @@ func lysWMLockKeys(fn func(keytoggles.Event)) (func(), error) {
 	}, nil
 }
 
-func lockChanges(prev, next lyswm.Locks) []keytoggles.Event {
+func lockChanges(prev, next wmipc.Locks) []keytoggles.Event {
 	var events []keytoggles.Event
 	for _, k := range []struct {
 		key        keytoggles.Key

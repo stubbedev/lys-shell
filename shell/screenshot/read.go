@@ -13,9 +13,9 @@ import (
 
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/qrcode"
+	"github.com/stubbedev/lys-desktop/desktopentry"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 
-	"github.com/stubbedev/lys-shell/desktopentry"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 )
 

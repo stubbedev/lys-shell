@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/edid"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/drmconn"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -26,7 +26,7 @@ import (
 // was issued for; version 3 adds the size of a virtual output and when
 // the grant was given.
 const (
-	restoreVendor           = version.Name
+	restoreVendor           = identity.Name
 	restoreV1        uint32 = 1
 	restoreV2        uint32 = 2
 	restoreV3        uint32 = 3

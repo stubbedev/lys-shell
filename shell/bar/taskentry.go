@@ -6,14 +6,13 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/shell/widgets"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // taskHub is the shell's window state the minimized-windows modules and
@@ -169,7 +168,7 @@ func openTaskMenu(ctx ModuleContext, host app.Host, anchor widget.Boundser, item
 // windowGeometry is where lys-wm's windows are: the watcher that keeps
 // them, read on the loop.
 type windowGeometry interface {
-	Windows() []lyswm.Window
+	Windows() []wmipc.Window
 }
 
 // followGeometry keeps lys-wm's window geometry in the hub: the docks
@@ -195,7 +194,7 @@ func (h *taskHub) geometryChanged() {
 }
 
 // geometry is every lys-wm window, false without lys-wm's geometry.
-func (h *taskHub) geometry() ([]lyswm.Window, bool) {
+func (h *taskHub) geometry() ([]wmipc.Window, bool) {
 	if h.geom == nil {
 		return nil, false
 	}

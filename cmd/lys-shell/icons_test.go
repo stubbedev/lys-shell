@@ -8,8 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/internal/icons"
-	"github.com/stubbedev/lys-shell/internal/icons/icontest"
+	"github.com/stubbedev/lys-desktop/icons"
+	"github.com/stubbedev/lys-desktop/icons/icontest"
+
 	"github.com/stubbedev/lys-shell/resources"
 )
 

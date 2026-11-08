@@ -13,8 +13,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/icons"
+
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/internal/icons"
 	"github.com/stubbedev/lys-shell/resources"
 )
 

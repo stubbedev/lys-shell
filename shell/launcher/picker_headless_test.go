@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/imagedecode"
+	"github.com/stubbedev/lys-desktop/shell/apptheme"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
-	"github.com/stubbedev/lys-shell/shell/apptheme"
 )
 
 // headlessWalls makes real thumbnails of real files; what it was told is

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/internal/spawn"
+	"github.com/stubbedev/lys-desktop/spawn"
 )
 
 // RunShell spawns `sh -c command`, detached (spawn.rs run_shell).

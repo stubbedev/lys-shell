@@ -4,13 +4,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
-	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 func inhibitMinutes(t *testing.T, minutes int64) inhibitduration.Duration {

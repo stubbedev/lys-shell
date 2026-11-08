@@ -9,17 +9,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/clockwatch"
 	"github.com/stubbedev/lys-shell/internal/jinja"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
-	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 // The schedule's cadence. A jump of the clock, as a resume from suspend
@@ -85,7 +85,7 @@ type sunsetEnv struct {
 // vars. It fails when they name none: the records would otherwise land
 // in whatever directory the shell started from.
 func liveSunsetEnv(vars xdg.Env, system *dbus.Conn) (sunsetEnv, error) {
-	dir, ok := vars.StateDir(version.Name)
+	dir, ok := vars.StateDir(identity.Name)
 	if !ok {
 		return sunsetEnv{}, errors.New("nightlight: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path")
 	}

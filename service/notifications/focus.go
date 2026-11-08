@@ -3,7 +3,7 @@ package notifications
 import (
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
+	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
 )
 
 // allows reports whether n pops up through do-not-disturb.

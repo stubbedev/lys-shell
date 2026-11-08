@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/fakeclock"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/mpris"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/lyrics"
-	"github.com/stubbedev/lys-shell/service/mpris"
 )
 
 func fakeLRCLIB(t *testing.T, status int, body string) (*httptest.Server, *atomic.Int32) {

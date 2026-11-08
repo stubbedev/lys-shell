@@ -9,14 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/spawn"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/spawn"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // cwsBlinkInterval is BLINK_INTERVAL: the urgent pulse half-period.
@@ -322,7 +321,7 @@ func (m *cwsModule) closeIPC() {
 // workspaceWindows is what a workspace preview shows: the workspace's
 // windows, placed where lys-wm's geometry says on lys-wm.
 func (m *cwsModule) workspaceWindows(ws cwsWorkspace) []previewWindow {
-	rects := map[uint64]lyswm.Rect{}
+	rects := map[uint64]wmipc.Rect{}
 	if m.kind == "lys-wm" && m.ctx.Tasks != nil {
 		if windows, ok := m.ctx.Tasks.geometry(); ok {
 			for _, w := range windows {

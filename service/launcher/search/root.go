@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/desktopentry"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/settingspage"
 	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/desktopentry"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/answer"
 	"github.com/stubbedev/lys-shell/service/launcher/charnames"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
-	"github.com/stubbedev/lys-shell/settingspage"
 )
 
 // Deps are the shell services a search session draws on.
@@ -58,7 +58,7 @@ const (
 
 // FrecencyPath is where uses are remembered.
 func FrecencyPath() (string, bool) {
-	dir, ok := xdg.OS.StateDir(version.Name)
+	dir, ok := xdg.OS.StateDir(identity.Name)
 	if !ok {
 		return "", false
 	}
@@ -173,10 +173,10 @@ func commandsDir(configured, home string) string {
 	if configured != "" {
 		return expandHome(configured, home)
 	}
-	if dir, ok := xdg.OS.ConfigDir(version.Name); ok {
+	if dir, ok := xdg.OS.ConfigDir(identity.Name); ok {
 		return filepath.Join(dir, "launcher", "commands")
 	}
-	return filepath.Join(home, ".config", version.Name, "launcher", "commands")
+	return filepath.Join(home, ".config", identity.Name, "launcher", "commands")
 }
 
 func filesConfig(cfg config.LauncherSearchConfig, home string) FilesConfig {
@@ -187,12 +187,12 @@ func filesConfig(cfg config.LauncherSearchConfig, home string) FilesConfig {
 	if len(roots) == 0 {
 		roots = []string{home}
 	}
-	cache := filepath.Join(home, ".cache", version.Name, fileIndexFileName)
-	if dir, ok := xdg.OS.CacheDir(version.Name); ok {
+	cache := filepath.Join(home, ".cache", identity.Name, fileIndexFileName)
+	if dir, ok := xdg.OS.CacheDir(identity.Name); ok {
 		cache = filepath.Join(dir, fileIndexFileName)
 	}
 	recent := filepath.Join(home, ".local", "share", "recently-used.xbel")
-	if dir, ok := xdg.OS.DataDir(version.Name); ok {
+	if dir, ok := xdg.OS.DataDir(identity.Name); ok {
 		recent = filepath.Join(filepath.Dir(dir), "recently-used.xbel")
 	}
 	return FilesConfig{

@@ -3,7 +3,7 @@ package bar
 import (
 	"testing"
 
-	"github.com/stubbedev/lys-shell/testhome"
+	"github.com/stubbedev/lys-desktop/testhome"
 )
 
 // TestMain runs the package against a scratch home: building a theme

@@ -5,11 +5,10 @@ import (
 	"slices"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 // revealPx is the strip a hidden bar or dock keeps at its edge, which
@@ -167,7 +166,7 @@ func loopAfter(application *app.Application) func(time.Duration, func()) func() 
 // windowsOn reports, from lys-wm's geometry, a window overlapping area
 // on output and a window filling output; known is false without the
 // geometry.
-func windowsOn(hub *taskHub, output string, area lyswm.Rect) (overlapping, fullscreen, known bool) {
+func windowsOn(hub *taskHub, output string, area wmipc.Rect) (overlapping, fullscreen, known bool) {
 	if hub == nil {
 		return false, false, false
 	}
@@ -175,7 +174,7 @@ func windowsOn(hub *taskHub, output string, area lyswm.Rect) (overlapping, fulls
 	if !ok {
 		return false, false, false
 	}
-	full := slices.ContainsFunc(windows, func(w lyswm.Window) bool {
+	full := slices.ContainsFunc(windows, func(w wmipc.Window) bool {
 		return w.Output == output && w.Stack != nil && !w.Minimized && w.Fullscreen
 	})
 	return covered(windows, output, area), full, true
@@ -231,8 +230,8 @@ func (w *barWindow) shownThickness() int {
 }
 
 // barArea is the strip of out a bar along edge covers.
-func barArea(edge widget.BarEdge, out *app.Output, thickness int) lyswm.Rect {
-	r := lyswm.Rect{X: int(out.LogicalX), Y: int(out.LogicalY), Width: int(out.LogicalW), Height: int(out.LogicalH)}
+func barArea(edge widget.BarEdge, out *app.Output, thickness int) wmipc.Rect {
+	r := wmipc.Rect{X: int(out.LogicalX), Y: int(out.LogicalY), Width: int(out.LogicalW), Height: int(out.LogicalH)}
 	switch edge {
 	case widget.BarTop:
 		r.Height = thickness

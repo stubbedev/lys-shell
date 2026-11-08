@@ -12,20 +12,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-desktop/service/upower"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/appicons"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/hyprland"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/sni"
-	"github.com/stubbedev/lys-shell/service/upower"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 type heldRead struct {

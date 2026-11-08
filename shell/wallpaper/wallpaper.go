@@ -11,16 +11,16 @@ import (
 	"log"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/imagedecode"
+	"github.com/stubbedev/lys-desktop/outputsize"
+	"github.com/stubbedev/lys-desktop/service/wallpaper/extract"
+	"github.com/stubbedev/lys-desktop/styling/material"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/imagedecode"
-	"github.com/stubbedev/lys-shell/outputsize"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
-	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
-	"github.com/stubbedev/lys-shell/styling/material"
 )
 
 // frameInterval paces transition steps.

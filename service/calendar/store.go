@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/internal/fswatch"
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/fswatch"
 )
 
 const (

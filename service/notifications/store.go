@@ -12,12 +12,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-lib/intconv"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 	_ "modernc.org/sqlite" // the pure-Go sqlite driver: notifications.db stays the Rust file
-
-	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // deleteBatch is the most rows one retention or expiry DELETE removes,
@@ -73,7 +72,7 @@ type Store struct {
 // $XDG_DATA_HOME/lys-shell or ~/.local/share/lys-shell, where the
 // launcher history and the colour history live too.
 func StorePath() (string, error) {
-	dir, ok := xdg.OS.DataDir(version.Name)
+	dir, ok := xdg.OS.DataDir(identity.Name)
 	if !ok {
 		return "", errors.New("notifications: neither XDG_DATA_HOME nor HOME is an absolute path")
 	}

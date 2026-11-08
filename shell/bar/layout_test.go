@@ -3,7 +3,7 @@ package bar
 import (
 	"testing"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 func TestFindLayoutExactMonitorBeatsStar(t *testing.T) {

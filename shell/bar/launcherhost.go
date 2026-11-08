@@ -8,20 +8,20 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/settingspage"
+	"github.com/stubbedev/lys-desktop/shell/apptheme"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/app"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
-	"github.com/stubbedev/lys-shell/internal/version"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/answer"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
 	"github.com/stubbedev/lys-shell/service/launcher/typetext"
-	"github.com/stubbedev/lys-shell/settingspage"
-	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/launcher"
 )
 
@@ -116,8 +116,8 @@ func inProcessSession(mode string) *launcheripc.Session {
 // newBrowserIndex reads the browsers of this home directory; without one
 // the panel offers neither bookmarks nor history.
 func newBrowserIndex() *search.BrowserIndex {
-	configDir, configOK := xdg.OS.ConfigDir(version.Name)
-	cacheDir, cacheOK := xdg.OS.CacheDir(version.Name)
+	configDir, configOK := xdg.OS.ConfigDir(identity.Name)
+	cacheDir, cacheOK := xdg.OS.CacheDir(identity.Name)
 	home := os.Getenv("HOME")
 	if !configOK || !cacheOK || !filepath.IsAbs(home) {
 		log.Print("launcher: XDG_CONFIG_HOME, XDG_CACHE_HOME and HOME are not absolute paths: browser bookmarks and history are unavailable")
@@ -170,7 +170,7 @@ const skinTonePath = "launcher.emoji.skin-tone"
 // newCurrencyRates keeps the ECB rates in the cache directory; without one
 // the panel answers no currencies.
 func newCurrencyRates() *answer.Rates {
-	cacheDir, ok := xdg.OS.CacheDir(version.Name)
+	cacheDir, ok := xdg.OS.CacheDir(identity.Name)
 	if !ok {
 		log.Print("launcher: XDG_CACHE_HOME is not an absolute path: currency answers are unavailable")
 		return nil

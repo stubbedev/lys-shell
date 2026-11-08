@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/service/idle/idlepolicy"
 )
 
 // Watcher tells when the session has been idle for a while: idle runs once

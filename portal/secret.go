@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/portaldialogs"
@@ -22,9 +24,6 @@ import (
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-secrets/client"
 	"github.com/stubbedev/lys-secrets/vault"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/version"
 )
 
 // secretLen is the master secret's length, as the reference backends.
@@ -104,7 +103,7 @@ func secretIface(conn *dbus.Conn, cfg *config.Service) dbusx.Interface {
 // secretDeclinedPath is the file of apps kept out of the vault, under
 // lys-shell's state directory; "" when none resolves.
 func secretDeclinedPath() string {
-	dir, ok := xdg.OS.StateDir(version.Name)
+	dir, ok := xdg.OS.StateDir(identity.Name)
 	if !ok {
 		return ""
 	}

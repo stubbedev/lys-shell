@@ -5,14 +5,14 @@ import (
 	"log"
 	"slices"
 
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/recorder/devicechoice"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/recorder"
-	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
 

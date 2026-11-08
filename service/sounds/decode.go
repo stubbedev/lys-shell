@@ -10,10 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/service/pulse/native"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/media/vorbis"
-
-	"github.com/stubbedev/lys-shell/service/pulse/native"
 )
 
 // maxSoundBytes bounds a sound file: a theme's chirps are a few hundred

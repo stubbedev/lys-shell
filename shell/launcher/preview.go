@@ -8,13 +8,13 @@ import (
 	"math"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/shell/widgets"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	engine "github.com/stubbedev/lys-shell/service/launcher"
-	"github.com/stubbedev/lys-shell/shell/widgets"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 const (

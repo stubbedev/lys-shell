@@ -12,11 +12,10 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
-
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // LargeThumbnailSize is the freedesktop large thumbnail size in pixels:

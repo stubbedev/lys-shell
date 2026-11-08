@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/shell/widgets"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // popoverCard is the popover root: lys-ui's popover surface (its fill,

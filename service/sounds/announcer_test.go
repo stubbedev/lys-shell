@@ -11,15 +11,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/fakeclock"
+	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/pulse/native"
+	"github.com/stubbedev/lys-desktop/service/pulse/pulsetest"
+	"github.com/stubbedev/lys-desktop/service/sounds/soundpolicy"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/service/pulse/native"
-	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
-	"github.com/stubbedev/lys-shell/service/sounds/soundpolicy"
 )
 
 type rig struct {

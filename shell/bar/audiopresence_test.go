@@ -8,12 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/pulse/native"
+	"github.com/stubbedev/lys-desktop/service/pulse/pulsetest"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/service/pulse/native"
-	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 )
 
 type audioPresenceModule interface {

@@ -38,7 +38,6 @@
       url = "github:stubbedev/lys-login";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
-      inputs.lys-shell.follows = "";
       inputs.lys-wm.follows = "lys-wm";
     };
     # The settings app, which the modules install beside the shell. Its Go side

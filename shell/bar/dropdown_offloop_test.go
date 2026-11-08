@@ -6,17 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/mpris"
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/recorder/devicechoice"
+	"github.com/stubbedev/lys-desktop/service/upower"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/brightness"
-	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
-	"github.com/stubbedev/lys-shell/service/upower"
 )
 
 type stuckCalls struct {

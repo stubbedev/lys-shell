@@ -1,6 +1,0 @@
-.audio-device-option.selected .media {
-  background: var(--accent-subtle);
-}
-.audio-device-option.selected image {
-  color: var(--accent);
-}

@@ -3,9 +3,8 @@ package recorder
 import (
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/media/mux"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // replay is an armed instant replay: a recording whose samples go to

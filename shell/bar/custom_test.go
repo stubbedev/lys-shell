@@ -11,9 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestParseCustomOutputPlain(t *testing.T) {

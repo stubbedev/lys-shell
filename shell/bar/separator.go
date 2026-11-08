@@ -4,10 +4,9 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // separatorModule is lys-ui's BarSeparator, a rule across the bar

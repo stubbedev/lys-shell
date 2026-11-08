@@ -7,6 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/desktopentry"
+	"github.com/stubbedev/lys-desktop/fileuri"
+	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -14,12 +18,8 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/desktopentry"
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 	"github.com/stubbedev/lys-shell/internal/ipp"
 	"github.com/stubbedev/lys-shell/internal/mime"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"
@@ -67,7 +67,7 @@ func servePortalHosts(conn *dbus.Conn, application *app.Application, outputs fun
 	}
 	home, _ := os.UserHomeDir()
 	viewFile, presetsFile := "", ""
-	if dir, ok := xdg.OS.StateDir(version.Name); ok {
+	if dir, ok := xdg.OS.StateDir(identity.Name); ok {
 		viewFile, presetsFile = filepath.Join(dir, "file-chooser-view"), filepath.Join(dir, "print-presets")
 	}
 	chooser := filechooser.New(filechooser.Deps{

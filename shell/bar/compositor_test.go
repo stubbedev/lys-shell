@@ -4,8 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-lib/wmipc"
+
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 )
@@ -33,8 +34,8 @@ func TestDetectCompositorTakesTheFirstAdvertised(t *testing.T) {
 		{[]string{"HYPRLAND_INSTANCE_SIGNATURE", "SWAYSOCK"}, compositorHyprland},
 		{[]string{niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"}, compositorNiri},
 		{[]string{mango.SocketEnv, "SWAYSOCK"}, compositorMango},
-		{[]string{lyswm.SocketEnv}, compositorLysWM},
-		{[]string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv}, compositorLysWM},
+		{[]string{wmipc.SocketEnv}, compositorLysWM},
+		{[]string{wmipc.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv}, compositorLysWM},
 	} {
 		advertise(t, tc.set...)
 		if got := detectCompositor(); got != tc.want {
@@ -72,7 +73,7 @@ func TestSwayWorkspacesSkippedUnderHyprland(t *testing.T) {
 }
 
 func TestNewWorkspacesFollowsTheCompositor(t *testing.T) {
-	for _, env := range []string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
+	for _, env := range []string{wmipc.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
 		t.Setenv(env, "")
 	}
 	_, err := newWorkspaces(ModuleContext{})

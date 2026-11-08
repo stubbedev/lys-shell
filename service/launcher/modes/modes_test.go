@@ -8,10 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/service/clipboard"
-	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
+	"github.com/stubbedev/lys-desktop/service/clipboard"
+	"github.com/stubbedev/lys-desktop/service/clipboard/historybudget"
+	"github.com/stubbedev/lys-lib/wmipc"
+
 	"github.com/stubbedev/lys-shell/service/launcher"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 )
 
@@ -737,7 +738,7 @@ func TestKeysListsBindingsReadOnly(t *testing.T) {
 }
 
 func TestLysWMWindows(t *testing.T) {
-	got := lysWMWindows([]lyswm.Window{
+	got := lysWMWindows([]wmipc.Window{
 		{ID: 1, AppID: "foot", Title: "a", Workspace: 1},
 		{ID: 2, AppID: "firefox", Title: "b", Workspace: 2, Focused: true},
 		{ID: 3, AppID: "mpv", Title: "c", Workspace: 2},
@@ -754,7 +755,7 @@ func TestLysWMWindows(t *testing.T) {
 	if got[2].FocusOrder >= got[0].FocusOrder {
 		t.Errorf("the newest window must rank first: %+v", got)
 	}
-	if none := lysWMWindows([]lyswm.Window{{ID: 1, Workspace: 0}}); none[0].OnCurrentWorkspace {
+	if none := lysWMWindows([]wmipc.Window{{ID: 1, Workspace: 0}}); none[0].OnCurrentWorkspace {
 		t.Errorf("nothing focused means no current workspace, not workspace 0: %+v", none)
 	}
 }

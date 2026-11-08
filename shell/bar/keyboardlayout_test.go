@@ -12,16 +12,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/sockdir"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/hyprland"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 func TestMainKeyboardLayoutPicksMainNonVirtual(t *testing.T) {
@@ -138,7 +138,7 @@ func TestKeyboardLayoutModuleRenders(t *testing.T) {
 // advertises, so each test names the one it fakes.
 func clearCompositorEnv(t *testing.T) {
 	t.Helper()
-	for _, name := range []string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
+	for _, name := range []string{wmipc.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv, "SWAYSOCK"} {
 		t.Setenv(name, "")
 	}
 }

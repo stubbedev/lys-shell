@@ -8,17 +8,17 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/vinput"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
-	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // On a real compositor a workspace's hover preview leaves the bar its
@@ -26,7 +26,7 @@ import (
 // calendar, and the preview gives way to it. Sway is the compositor the
 // workspaces module detects, whatever session the test runs inside.
 func TestHeadlessAClickBesideTheWorkspacePreviewReachesTheBar(t *testing.T) {
-	for _, name := range []string{lyswm.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv} {
+	for _, name := range []string{wmipc.SocketEnv, "HYPRLAND_INSTANCE_SIGNATURE", niri.SocketEnv, mango.SocketEnv} {
 		t.Setenv(name, "")
 	}
 	sway := swaytest.Start(t)

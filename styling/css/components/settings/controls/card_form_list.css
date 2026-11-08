@@ -1,6 +1,0 @@
-.card-form-editor entry.error {
-  border-color: var(--status-error);
-}
-.card-form-editor entry.error image {
-  color: var(--status-error);
-}

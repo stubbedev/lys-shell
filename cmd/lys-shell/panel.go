@@ -8,12 +8,12 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/rusterr"
+	"github.com/stubbedev/lys-desktop/settingspage"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/internal/rusterr"
 	"github.com/stubbedev/lys-shell/service/shellipc"
-	"github.com/stubbedev/lys-shell/settingspage"
 )
 
 // panelCommand is lys-shell/src/cli/panel/commands.rs.

@@ -4,13 +4,13 @@ import (
 	"context"
 	"log"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/upower"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
 	"github.com/stubbedev/lys-shell/service/batteryalert"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
-	"github.com/stubbedev/lys-shell/service/upower"
 )
 
 // startBatteryAlerts runs the low-battery notifications and the

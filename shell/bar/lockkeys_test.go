@@ -7,25 +7,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/wmipc"
+
 	"github.com/stubbedev/lys-shell/service/keytoggles"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 func TestLockChangesReportsEachChangedKeyWithItsNewState(t *testing.T) {
 	for _, c := range []struct {
 		name       string
-		prev, next lyswm.Locks
+		prev, next wmipc.Locks
 		want       []keytoggles.Event
 	}{
-		{"caps on", lyswm.Locks{}, lyswm.Locks{Caps: true}, []keytoggles.Event{{Key: keytoggles.CapsLock, Active: true}}},
-		{"num off", lyswm.Locks{Num: true}, lyswm.Locks{}, []keytoggles.Event{{Key: keytoggles.NumLock}}},
-		{"scroll on beside an unchanged num", lyswm.Locks{Num: true}, lyswm.Locks{Num: true, Scroll: true}, []keytoggles.Event{{Key: keytoggles.ScrollLock, Active: true}}},
-		{"all three", lyswm.Locks{Caps: true}, lyswm.Locks{Num: true, Scroll: true}, []keytoggles.Event{
+		{"caps on", wmipc.Locks{}, wmipc.Locks{Caps: true}, []keytoggles.Event{{Key: keytoggles.CapsLock, Active: true}}},
+		{"num off", wmipc.Locks{Num: true}, wmipc.Locks{}, []keytoggles.Event{{Key: keytoggles.NumLock}}},
+		{"scroll on beside an unchanged num", wmipc.Locks{Num: true}, wmipc.Locks{Num: true, Scroll: true}, []keytoggles.Event{{Key: keytoggles.ScrollLock, Active: true}}},
+		{"all three", wmipc.Locks{Caps: true}, wmipc.Locks{Num: true, Scroll: true}, []keytoggles.Event{
 			{Key: keytoggles.CapsLock},
 			{Key: keytoggles.NumLock, Active: true},
 			{Key: keytoggles.ScrollLock, Active: true},
 		}},
-		{"unchanged", lyswm.Locks{Caps: true, Num: true}, lyswm.Locks{Caps: true, Num: true}, nil},
+		{"unchanged", wmipc.Locks{Caps: true, Num: true}, wmipc.Locks{Caps: true, Num: true}, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			if got := lockChanges(c.prev, c.next); !slices.Equal(got, c.want) {

@@ -3,10 +3,9 @@ package bar
 import (
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // barButton is a module's button: lys-ui's BarButton with the module's

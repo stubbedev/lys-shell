@@ -1,7 +1,8 @@
 package bar
 
 import (
-	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-desktop/i18n"
+
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 

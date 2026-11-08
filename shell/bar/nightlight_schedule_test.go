@@ -13,14 +13,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/apptest"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
-	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 // fakeSunset is a scripted sunsetEnv: a fake filter, a settable clock,
@@ -322,7 +322,7 @@ func TestNightlightLiveEnvNeedsAStateDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := filepath.Join("/state", version.Name); env.stateDir != want {
+	if want := filepath.Join("/state", identity.Name); env.stateDir != want {
 		t.Errorf("stateDir = %q, want %q", env.stateDir, want)
 	}
 	if _, err := env.locate(context.Background()); err == nil || !strings.Contains(err.Error(), "no system bus") {

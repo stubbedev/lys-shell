@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
-	"github.com/stubbedev/lys-shell/styling/material"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/wallpaper/extract"
+	"github.com/stubbedev/lys-desktop/styling/material"
 )
 
 func seeded() *rand.Rand { return rand.New(rand.NewPCG(1, 2)) }

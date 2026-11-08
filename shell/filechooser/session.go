@@ -6,7 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-desktop/fileuri"
+
 	"github.com/stubbedev/lys-shell/internal/mime"
 )
 

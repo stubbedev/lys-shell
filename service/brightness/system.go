@@ -11,10 +11,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/fswatch"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/fswatch"
 )
 
 // hotplugSettle is the pause before a hotplug-triggered DDC scan, so

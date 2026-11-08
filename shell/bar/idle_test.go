@@ -5,18 +5,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/idle/idlepolicy"
+	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/idle"
-	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
-	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 type countingDim struct{ dims, undims atomic.Int32 }

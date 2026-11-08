@@ -3,9 +3,8 @@ package notifications
 import (
 	"path/filepath"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // Urgency is the spec's urgency hint (types/notification.rs's Urgency).

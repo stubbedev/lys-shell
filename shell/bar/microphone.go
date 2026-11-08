@@ -6,9 +6,8 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/service/pulse"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/service/pulse"
 )
 
 // microphoneLabel is helpers.rs's format_label: the rounded percentage. A

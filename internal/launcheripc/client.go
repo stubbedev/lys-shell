@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/ipcsock"
+	"github.com/stubbedev/lys-desktop/ipcsock"
 )
 
 // ErrDisconnected is the shell closing the connection without a

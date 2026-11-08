@@ -7,14 +7,15 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/wmipc"
 
 	"github.com/stubbedev/lys-shell/internal/drmconn"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
@@ -56,7 +57,7 @@ type screenCast struct {
 	// tests).
 	focused func() (string, error)
 	// windows are lys-wm's windows.
-	windows func() ([]lyswm.Window, error)
+	windows func() ([]wmipc.Window, error)
 	// toplevels are the compositor's windows with their identifiers
 	// (listToplevels; a fake in tests).
 	toplevels func() ([]capture.Toplevel, error)

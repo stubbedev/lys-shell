@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 // FitMode is how an image is scaled to its monitor

@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
 	analyzer "github.com/stubbedev/lys-shell/cava"
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // spectrumHeightRem is the visualizer's natural thickness (the icon-lg

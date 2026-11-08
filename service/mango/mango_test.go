@@ -10,9 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/ipcsock/ipcsocktest"
 	"github.com/stubbedev/lys-lib/sockdir"
-
-	"github.com/stubbedev/lys-shell/internal/ipcsock/ipcsocktest"
 )
 
 // monitorsFrame is types.rs's ALL_MONITORS_FRAME fixture.

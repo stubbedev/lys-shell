@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
 )
 
 // loadUserConfig is the CLI's one-shot ConfigService::load: the user's

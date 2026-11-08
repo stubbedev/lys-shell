@@ -3,7 +3,7 @@ package nightlight
 import (
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
+	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
 )
 
 // Target is what the schedule wants at a moment.

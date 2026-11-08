@@ -9,9 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/fswatch"
 	"golang.org/x/sys/unix"
-
-	"github.com/stubbedev/lys-shell/internal/fswatch"
 )
 
 // bigDirEntries is the folder size the listing is gated on.

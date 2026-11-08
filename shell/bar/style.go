@@ -3,10 +3,9 @@ package bar
 import (
 	"math"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // barStyle is what the Go-painted surfaces (the dropdown panels, the

@@ -17,10 +17,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/identity"
 )
 
 // Status is the lifecycle gate (state.rs's Status), updated
@@ -494,14 +494,14 @@ func BuildOptions(cfg config.RecorderConfig, now time.Time) Options {
 // the configured directory, else the videos directory; a format's name
 // is its extension.
 func OutputPath(configuredDir string, format config.RecorderFormat, now time.Time) string {
-	return outputFile(configuredDir, version.Name+"-"+now.Format("20060102-150405"), format)
+	return outputFile(configuredDir, identity.Name+"-"+now.Format("20060102-150405"), format)
 }
 
 // ReplayPath is where a replay saved at now goes: lys-shell-replay-<local
 // timestamp to the millisecond>.<format>, beside the recordings, so two
 // saves in one second never replace each other.
 func ReplayPath(configuredDir string, format config.RecorderFormat, now time.Time) string {
-	return outputFile(configuredDir, version.Name+"-replay-"+now.Format("20060102-150405.000"), format)
+	return outputFile(configuredDir, identity.Name+"-replay-"+now.Format("20060102-150405.000"), format)
 }
 
 func outputFile(configuredDir, stem string, format config.RecorderFormat) string {

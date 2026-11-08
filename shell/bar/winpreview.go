@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 )
 
@@ -38,7 +38,7 @@ const (
 // names it, and where it sits when the compositor says.
 type previewWindow struct {
 	id, title, appID string
-	rect             lyswm.Rect
+	rect             wmipc.Rect
 	hasRect          bool
 }
 
@@ -294,7 +294,7 @@ func (p *windowPreview) build(windows []previewWindow, actions previewActions, s
 // placeWindows scales the windows' rectangles into a w x h area, keeping
 // their arrangement; nil when a window has no rectangle.
 func placeWindows(windows []previewWindow, w, h int) []render.Rect {
-	var box lyswm.Rect
+	var box wmipc.Rect
 	for i, win := range windows {
 		if !win.hasRect || win.rect.Width <= 0 || win.rect.Height <= 0 {
 			return nil
@@ -305,7 +305,7 @@ func placeWindows(windows []previewWindow, w, h int) []render.Rect {
 		}
 		x0, y0 := min(box.X, win.rect.X), min(box.Y, win.rect.Y)
 		x1, y1 := max(box.X+box.Width, win.rect.X+win.rect.Width), max(box.Y+box.Height, win.rect.Y+win.rect.Height)
-		box = lyswm.Rect{X: x0, Y: y0, Width: x1 - x0, Height: y1 - y0}
+		box = wmipc.Rect{X: x0, Y: y0, Width: x1 - x0, Height: y1 - y0}
 	}
 	scale := min(float64(w)/float64(box.Width), float64(h)/float64(box.Height))
 	offX := (w - int(float64(box.Width)*scale)) / 2

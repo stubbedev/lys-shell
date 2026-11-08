@@ -6,13 +6,13 @@ import (
 	"log"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/idle/idlepolicy"
+	"github.com/stubbedev/lys-desktop/service/logind"
+	"github.com/stubbedev/lys-desktop/service/upower"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/idle"
-	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
-	"github.com/stubbedev/lys-shell/service/logind"
-	"github.com/stubbedev/lys-shell/service/upower"
 )
 
 type idlePolicy struct {

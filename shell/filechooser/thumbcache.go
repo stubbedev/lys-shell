@@ -12,10 +12,9 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-lib/atomicfile"
 	"github.com/stubbedev/lys-lib/xdg"
-
-	"github.com/stubbedev/lys-shell/internal/fileuri"
 )
 
 // failApp is the directory under the cache's fail/ that records the

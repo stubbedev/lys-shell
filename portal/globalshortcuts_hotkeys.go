@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/stubbedev/lys-desktop/portal/permissions"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-ui/app"
-
-	"github.com/stubbedev/lys-shell/portal/permissions"
 )
 
 // hotkeyDevice binds the trigger the user chose (waylandHotkeys,

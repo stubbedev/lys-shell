@@ -25,7 +25,7 @@ for bin in lys-shell lys-lock; do
 done
 cp "${BIN_DIR}/completions/completions.bash" "${BIN_DIR}/completions/_lys-shell" "${BIN_DIR}/completions/lys-shell.fish" "${STAGING}/completions/"
 
-cp LICENSE service/bitwarden/generator/eff_large_wordlist.NOTICE "${STAGING}/"
+cp LICENSE "${BIN_DIR}/eff_large_wordlist.NOTICE" "${STAGING}/"
 cp -R resources/icons/hicolor "${STAGING}/icons/"
 cp resources/lys-shell.service \
 	resources/dev.stubbe.lys.vpn-sso-callback.desktop \

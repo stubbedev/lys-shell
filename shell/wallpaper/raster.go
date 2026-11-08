@@ -5,13 +5,13 @@ import (
 	"log"
 	"sync/atomic"
 
+	"github.com/stubbedev/lys-desktop/imagedecode"
+	"github.com/stubbedev/lys-desktop/offheap"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/memory-go"
 
-	"github.com/stubbedev/lys-shell/imagedecode"
 	"github.com/stubbedev/lys-shell/internal/handoff"
-	"github.com/stubbedev/lys-shell/offheap"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 

@@ -9,14 +9,14 @@ package portal
 import (
 	"fmt"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/portal/permissions"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/toplevels"
-	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/portal/permissions"
 	"github.com/stubbedev/lys-shell/service/screenshare"
 )
 
@@ -28,7 +28,7 @@ const ObjectPath = screenshare.Path
 
 // shellName is what the portal's PipeWire client and EIS seat are
 // called, and what its ScreenCast streams are named after.
-const shellName = version.Name
+const shellName = identity.Name
 
 // screencastNode is the PipeWire node name of every ScreenCast stream.
 const screencastNode = shellName + "-screencast"
@@ -65,7 +65,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
 	}
 	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)
-	if dir, ok := xdg.OS.DataDir(version.Name); ok {
+	if dir, ok := xdg.OS.DataDir(identity.Name); ok {
 		b.dataDir = dir
 	}
 	b.windows = &windowList{conn: conn, watch: toplevels.Watch}

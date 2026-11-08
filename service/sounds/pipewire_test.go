@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/pulse/native"
+	"github.com/stubbedev/lys-desktop/service/sounds/soundpolicy"
 	"github.com/stubbedev/lys-lib/sockdir"
 
 	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/service/pulse/native"
-	"github.com/stubbedev/lys-shell/service/sounds/soundpolicy"
 )
 
 const pipewirePulseConf = `

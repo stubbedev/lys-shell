@@ -13,9 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/capture"
-
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // A region of a 100x50 logical output maps to the buffer by each

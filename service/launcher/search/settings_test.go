@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/settingspage"
+	"github.com/stubbedev/lys-desktop/settingspage"
 )
 
 func settingsEntries(t *testing.T, pages func(context.Context) ([]settingspage.Page, error)) []Entry {

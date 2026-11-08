@@ -13,11 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-desktop/service/logind"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/feed"
-	"github.com/stubbedev/lys-shell/service/logind"
 )
 
 // This file is VPN state and control with NetworkManager as the single

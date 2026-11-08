@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/service/wallpaper/extract"
 	"github.com/stubbedev/lys-lib/dbustest"
 
 	"github.com/stubbedev/lys-shell/service/wallpaper"
-	"github.com/stubbedev/lys-shell/service/wallpaper/extract"
 )
 
 // recordRust, when set to the Rust lys-shell binary, re-records

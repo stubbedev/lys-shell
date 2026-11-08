@@ -6,12 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	shelllocales "github.com/stubbedev/lys-desktop/i18n/locales/shell"
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	shelllocales "github.com/stubbedev/lys-shell/i18n/locales/shell"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // Every built-in module has a title in every locale the shell ships.

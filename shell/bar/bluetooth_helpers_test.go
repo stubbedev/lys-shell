@@ -4,7 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-desktop/i18n"
+
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 )
 

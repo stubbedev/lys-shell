@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
+	"github.com/stubbedev/lys-desktop/service/mpris"
 	"github.com/stubbedev/lys-secrets/vault"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/jinja"
-	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
-	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 	"github.com/stubbedev/lys-shell/service/treeman"

@@ -5,15 +5,15 @@ import (
 	"slices"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/anim"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/config"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/search"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // panelViews is the panel's widget tree, built once per config and

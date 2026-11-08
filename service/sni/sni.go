@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-desktop/feed"
 )
 
 // Category describes the kind of application behind an item.

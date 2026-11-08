@@ -4,12 +4,12 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/shell/widgets"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/mail"
-	"github.com/stubbedev/lys-shell/shell/widgets"
 )
 
 // mailView is the mail dropdown: an item card of the accounts (each

@@ -7,11 +7,10 @@ import (
 	"log"
 	"time"
 
+	desktopidentity "github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
-
-	"github.com/stubbedev/lys-shell/internal/version"
-	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 // GeoClue2 names (geoclue.rs).
@@ -84,7 +83,7 @@ func noAnswerError(step string, err error) error {
 	if !errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("geoclue: %s: %w", step, err)
 	}
-	return fmt.Errorf("geoclue: %s: %w: GeoClue answers only once an agent serves this user, so the likely cause, not a certain one, is that no agent runs and GeoClue's whitelist does not allow %s as one; check %s", step, err, version.Name, geoclueConfigFiles)
+	return fmt.Errorf("geoclue: %s: %w: GeoClue answers only once an agent serves this user, so the likely cause, not a certain one, is that no agent runs and GeoClue's whitelist does not allow %s as one; check %s", step, err, desktopidentity.Name, geoclueConfigFiles)
 }
 
 // selfAgent is the agent a lookup registers when the session has none:
@@ -95,7 +94,7 @@ type selfAgent struct{}
 
 // AuthorizeApp is the Agent interface's method.
 func (selfAgent) AuthorizeApp(desktopID string, requested uint32) (bool, uint32, *dbus.Error) {
-	if desktopID != version.Name {
+	if desktopID != desktopidentity.Name {
 		return false, 0, nil
 	}
 	return true, min(requested, accuracyCity), nil
@@ -110,13 +109,13 @@ func registerAgent(ctx context.Context, conn *dbus.Conn, manager dbus.BusObject)
 	}}); err != nil {
 		return fmt.Errorf("geoclue: export the agent's properties: %w", err)
 	}
-	err := manager.CallWithContext(ctx, geoclueManager+".AddAgent", 0, version.Name).Err
+	err := manager.CallWithContext(ctx, geoclueManager+".AddAgent", 0, desktopidentity.Name).Err
 	var refused dbus.Error
 	switch {
 	case err == nil:
 		return nil
 	case errors.As(err, &refused) && refused.Name == "org.freedesktop.DBus.Error.AccessDenied":
-		return fmt.Errorf("geoclue: no agent serves this user, and GeoClue does not allow %s as one: add it to whitelist under [agent] in %s, then restart geoclue: %w", version.Name, geoclueConfigFiles, err)
+		return fmt.Errorf("geoclue: no agent serves this user, and GeoClue does not allow %s as one: add it to whitelist under [agent] in %s, then restart geoclue: %w", desktopidentity.Name, geoclueConfigFiles, err)
 	default:
 		return noAnswerError("register as the agent", err)
 	}
@@ -134,7 +133,7 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (ni
 	}
 	// DesktopId is mandatory before Start; without a requested accuracy
 	// the daemon yields nothing.
-	if err := set("DesktopId", version.Name); err != nil {
+	if err := set("DesktopId", desktopidentity.Name); err != nil {
 		return nightschedule.Location{}, fmt.Errorf("geoclue: desktop id: %w", err)
 	}
 	if err := set("RequestedAccuracyLevel", accuracyCity); err != nil {

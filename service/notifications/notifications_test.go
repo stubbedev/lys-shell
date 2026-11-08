@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/fakeclock"
-	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
+	"github.com/stubbedev/lys-desktop/fakeclock"
+	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
 )
 
 // collect waits for n events.

@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/clipboard"
 	"github.com/stubbedev/lys-secrets/vault"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
-	"github.com/stubbedev/lys-shell/service/clipboard"
 )
 
 // sendsView is an open vault's dropdown on its Sends page, with a fixed

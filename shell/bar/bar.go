@@ -12,6 +12,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/logging"
+	"github.com/stubbedev/lys-desktop/service/clipboard"
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/mpris"
+	"github.com/stubbedev/lys-desktop/service/pulse"
+	"github.com/stubbedev/lys-desktop/service/upower"
+	"github.com/stubbedev/lys-desktop/shell/apptheme"
+	"github.com/stubbedev/lys-desktop/shell/lockclient"
+	"github.com/stubbedev/lys-desktop/spawn"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/wlr"
@@ -19,45 +32,32 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/desktopnotify"
-	"github.com/stubbedev/lys-shell/internal/spawn"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
-	"github.com/stubbedev/lys-shell/logging"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
-	"github.com/stubbedev/lys-shell/service/clipboard"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/lyrics"
-	"github.com/stubbedev/lys-shell/service/lyswm"
-	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/privacy"
-	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/screenshare"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 	"github.com/stubbedev/lys-shell/service/sni"
 	"github.com/stubbedev/lys-shell/service/sounds"
 	"github.com/stubbedev/lys-shell/service/treeman"
-	"github.com/stubbedev/lys-shell/service/upower"
 	"github.com/stubbedev/lys-shell/service/weather"
-	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/launcher"
 	"github.com/stubbedev/lys-shell/shell/layering"
-	"github.com/stubbedev/lys-shell/shell/lockclient"
 	"github.com/stubbedev/lys-shell/shell/osd"
 	"github.com/stubbedev/lys-shell/shell/popups"
 	"github.com/stubbedev/lys-shell/shell/powermenu"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 	wallpapershell "github.com/stubbedev/lys-shell/shell/wallpaper"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // Run hands the session's cursor to lys-login's display manager in
@@ -361,7 +361,7 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 	}
 	s.ctx.Calendar = startCalendar(s.cfg.Clock, s.current.Load)
 	s.down.add(s.ctx.Calendar.Close)
-	if dir, ok := xdg.OS.CacheDir(version.Name); ok {
+	if dir, ok := xdg.OS.CacheDir(identity.Name); ok {
 		s.ctx.Lyrics = lyrics.New(lyrics.Endpoint, filepath.Join(dir, "lyrics"))
 	} else {
 		log.Print("lyrics: no cache directory (neither XDG_CACHE_HOME nor HOME is set), so no lyrics")
@@ -416,7 +416,7 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 		// The recorder asks the share picker on this bus for an output or
 		// a region, records it on the GPU with audio from the audio service,
 		// and reports through the OSD and desktop notifications.
-		stateDir, ok := xdg.OS.StateDir(version.Name)
+		stateDir, ok := xdg.OS.StateDir(identity.Name)
 		if !ok {
 			log.Print("recorder: no state directory: neither XDG_STATE_HOME nor HOME is an absolute path; a picked source is not remembered")
 		}

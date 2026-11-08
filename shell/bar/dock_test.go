@@ -7,19 +7,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 )
 
 // fakeGeometry is lys-wm's window geometry as the test sets it.
-type fakeGeometry struct{ windows []lyswm.Window }
+type fakeGeometry struct{ windows []wmipc.Window }
 
-func (g *fakeGeometry) Windows() []lyswm.Window { return g.windows }
+func (g *fakeGeometry) Windows() []wmipc.Window { return g.windows }
 
 type dockRig struct {
 	d        *dock
@@ -147,9 +146,9 @@ func TestAnAutoHidingDockHidesUnderAWindowAndRevealsAtTheEdge(t *testing.T) {
 	r.d.surface.Measure(widget.Column, widget.Unknown)
 	r.d.surface.Arrange(render.Rect{Y: 700, W: 1000, H: 100})
 	top := 0
-	r.geom.windows = []lyswm.Window{
-		{ID: 1, Output: "DP-1", Rect: lyswm.Rect{Width: 1000, Height: 800}, Stack: &top},
-		{ID: 2, Output: "HDMI-A-1", Rect: lyswm.Rect{Width: 1000, Height: 800}, Stack: &top},
+	r.geom.windows = []wmipc.Window{
+		{ID: 1, Output: "DP-1", Rect: wmipc.Rect{Width: 1000, Height: 800}, Stack: &top},
+		{ID: 2, Output: "HDMI-A-1", Rect: wmipc.Rect{Width: 1000, Height: 800}, Stack: &top},
 	}
 	r.d.hub.geometryChanged()
 	r.d.hub.geometryChanged()
@@ -214,30 +213,30 @@ func TestAnAutoHidingDockWithoutGeometryShowsOnlyUnderThePointer(t *testing.T) {
 // A bottom dock is centered on its output's bottom edge, a side dock on
 // its side; only an overlapping shown window covers it.
 func TestTheDockAreaAndWhatCoversIt(t *testing.T) {
-	out := lyswm.Rect{X: 1000, Width: 1000, Height: 800}
+	out := wmipc.Rect{X: 1000, Width: 1000, Height: 800}
 	size := widget.Size{W: 200, H: 60}
-	if got := dockArea(config.DockEdgeBottom, out, size); got != (lyswm.Rect{X: 1400, Y: 740, Width: 200, Height: 60}) {
+	if got := dockArea(config.DockEdgeBottom, out, size); got != (wmipc.Rect{X: 1400, Y: 740, Width: 200, Height: 60}) {
 		t.Errorf("bottom = %+v", got)
 	}
-	if got := dockArea(config.DockEdgeLeft, out, size); got != (lyswm.Rect{X: 1000, Y: 370, Width: 200, Height: 60}) {
+	if got := dockArea(config.DockEdgeLeft, out, size); got != (wmipc.Rect{X: 1000, Y: 370, Width: 200, Height: 60}) {
 		t.Errorf("left = %+v", got)
 	}
-	if got := dockArea(config.DockEdgeRight, out, size); got != (lyswm.Rect{X: 1800, Y: 370, Width: 200, Height: 60}) {
+	if got := dockArea(config.DockEdgeRight, out, size); got != (wmipc.Rect{X: 1800, Y: 370, Width: 200, Height: 60}) {
 		t.Errorf("right = %+v", got)
 	}
 	area := dockArea(config.DockEdgeBottom, out, size)
 	top := 0
-	above := lyswm.Window{Output: "DP-1", Rect: lyswm.Rect{X: 1000, Width: 1000, Height: 740}, Stack: &top}
-	if covered([]lyswm.Window{above}, "DP-1", area) {
+	above := wmipc.Window{Output: "DP-1", Rect: wmipc.Rect{X: 1000, Width: 1000, Height: 740}, Stack: &top}
+	if covered([]wmipc.Window{above}, "DP-1", area) {
 		t.Error("a window ending above the dock covers it")
 	}
 	above.Rect.Height = 741
-	if !covered([]lyswm.Window{above}, "DP-1", area) {
+	if !covered([]wmipc.Window{above}, "DP-1", area) {
 		t.Error("a window reaching into the dock does not cover it")
 	}
 	hidden := above
 	hidden.Stack = nil
-	if covered([]lyswm.Window{hidden}, "DP-1", area) {
+	if covered([]wmipc.Window{hidden}, "DP-1", area) {
 		t.Error("a window no output shows covers the dock")
 	}
 }

@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/styling"
+
 	"github.com/stubbedev/lys-shell/service/brightness"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 func TestBrightnessLabel(t *testing.T) {

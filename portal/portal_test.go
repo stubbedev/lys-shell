@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/gtksettings"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
@@ -45,7 +45,7 @@ func newRig(t *testing.T, edit func(*Backend)) *rig {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	t.Setenv(lyswm.SocketEnv, "")
+	t.Setenv(wmipc.SocketEnv, "")
 	if os.Getenv("XDG_DATA_HOME") == processDataHome {
 		t.Setenv("XDG_DATA_HOME", t.TempDir())
 	}

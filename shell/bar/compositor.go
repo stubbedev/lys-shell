@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/stubbedev/lys-shell/service/lyswm"
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sway"

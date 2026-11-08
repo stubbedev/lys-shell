@@ -5,13 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/vinput"
 	"github.com/stubbedev/lys-ui/app"
-
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/lyswm/lyswmtest"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // On sway an auto-hiding dock without window geometry hides to a strip

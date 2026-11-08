@@ -4,19 +4,19 @@ import (
 	"image"
 	"log"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	timeclock "github.com/stubbedev/lys-shell/internal/clock"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/markup"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/shell/shotthumb"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 const toolbarPx = 14

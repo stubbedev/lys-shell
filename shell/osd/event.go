@@ -5,13 +5,13 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/mpris"
 	"github.com/stubbedev/lys-ui/widget/css"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/widgetipc"
 	"github.com/stubbedev/lys-shell/service/keytoggles"
-	"github.com/stubbedev/lys-shell/service/mpris"
 )
 
 // kind is OsdEvent's variant.

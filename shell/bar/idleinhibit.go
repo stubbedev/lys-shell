@@ -7,16 +7,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/idle/idlepolicy"
+	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/idle"
-	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
-	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 // idleInhibitLabel is helpers.rs's build_label: On/Off state, the

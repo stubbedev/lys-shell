@@ -3,9 +3,8 @@ package bar
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 func TestScreenshotBuiltin(t *testing.T) {

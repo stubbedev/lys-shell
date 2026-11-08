@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/stubbedev/lys-shell/internal/glob"
+	"github.com/stubbedev/lys-desktop/glob"
 )
 
 // MatchMethod is rofi's -matching.

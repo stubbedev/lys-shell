@@ -16,9 +16,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/ipcsock"
 	"github.com/stubbedev/lys-lib/intconv"
-
-	"github.com/stubbedev/lys-shell/internal/ipcsock"
 )
 
 // SocketPath reads $SWAYSOCK; empty when sway is not running.

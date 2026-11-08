@@ -1,6 +1,6 @@
 package bar
 
-import "github.com/stubbedev/lys-shell/config"
+import "github.com/stubbedev/lys-desktop/config"
 
 // floating reports whether an inset pulls the bar off its edges: the
 // floating class of apply_css_classes (bar/methods.rs), which the bar

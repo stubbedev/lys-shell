@@ -16,10 +16,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/rusterr"
 	"github.com/stubbedev/lys-lib/xdg"
 
 	"github.com/stubbedev/lys-shell/internal/runtimesock"
-	"github.com/stubbedev/lys-shell/internal/rusterr"
 )
 
 // Methods.

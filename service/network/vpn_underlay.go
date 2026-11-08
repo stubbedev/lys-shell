@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/feed"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/feed"
 )
 
 // This file watches the network a tunnel rides on (vpn/underlay.rs).

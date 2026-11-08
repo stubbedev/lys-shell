@@ -3,8 +3,8 @@ package osd
 import (
 	"testing"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/service/mpris"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/service/mpris"
 )
 
 func track(title string, requested bool) mpris.TrackChange {

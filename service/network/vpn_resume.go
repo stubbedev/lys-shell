@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-desktop/feed"
 )
 
 // This file brings tunnels back after a suspend (vpn/resume.rs).

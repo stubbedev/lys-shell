@@ -6,10 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/strftime"
+
 	"github.com/stubbedev/lys-shell/service/weather"
-	"github.com/stubbedev/lys-shell/strftime"
 )
 
 // osWrite writes one config variant for the load tests.

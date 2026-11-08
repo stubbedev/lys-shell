@@ -22,14 +22,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-lib/xkb"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
-	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/shell/keys"
 	"github.com/stubbedev/lys-shell/shell/loupe"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -129,7 +129,7 @@ func New(a *app.Application, gate *regionoverlay.Gate, outputs func() []*app.Out
 // $XDG_DATA_HOME/lys-shell/color-history, else ~/.local/share/lys-shell/color-history.
 // Empty when neither is an absolute path.
 func HistoryPath() string {
-	dir, ok := xdg.OS.DataDir(version.Name)
+	dir, ok := xdg.OS.DataDir(identity.Name)
 	if !ok {
 		return ""
 	}

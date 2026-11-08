@@ -3,9 +3,10 @@ package portal
 import (
 	"errors"
 
+	"github.com/stubbedev/lys-desktop/service/lyswm"
 	"github.com/stubbedev/lys-lib/portaldialogs"
+	"github.com/stubbedev/lys-lib/wmipc"
 
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
 )
 
@@ -37,7 +38,7 @@ var virtualConsent = portaldialogs.AccessRequest{
 
 // createLysWMOutput makes a lys-wm virtual output of the size.
 func createLysWMOutput(size virtualSize) (string, error) {
-	return lyswm.CreateOutput(lyswm.Mode{Width: int(size.width), Height: int(size.height), RefreshMHz: virtualRefreshMHz}, virtualScale)
+	return lyswm.CreateOutput(wmipc.Mode{Width: int(size.width), Height: int(size.height), RefreshMHz: virtualRefreshMHz}, virtualScale)
 }
 
 // availableSources is what the session can share: monitors and windows,

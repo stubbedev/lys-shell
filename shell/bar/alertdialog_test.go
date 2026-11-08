@@ -3,9 +3,8 @@ package bar
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-ui/app"
-
-	"github.com/stubbedev/lys-shell/config"
 )
 
 // fakeAlert records the alerts a view asks and holds their answers.

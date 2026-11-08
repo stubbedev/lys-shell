@@ -22,7 +22,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/stubbedev/lys-shell/internal/fileuri"
+	"github.com/stubbedev/lys-desktop/fileuri"
 )
 
 // AnyConnect single sign-on through the system browser (sso.rs): the

@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/capture"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/shell/sharepicker"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 // blockSize is the side of the test pattern's blocks in pixels: large

@@ -10,11 +10,11 @@ import (
 	"testing"
 	"testing/iotest"
 
+	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/ipp"
-	"github.com/stubbedev/lys-shell/shell/treetest"
 )
 
 // The layout dropdowns after the first six, in the form's order, and

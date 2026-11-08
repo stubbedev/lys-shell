@@ -16,12 +16,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/spawn"
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-ui/widget"
 
-	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/jinja"
-	"github.com/stubbedev/lys-shell/internal/spawn"
 )
 
 // Custom module limits (watchers/command.rs, events.rs, helpers.rs).

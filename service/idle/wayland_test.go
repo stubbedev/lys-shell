@@ -7,10 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/service/idle/idlepolicy"
+	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/vinput"
-
-	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
-	"github.com/stubbedev/lys-shell/swaytest"
 )
 
 type recordingActions struct {

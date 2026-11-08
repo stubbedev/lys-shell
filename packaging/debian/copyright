@@ -6,7 +6,7 @@ Files: *
 Copyright: 2025 Jas Singh
 License: MIT
 
-Files: service/bitwarden/generator/eff_large_wordlist.txt
+Files: */lys-desktop/service/bitwarden/generator/eff_large_wordlist.txt
 Copyright: 2016 Electronic Frontier Foundation
 License: CC-BY-3.0-US
 Comment: The words of https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt

@@ -10,7 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-desktop/config"
+
 	"github.com/stubbedev/lys-shell/service/recorder"
 )
 

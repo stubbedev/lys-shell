@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
+	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
 )
 
 func mustLocation(t *testing.T, latitude, longitude float64) nightschedule.Location {

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/shlex"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/service/launcher"
-	"github.com/stubbedev/lys-shell/shlex"
 )
 
 // maxEntries caps the collected entries: a recursive walk of a home

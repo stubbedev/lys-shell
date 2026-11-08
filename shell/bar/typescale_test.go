@@ -3,10 +3,9 @@ package bar
 import (
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/shell/treetest"
+	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-ui/widget"
-
-	"github.com/stubbedev/lys-shell/shell/treetest"
-	"github.com/stubbedev/lys-shell/styling"
 )
 
 // desktopRem is a "Sans 10" desktop's 1rem at 96 dpi.

@@ -5,9 +5,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/stubbedev/lys-desktop/logging"
 	"github.com/stubbedev/lys-ui/app"
-
-	"github.com/stubbedev/lys-shell/logging"
 )
 
 // waylandLoop is the portal's one Wayland connection: a headless lys-ui

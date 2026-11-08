@@ -12,10 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stubbedev/lys-shell/i18n"
+	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/service/lyswm"
+	"github.com/stubbedev/lys-lib/wmipc"
+
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/service/launcher"
-	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
@@ -552,7 +554,7 @@ func (lysWMBackend) List(context.Context) ([]WindowInfo, error) {
 
 // lysWMWindows maps lys-wm's list, oldest first: lys-wm reports no focus
 // history, so the newest window ranks as the most recently used.
-func lysWMWindows(windows []lyswm.Window) []WindowInfo {
+func lysWMWindows(windows []wmipc.Window) []WindowInfo {
 	focusedWS, found := 0, false
 	for _, w := range windows {
 		if w.Focused {

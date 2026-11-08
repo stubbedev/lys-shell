@@ -7,11 +7,11 @@ import (
 	"image/draw"
 	"math"
 
+	"github.com/stubbedev/lys-desktop/offheap"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/memory-go"
 
-	"github.com/stubbedev/lys-shell/offheap"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
