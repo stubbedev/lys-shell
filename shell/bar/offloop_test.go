@@ -446,6 +446,9 @@ func TestCwsEqualModelsAllocateLittle(t *testing.T) {
 	if icon() != shown || &m.models[0] != models {
 		t.Error("a title no pattern reads changed what the segments show")
 	}
+	if raceEnabled {
+		return
+	}
 	if got > 70 {
 		t.Fatalf("an unchanged snapshot allocates %.0f times, want at most 70", got)
 	}
