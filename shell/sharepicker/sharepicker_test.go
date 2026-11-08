@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/config"
+	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
 	"github.com/stubbedev/lys-shell/shell/apptheme"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
@@ -229,7 +230,7 @@ func TestBuildOffersOnlyTheSourcesAsked(t *testing.T) {
 	p, _ := testPicker(t, cfg, false, false)
 	tabs := func(nb *widget.Notebook) []string {
 		var out []string
-		for _, name := range []string{pageWindows, pageOutputs, pageRegion} {
+		for _, name := range []string{pageWindows, pageOutputs, pageRegion, pageDynamic} {
 			if nb.TabLabel(name) != nil {
 				out = append(out, name)
 			}
@@ -241,7 +242,8 @@ func TestBuildOffersOnlyTheSourcesAsked(t *testing.T) {
 		tabs     []string
 		selected string
 	}{
-		{AllSources, []string{pageWindows, pageOutputs, pageRegion}, pageWindows},
+		{AllSources, []string{pageWindows, pageOutputs, pageRegion, pageDynamic}, pageWindows},
+		{SourceOutputs | SourceDynamic, []string{pageOutputs, pageDynamic}, pageOutputs},
 		{SourceOutputs | SourceRegions, []string{pageOutputs, pageRegion}, pageOutputs},
 		{SourceWindows, []string{pageWindows}, pageWindows},
 		{SourceRegions, []string{pageRegion}, pageRegion},
@@ -522,5 +524,23 @@ func TestFocusedChoiceIsHighlighted(t *testing.T) {
 	}
 	if bytes.Equal(paint(), resting) {
 		t.Error("the focused card looks as it does at rest")
+	}
+}
+
+// The Dynamic page, under its localized title, holds one card that
+// answers the cast target.
+func TestTheDynamicPageAnswersTheCastTarget(t *testing.T) {
+	p, ch := testPicker(t, config.DefaultsSharePicker(), false, false)
+	nb := treetest.First[*widget.Notebook](t, p.root)
+	if l, ok := nb.TabLabel(pageDynamic).(*widget.Label); !ok || l.Text() != i18n.T("share-picker-dynamic-page") {
+		t.Fatalf("the Dynamic tab label is %v", nb.TabLabel(pageDynamic))
+	}
+	choices := p.choices[pageDynamic]
+	if len(choices) != 1 {
+		t.Fatalf("%d choices on the Dynamic page, want its one card", len(choices))
+	}
+	choices[0].(*widget.Button).OnClick()
+	if got := <-ch; got != "/dynamic" {
+		t.Fatalf("the Dynamic card answered %q", got)
 	}
 }

@@ -50,25 +50,26 @@ type windowCapturer interface {
 	Close() error
 }
 
-// windowSession is the windowCapturer over a capture client. mu guards
-// s only: a Capture waits without it, and Close wakes that wait.
-type windowSession struct {
+// sourceSession is the windowCapturer over a capture client, on a
+// window or the cast target. mu guards s only: a Capture waits without
+// it, and Close wakes that wait.
+type sourceSession struct {
 	c      *capture.Client
-	t      capture.Toplevel
+	src    capture.Source
 	cursor bool
 	mu     sync.Mutex
 	s      *capture.DmabufSession
 }
 
-func (w *windowSession) Import(d dmabuf.Buffer) (importedBuffer, error) { return w.c.ImportDmabuf(d) }
+func (w *sourceSession) Import(d dmabuf.Buffer) (importedBuffer, error) { return w.c.ImportDmabuf(d) }
 
-func (w *windowSession) Open() error {
+func (w *sourceSession) Open() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.s != nil {
 		return nil
 	}
-	s, err := w.c.OpenDmabufSession(w.t, w.cursor)
+	s, err := w.c.OpenDmabufSession(w.src, w.cursor)
 	if err != nil {
 		return fmt.Errorf("screencast: open the window's capture session: %w", err)
 	}
@@ -76,7 +77,7 @@ func (w *windowSession) Open() error {
 	return nil
 }
 
-func (w *windowSession) session() (*capture.DmabufSession, error) {
+func (w *sourceSession) session() (*capture.DmabufSession, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.s == nil {
@@ -85,7 +86,7 @@ func (w *windowSession) session() (*capture.DmabufSession, error) {
 	return w.s, nil
 }
 
-func (w *windowSession) Formats() ([]capture.DmabufFormat, error) {
+func (w *sourceSession) Formats() ([]capture.DmabufFormat, error) {
 	s, err := w.session()
 	if err != nil {
 		return nil, err
@@ -93,7 +94,7 @@ func (w *windowSession) Formats() ([]capture.DmabufFormat, error) {
 	return s.Formats()
 }
 
-func (w *windowSession) Capture(buf importedBuffer) (capture.FrameInfo, error) {
+func (w *sourceSession) Capture(buf importedBuffer) (capture.FrameInfo, error) {
 	b, ok := buf.(*capture.DmabufBuffer)
 	if !ok {
 		return capture.FrameInfo{}, errors.New("screencast: a buffer the window's client did not import")
@@ -105,7 +106,7 @@ func (w *windowSession) Capture(buf importedBuffer) (capture.FrameInfo, error) {
 	return s.Capture(b)
 }
 
-func (w *windowSession) Close() error {
+func (w *sourceSession) Close() error {
 	w.mu.Lock()
 	s := w.s
 	w.s = nil

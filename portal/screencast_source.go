@@ -41,11 +41,15 @@ func parseCursorMode(v uint32) (cursorMode, bool) {
 }
 
 // pickerSources is what the share picker offers for the source types:
-// a monitor is a whole output or a region of one.
-func pickerSources(types uint32) sharepicker.Sources {
+// a monitor is a whole output, a region of one, or the compositor's cast
+// target where it offers one.
+func pickerSources(types uint32, dynamic bool) sharepicker.Sources {
 	var s sharepicker.Sources
 	if types&sourceMonitor != 0 {
 		s |= sharepicker.SourceOutputs | sharepicker.SourceRegions
+		if dynamic {
+			s |= sharepicker.SourceDynamic
+		}
 	}
 	if types&sourceWindow != 0 {
 		s |= sharepicker.SourceWindows
@@ -53,8 +57,8 @@ func pickerSources(types uint32) sharepicker.Sources {
 	return s
 }
 
-// sourceTypeOf is the target's AvailableSourceTypes bit: a region is
-// part of a monitor.
+// sourceTypeOf is the target's AvailableSourceTypes bit: a region and
+// the cast target stream as a monitor.
 func sourceTypeOf(t sharepicker.Target) uint32 {
 	if t.Kind == sharepicker.TargetWindow {
 		return sourceWindow
@@ -64,9 +68,10 @@ func sourceTypeOf(t sharepicker.Target) uint32 {
 
 // targetGeometry is the target's place in the compositor's logical
 // space: an output's, or a region's within its output; false for a
-// window, whose place the capture does not know, or an output not listed.
+// window, whose place the capture does not know, the cast target, which
+// moves, or an output not listed.
 func targetGeometry(t sharepicker.Target, outputs []outputGeometry) (x, y, width, height int32, ok bool) {
-	if t.Kind == sharepicker.TargetWindow {
+	if t.Kind == sharepicker.TargetWindow || t.Kind == sharepicker.TargetDynamic {
 		return 0, 0, 0, 0, false
 	}
 	i := slices.IndexFunc(outputs, func(o outputGeometry) bool { return o.name == t.Name })

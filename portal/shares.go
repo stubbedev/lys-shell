@@ -89,6 +89,8 @@ func (sh *shares) list() []screenshare.Share {
 				t.Kind, t.Title = screenshare.TargetWindow, titles[st.target.Name]
 			case sharepicker.TargetRegion:
 				t.Kind = screenshare.TargetRegion
+			case sharepicker.TargetDynamic:
+				t.Kind = screenshare.TargetDynamic
 			default:
 				t.Kind = screenshare.TargetOutput
 			}

@@ -32,9 +32,10 @@ const (
 
 // The kinds of target.
 const (
-	TargetOutput = "output"
-	TargetWindow = "window"
-	TargetRegion = "region"
+	TargetOutput  = "output"
+	TargetWindow  = "window"
+	TargetRegion  = "region"
+	TargetDynamic = "dynamic"
 )
 
 // Target is one source a share streams.

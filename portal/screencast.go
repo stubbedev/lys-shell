@@ -68,6 +68,9 @@ type screenCast struct {
 	virtualOffered func() (bool, error)
 	createVirtual  func(virtualSize) (string, error)
 	removeVirtual  func(name string) error
+	// dynamicOffered asks the compositor whether it offers its cast
+	// target as a capture source (a fake in tests).
+	dynamicOffered func() (bool, error)
 	// reminder asks again about an old persistent grant.
 	reminder castReminder
 }
@@ -88,6 +91,7 @@ func newScreenCast(conn *dbus.Conn, s *sessions, reminder castReminder, start fu
 		conn: conn, sessions: s, reminder: reminder, start: start, outputs: outputs, focused: lysWMFocusedOutput, windows: lyswm.Windows,
 		toplevels: listToplevels, displays: func() (map[string]displayID, error) { return readDisplays(drmconn.Dir) },
 		virtualOffered: lyswm.OffersVirtualOutputs, createVirtual: createLysWMOutput, removeVirtual: lyswm.RemoveOutput,
+		dynamicOffered: dynamicCaptureOffered,
 	}
 }
 
@@ -100,7 +104,7 @@ func (c *screenCast) sources(targets []sharepicker.Target) (sources, error) {
 		now.windows = windows
 		errs = append(errs, err)
 	}
-	if slices.ContainsFunc(targets, func(t sharepicker.Target) bool { return t.Kind != sharepicker.TargetWindow }) {
+	if slices.ContainsFunc(targets, onOutput) {
 		outputs, err := c.outputs()
 		for _, o := range outputs {
 			now.outputs = append(now.outputs, o.name)
@@ -307,8 +311,9 @@ func (c *screenCast) config(s *session) castState {
 func (c *screenCast) pick(call *call, cfg castState) (token bool, targets []sharepicker.Target, code uint32) {
 	// No window list: the picker enumerates toplevels itself and
 	// replies identifiers the capture re-resolves.
+	sources := pickerSources(cfg.types, c.offersDynamic())
 	reply, err := sharepicker.NewClient(c.conn).Pick(call.on(sharepicker.ServiceName), call.caller, sharepicker.Request{
-		Sources: pickerSources(cfg.types), AllowToken: cfg.persistMode > 0, Multiple: cfg.multiple,
+		Sources: sources, AllowToken: cfg.persistMode > 0, Multiple: cfg.multiple,
 	})
 	switch {
 	case call.closed():
@@ -322,7 +327,7 @@ func (c *screenCast) pick(call *call, cfg castState) (token bool, targets []shar
 		return false, nil, ResponseCancelled
 	}
 	token, targets, ok := sharepicker.ParseReply(reply)
-	if !ok || !allOfTypes(targets, cfg.types) {
+	if !ok || !allOfTypes(targets, cfg.types) || sources&sharepicker.SourceDynamic == 0 && slices.ContainsFunc(targets, isDynamic) {
 		warnf("screencast: the picker replied %q for source types %#x", reply, cfg.types)
 		return false, nil, ResponseOther
 	}

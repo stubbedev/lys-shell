@@ -136,6 +136,8 @@ func shareTargets(s screenshare.Share) string {
 			parts = append(parts, i18n.T("dropdown-screen-share-window", i18n.Str("title", title)))
 		case screenshare.TargetRegion:
 			parts = append(parts, i18n.T("dropdown-screen-share-region", i18n.Str("name", t.Name)))
+		case screenshare.TargetDynamic:
+			parts = append(parts, i18n.T("dropdown-screen-share-dynamic"))
 		default:
 			parts = append(parts, i18n.T("dropdown-screen-share-output", i18n.Str("name", t.Name)))
 		}

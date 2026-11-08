@@ -140,15 +140,15 @@ type castCursor struct {
 // new), and a compositor without it, a region, and a window take one
 // screencopy or toplevel capture per frame.
 func (st screenStreams) startCapture(target sharepicker.Target, cur castCursor, fps uint32) (screenStream, error) {
-	if target.Kind == sharepicker.TargetWindow {
-		s, err := st.startWindowGPU(target.Name, cur, fps)
+	if target.Kind == sharepicker.TargetWindow || target.Kind == sharepicker.TargetDynamic {
+		s, err := st.startSessionTarget(target, cur, fps)
 		if err == nil {
 			return s, nil
 		}
 		if !errors.Is(err, errNoDmabuf) {
 			return nil, err
 		}
-		warnf("screencast: window %s streams through shared memory: %v", target.Name, err)
+		warnf("screencast: %s streams through shared memory: %v", sessionTargetName(target), err)
 	}
 	if target.Kind == sharepicker.TargetOutput || target.Kind == sharepicker.TargetRegion {
 		s, err := st.startGPU(target, cur, fps)
@@ -283,11 +283,16 @@ type castPointer struct {
 
 // openCastPointer follows the pointer over target's output or window.
 func openCastPointer(target sharepicker.Target) (*castPointer, error) {
-	open := capture.OpenOutputCursor
-	if target.Kind == sharepicker.TargetWindow {
-		open = capture.OpenToplevelCursor
+	var k *capture.Cursor
+	var err error
+	switch target.Kind {
+	case sharepicker.TargetWindow:
+		k, err = capture.OpenToplevelCursor(target.Name)
+	case sharepicker.TargetDynamic:
+		k, err = capture.OpenDynamicCursor()
+	default:
+		k, err = capture.OpenOutputCursor(target.Name)
 	}
-	k, err := open(target.Name)
 	if err != nil {
 		return nil, fmt.Errorf("screencast: follow the pointer over %s: %w", target.Payload(), err)
 	}
@@ -444,6 +449,12 @@ func startSnapshotStream(target sharepicker.Target, cur castCursor, fps uint32) 
 		}
 		grab = toplevelGrab(c, t, cur.paint)
 		gone = toplevelGone(c, target.Name)
+	case sharepicker.TargetDynamic:
+		if !c.HasDynamicCapture() {
+			_ = c.Close()
+			return nil, fmt.Errorf("%w: the compositor offers no cast target", capture.ErrUnsupported)
+		}
+		grab, gone = dynamicGrab(c, cur.paint), never
 	}
 	first, err := grab(nil)
 	if err != nil {
@@ -485,6 +496,16 @@ func findToplevel(c *capture.Client, id string) (capture.Toplevel, bool) {
 	return capture.Toplevel{}, false
 }
 
+// never is the cast target's vanish check: it follows the target, and
+// ends only with its capture session.
+func never() bool { return false }
+
+// dynamicGrab captures the cast target per call, into dst when it fits.
+func dynamicGrab(c *capture.Client, cursor bool) func(dst []byte) (*capture.Frame, error) {
+	opts := capture.Options{Cursor: cursor}
+	return func(dst []byte) (*capture.Frame, error) { opts.Dst = dst; return c.CaptureDynamic(opts) }
+}
+
 // toplevelGone reports, on each call, whether the window closed.
 func toplevelGone(c *capture.Client, id string) func() bool {
 	return func() bool { _, ok := findToplevel(c, id); return !ok }
@@ -519,11 +540,11 @@ func outputGrab(c *capture.Client, o capture.Output, region *image.Rectangle, cu
 	}
 }
 
-// windowDmabufFormat is the dmabuf layout a capture session on t
+// sessionDmabufFormat is the dmabuf layout a capture session on src
 // prefers, read from a session opened for it and closed again: the
 // stream opens its own only once a consumer takes the GPU buffers.
-func windowDmabufFormat(c *capture.Client, t capture.Toplevel, cursor bool) (capture.DmabufFormat, error) {
-	session, err := c.OpenDmabufSession(t, cursor)
+func sessionDmabufFormat(c *capture.Client, src capture.Source, cursor bool) (capture.DmabufFormat, error) {
+	session, err := c.OpenDmabufSession(src, cursor)
 	if err != nil {
 		return capture.DmabufFormat{}, err
 	}
@@ -532,7 +553,7 @@ func windowDmabufFormat(c *capture.Client, t capture.Toplevel, cursor bool) (cap
 		return capture.DmabufFormat{}, err
 	}
 	if len(formats) == 0 {
-		return capture.DmabufFormat{}, errors.New("the window's capture session offers no dmabuf format")
+		return capture.DmabufFormat{}, errors.New("the capture session offers no dmabuf format")
 	}
 	return formats[0], nil
 }
@@ -636,12 +657,36 @@ func (st screenStreams) startWindowGPU(id string, cur castCursor, fps uint32) (s
 	if !ok {
 		return fail(fmt.Errorf("window '%s' is gone", id))
 	}
-	grab := toplevelGrab(c, t, cur.paint)
+	return st.startSessionGPU(c, fail, t, toplevelGrab(c, t, cur.paint), toplevelGone(c, id), cur, fps)
+}
+
+// startSessionTarget streams a window or the cast target zero-copy.
+func (st screenStreams) startSessionTarget(target sharepicker.Target, cur castCursor, fps uint32) (screenStream, error) {
+	if target.Kind == sharepicker.TargetDynamic {
+		return st.startDynamicGPU(cur, fps)
+	}
+	return st.startWindowGPU(target.Name, cur, fps)
+}
+
+// startDynamicGPU streams the cast target zero-copy as startWindowGPU
+// streams a window; it never vanishes, only follows the target.
+func (st screenStreams) startDynamicGPU(cur castCursor, fps uint32) (screenStream, error) {
+	c, fail, err := connectForDmabuf()
+	if err != nil {
+		return nil, err
+	}
+	return st.startSessionGPU(c, fail, capture.Dynamic{}, dynamicGrab(c, cur.paint), never, cur, fps)
+}
+
+// startSessionGPU streams src over a capture session of its own on c,
+// fed by grab for a consumer of shared memory, ending once gone says the
+// source went away.
+func (st screenStreams) startSessionGPU(c *capture.Client, fail func(error) (screenStream, error), source capture.Source, grab func([]byte) (*capture.Frame, error), gone func() bool, cur castCursor, fps uint32) (screenStream, error) {
 	first, err := grab(nil)
 	if err != nil {
 		return fail(err)
 	}
-	offered, err := windowDmabufFormat(c, t, cur.paint)
+	offered, err := sessionDmabufFormat(c, source, cur.paint)
 	if err != nil {
 		return fail(err)
 	}
@@ -649,8 +694,8 @@ func (st screenStreams) startWindowGPU(id string, cur castCursor, fps uint32) (s
 	if err != nil {
 		return fail(err)
 	}
-	watch := newVanishWatch(toplevelGone(c, id))
-	ws := &windowSession{c: c, t: t, cursor: cur.paint}
+	watch := newVanishWatch(gone)
+	ws := &sourceSession{c: c, src: source, cursor: cur.paint}
 	src, err := newWindowGPUSource(newSnapshotSource(grab, first, watch), dev, ws, offered, layouts)
 	if err != nil {
 		dev.Close()

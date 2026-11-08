@@ -98,6 +98,8 @@ type fakeStarts struct {
 	displays  dbustest.Var[map[string]displayID]
 	// virtual is lys-wm's virtual outputs.
 	virtual fakeVirtual
+	// dynamic is whether the compositor offers its cast target.
+	dynamic dbustest.Var[bool]
 	// clock is the reminders' clock.
 	clock *fakeclock.Clock
 }
@@ -112,6 +114,7 @@ func (f *fakeStarts) screenCast(b *Backend) *screenCast {
 	c.toplevels = func() ([]capture.Toplevel, error) { return f.toplevels.Load(), nil }
 	c.displays = func() (map[string]displayID, error) { return f.displays.Load(), nil }
 	c.virtualOffered, c.createVirtual, c.removeVirtual = f.virtual.offeredNow, f.virtual.create, f.virtual.remove
+	c.dynamicOffered = func() (bool, error) { return f.dynamic.Load(), nil }
 	return c
 }
 

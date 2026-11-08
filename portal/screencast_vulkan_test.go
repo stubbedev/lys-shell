@@ -326,7 +326,7 @@ func TestWindowSessionCopiesIntoTheStreamsBuffers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	offered, err := windowDmabufFormat(c, tl, false)
+	offered, err := sessionDmabufFormat(c, tl, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -334,7 +334,7 @@ func TestWindowSessionCopiesIntoTheStreamsBuffers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	src, err := newWindowGPUSource(newSnapshotSource(grab, first, newVanishWatch(toplevelGone(c, id))), dev, &windowSession{c: c, t: tl}, offered, layouts)
+	src, err := newWindowGPUSource(newSnapshotSource(grab, first, newVanishWatch(toplevelGone(c, id))), dev, &sourceSession{c: c, src: tl}, offered, layouts)
 	if err != nil {
 		t.Fatalf("the zero-copy path declined: %v", err)
 	}

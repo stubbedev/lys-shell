@@ -1,12 +1,13 @@
 // Package sharepicker is the screencast source picker
 // (crates/lys-shell/src/shell/share_picker) the portal pops over
-// dev.stubbe.lys.SharePicker1: a layer surface with Windows, Outputs, and
-// Region pages. A card or region confirms at once in single-select
+// dev.stubbe.lys.SharePicker1: a layer surface with Windows, Outputs, Region
+// and, where the compositor offers its cast target, Dynamic pages. A card
+// or region confirms at once in single-select
 // mode; in multi-select mode cards toggle into a pending set the Share
 // button confirms. The keyboard drives all of it: the opened page's
 // first card holds the focus, Ctrl+PageUp/PageDown switch pages, the
 // arrows move to the nearest card that way, and Enter or Space chooses. The reply is the XDPH selection suffix -
-// `[r]/window:<id>`, `/screen:<name>`, `/region:<out>@x,y,w,h`, several
+// `[r]/window:<id>`, `/screen:<name>`, `/region:<out>@x,y,w,h`, `/dynamic`, several
 // payloads joined by `;` - or empty on cancel.
 package sharepicker
 
@@ -54,6 +55,7 @@ const (
 	pageWindows = "Windows"
 	pageOutputs = "Outputs"
 	pageRegion  = "Region"
+	pageDynamic = "Dynamic"
 )
 
 // Deps are the picker's collaborators.
@@ -531,7 +533,7 @@ func regionPayload(sel regionoverlay.Selection) string {
 //	└ revealer
 //	  └ box.share-picker-surface (vertical, the configured size request)
 //	    ├ notebook.share-picker-notebook (the pages of the sources
-//	    │   offered: Windows, Outputs, Region)
+//	    │   offered: Windows, Outputs, Region, Dynamic)
 //	    ├ checkbutton.share-picker-restore-button > label
 //	    └ button.share-picker-confirm-button (multi-select only)
 //
@@ -544,18 +546,19 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources, read 
 	p.nb, p.choices = nb, map[string][]widget.Widget{}
 	var pages []string
 	for _, page := range []struct {
-		name   string
-		source Sources
-		build  func() widget.Widget
+		name, title string
+		source      Sources
+		build       func() widget.Widget
 	}{
-		{pageWindows, SourceWindows, func() widget.Widget { return p.windowsPage(toplevels) }},
-		{pageOutputs, SourceOutputs, func() widget.Widget { return p.outputsPage(read) }},
-		{pageRegion, SourceRegions, p.regionPage},
+		{pageWindows, pageWindows, SourceWindows, func() widget.Widget { return p.windowsPage(toplevels) }},
+		{pageOutputs, pageOutputs, SourceOutputs, func() widget.Widget { return p.outputsPage(read) }},
+		{pageRegion, pageRegion, SourceRegions, p.regionPage},
+		{pageDynamic, dynamicPageTitle(), SourceDynamic, p.dynamicPage},
 	} {
 		if sources&page.source != 0 {
 			content := page.build()
 			p.choices[page.name] = choicesIn(content)
-			p.appendPage(nb, page.name, content)
+			p.appendPage(nb, page.name, page.title, content)
 			pages = append(pages, page.name)
 		}
 	}
@@ -635,8 +638,8 @@ func (p *Picker) placeholder(icon, text string) widget.Widget {
 
 // appendPage adds a page under its page_label: a centered
 // .share-picker-tab-label filling the tab, the pointer over all of it.
-func (p *Picker) appendPage(nb *widget.Notebook, name string, page widget.Widget) {
-	l := p.label(name)
+func (p *Picker) appendPage(nb *widget.Notebook, name, title string, page widget.Widget) {
+	l := p.label(title)
 	l.AddClass("share-picker-tab-label")
 	l.SetHExpand(true)
 	l.SetAlignment(render.AlignCenter)

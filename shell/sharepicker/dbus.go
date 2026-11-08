@@ -21,12 +21,14 @@ const (
 // Sources are the kinds of source a request may pick, a bit set.
 type Sources uint32
 
-// The kinds of source; a region is part of an output.
+// The kinds of source; a region is part of an output, and the dynamic
+// source is the compositor's cast target.
 const (
 	SourceOutputs Sources = 1 << iota
 	SourceWindows
 	SourceRegions
-	AllSources = SourceOutputs | SourceWindows | SourceRegions
+	SourceDynamic
+	AllSources = SourceOutputs | SourceWindows | SourceRegions | SourceDynamic
 )
 
 // Request is one pick, (subb): the XDPH window list ("" without one),

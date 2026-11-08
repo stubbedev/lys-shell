@@ -178,10 +178,10 @@ func TestHeadlessCtrlPageKeysSwitchPages(t *testing.T) {
 		t.Fatalf("PageDown without Ctrl opened %s", got)
 	}
 	k.kb.CtrlTap(keytest.PageUp)
-	apptest.Until(t, k.a, "Ctrl+PageUp from Windows wraps to Region", func() bool { return k.p.nb.SelectedTab() == pageRegion })
+	apptest.Until(t, k.a, "Ctrl+PageUp from Windows wraps to Dynamic", func() bool { return k.p.nb.SelectedTab() == pageDynamic })
 	k.kb.CtrlTap(keytest.PageDown)
 	k.kb.CtrlTap(keytest.PageDown)
-	apptest.Until(t, k.a, "Ctrl+PageDown twice from Region wraps to Outputs", func() bool { return k.p.nb.SelectedTab() == pageOutputs })
+	apptest.Until(t, k.a, "Ctrl+PageDown twice from Dynamic wraps to Outputs", func() bool { return k.p.nb.SelectedTab() == pageOutputs })
 	k.kb.Tap(keytest.Return)
 	if got := k.answer("Enter on the Outputs page"); got != "/screen:DP-1" {
 		t.Fatalf("Enter answered %q, want the first output", got)

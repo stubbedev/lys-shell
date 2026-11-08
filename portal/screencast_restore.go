@@ -215,7 +215,7 @@ func decodeTargets(devices uint32, targets []tokenTarget) (restoreGrant, bool) {
 	g := restoreGrant{devices: devices, targets: make([]restoreTarget, len(targets))}
 	for i, w := range targets {
 		picked := sharepicker.Target{Kind: w.Kind, Name: w.Name, X: w.X, Y: w.Y, Width: w.Width, Height: w.Height}
-		if _, ok := sharepicker.ParseTarget(picked.Payload()); !ok || w.Kind > sharepicker.TargetRegion {
+		if parsed, ok := sharepicker.ParseTarget(picked.Payload()); !ok || parsed != picked {
 			return restoreGrant{}, false
 		}
 		g.targets[i] = restoreTarget{picked: picked, appID: w.AppID, title: w.Title, display: displayID{w.PNP, w.Model, w.Serial}}
@@ -244,9 +244,10 @@ func resolve(kept []restoreTarget, now sources) ([]sharepicker.Target, error) {
 	for i, k := range kept {
 		t := k.picked
 		var err error
-		if t.Kind == sharepicker.TargetWindow {
+		switch t.Kind {
+		case sharepicker.TargetWindow:
 			t.Name, err = resolveWindow(k, now.windows)
-		} else {
+		case sharepicker.TargetOutput, sharepicker.TargetRegion:
 			t.Name, err = resolveOutput(k, now)
 		}
 		if err != nil {
@@ -322,8 +323,10 @@ func describe(targets []sharepicker.Target, now sources) []restoreTarget {
 	out := make([]restoreTarget, len(targets))
 	for i, t := range targets {
 		out[i] = restoreTarget{picked: t}
-		if t.Kind != sharepicker.TargetWindow {
+		if onOutput(t) {
 			out[i].display = now.displays[t.Name]
+		}
+		if t.Kind != sharepicker.TargetWindow {
 			continue
 		}
 		for _, w := range now.windows {
