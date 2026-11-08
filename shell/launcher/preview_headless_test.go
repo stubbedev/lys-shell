@@ -90,9 +90,10 @@ func startHeadlessPreview(t *testing.T) *headlessPreview {
 			return search.Deps{Env: search.Env{Spawn: func([]string) {}, SpawnShell: func(string) {}}}
 		},
 	})
-	editor := widget.NewLabel(font, 22, "notes.md\n\nA window the launcher pictures.", 0)
+	var editor *widget.Label
 	var win *app.Window
 	if err := apptest.On(a, func() (err error) {
+		editor = widget.NewLabel(font, 22, "notes.md\n\nA window the launcher pictures.", 0)
 		win, err = a.NewWindow(app.WindowConfig{Title: "notes.md", AppID: "editor", Width: 640, Height: 400, Root: editor, Background: render.RGB(0xf6, 0xd3, 0x2d)})
 		return err
 	}); err != nil {
