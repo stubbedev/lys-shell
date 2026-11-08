@@ -218,7 +218,7 @@ func overlayRoot(area widget.Widget, sheet *widget.Stylesheet) widget.Widget {
 // and its selection as they are, and answers ErrBusy. Call it from any
 // goroutine but the loop's.
 func (o *Overlay) Request(ctx context.Context, frames Frames) (Selection, bool, error) {
-	r, err := OpenSession(ctx, o.gate, o.app.Invoke, frames, o.show, o.cancel)
+	r, err := OpenSession(ctx, o.gate, AppLoop(o.app), frames, o.show, o.cancel)
 	return r.sel, r.ok, err
 }
 

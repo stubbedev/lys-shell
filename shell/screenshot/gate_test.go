@@ -14,6 +14,14 @@ import (
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
+// syncLoop stands in for the application's loop: it runs what it is
+// given at once and settles at once.
+type syncLoop struct{}
+
+func (syncLoop) Invoke(fn func()) { fn() }
+
+func (syncLoop) Settle(done func()) { done() }
+
 // gated is an overlay under the real gate that stays open until the test
 // answers it or its context ends.
 type gated[T any] struct {
@@ -26,7 +34,7 @@ func newGated[T any](g *regionoverlay.Gate) *gated[T] {
 }
 
 func (o *gated[T]) open(ctx context.Context, frames regionoverlay.Frames) (T, error) {
-	return regionoverlay.OpenSession(ctx, o.gate, func(fn func()) { fn() }, frames,
+	return regionoverlay.OpenSession(ctx, o.gate, syncLoop{}, frames,
 		func(_ map[string]render.StillImage, reply chan T) { o.opened <- reply },
 		func(reply chan T) {
 			var none T

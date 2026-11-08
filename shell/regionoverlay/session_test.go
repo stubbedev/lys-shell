@@ -10,8 +10,13 @@ import (
 	"github.com/stubbedev/lys-shell/internal/apptest"
 )
 
-// onLoop stands in for the application's Invoke.
-func onLoop(fn func()) { fn() }
+// syncLoop stands in for the application's loop: it runs what it is
+// given at once and settles at once.
+type syncLoop struct{}
+
+func (syncLoop) Invoke(fn func()) { fn() }
+
+func (syncLoop) Settle(done func()) { done() }
 
 // session is an OpenSession left open until its reply is answered or its
 // context ends.
@@ -28,7 +33,7 @@ type sessionAnswer struct {
 func openSession(ctx context.Context, g *Gate, frames Frames) *session {
 	s := &session{reply: make(chan chan int, 1), answer: make(chan sessionAnswer, 1)}
 	go func() {
-		n, err := OpenSession(ctx, g, onLoop, frames,
+		n, err := OpenSession(ctx, g, syncLoop{}, frames,
 			func(_ map[string]render.StillImage, reply chan int) { s.reply <- reply },
 			func(reply chan int) { reply <- -1 })
 		s.answer <- sessionAnswer{n, err}
@@ -39,7 +44,7 @@ func openSession(ctx context.Context, g *Gate, frames Frames) *session {
 func refuse(t *testing.T, g *Gate) {
 	t.Helper()
 	captured, shown := 0, 0
-	_, err := OpenSession(context.Background(), g, onLoop,
+	_, err := OpenSession(context.Background(), g, syncLoop{},
 		func() (map[string]render.StillImage, error) { captured++; return nil, nil },
 		func(_ map[string]render.StillImage, reply chan int) { shown++; reply <- 0 },
 		func(chan int) { t.Error("a refused request cancelled") })
@@ -93,7 +98,7 @@ func TestSessionContextCancelsItsOwnReply(t *testing.T) {
 func TestSessionEndedDuringTheCaptureShowsNothing(t *testing.T) {
 	g := &Gate{}
 	ctx, cancel := context.WithCancel(context.Background())
-	n, err := OpenSession(ctx, g, onLoop,
+	n, err := OpenSession(ctx, g, syncLoop{},
 		func() (map[string]render.StillImage, error) { cancel(); return nil, nil },
 		func(map[string]render.StillImage, chan int) { t.Error("a dismissed session showed") },
 		func(chan int) { t.Error("a session never shown cancelled") })
@@ -109,7 +114,7 @@ func TestSessionEndedDuringTheCaptureShowsNothing(t *testing.T) {
 func TestSessionCaptureFailure(t *testing.T) {
 	g := &Gate{}
 	failed := errors.New("no compositor")
-	_, err := OpenSession(context.Background(), g, onLoop,
+	_, err := OpenSession(context.Background(), g, syncLoop{},
 		func() (map[string]render.StillImage, error) { return nil, failed },
 		func(map[string]render.StillImage, chan int) { t.Error("a failed capture showed") },
 		func(chan int) {})
@@ -259,7 +264,7 @@ func TestAskingWhetherASessionIsOpenRefusesNobody(t *testing.T) {
 	release := make(chan struct{})
 	opened := make(chan error, 1)
 	go func() {
-		_, err := OpenSession(context.Background(), g, func(f func()) { f() }, nil, func(_ map[string]render.StillImage, reply chan struct{}) {
+		_, err := OpenSession(context.Background(), g, syncLoop{}, nil, func(_ map[string]render.StillImage, reply chan struct{}) {
 			opened <- nil
 			go func() { <-release; reply <- struct{}{} }()
 		}, func(chan struct{}) {})
@@ -278,4 +283,45 @@ func TestAskingWhetherASessionIsOpenRefusesNobody(t *testing.T) {
 	if g.Open() {
 		t.Error("an ended session reads as open")
 	}
+}
+
+// heldLoop runs what it is given at once and hands each settle to the test.
+type heldLoop struct{ settles chan func() }
+
+func (l heldLoop) Invoke(fn func()) { fn() }
+
+func (l heldLoop) Settle(done func()) { l.settles <- done }
+
+// An answered session holds the gate until the compositor confirmed its
+// surfaces are gone: a background capture admitted before then could show
+// the overlay still on the screen.
+func TestAnsweredSessionHoldsTheGateUntilTheLoopSettled(t *testing.T) {
+	g := &Gate{}
+	loop := heldLoop{settles: make(chan func(), 1)}
+	answered := make(chan int, 1)
+	go func() {
+		n, err := OpenSession(context.Background(), g, loop, nil,
+			func(_ map[string]render.StillImage, reply chan int) { reply <- 7 },
+			func(chan int) {})
+		if err != nil {
+			t.Errorf("the session answered %v", err)
+		}
+		answered <- n
+	}()
+	done := apptest.Answer(t, "the settle after the answer", loop.settles)
+	captured := make(chan struct{}, 1)
+	go func() {
+		_, _ = BackgroundCapture(context.Background(), g, func() (struct{}, error) { return struct{}{}, nil })
+		captured <- struct{}{}
+	}()
+	apptest.Never(t, "a background capture before the loop settled", captured)
+	apptest.Never(t, "the session's answer before the loop settled", answered)
+	if !g.Open() {
+		t.Error("the gate reads as free before the loop settled")
+	}
+	done()
+	if n := apptest.Answer(t, "the session's answer", answered); n != 7 {
+		t.Errorf("the session answered %d, want 7", n)
+	}
+	apptest.Answer(t, "the background capture once the loop settled", captured)
 }

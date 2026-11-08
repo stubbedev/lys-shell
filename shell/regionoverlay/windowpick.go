@@ -89,7 +89,7 @@ func NewWindowPick(a *app.Application, gate *Gate, outputs func() []*app.Output,
 // without an error; another capture session holding the gate answers
 // ErrBusy. Call it from any goroutine but the loop's.
 func (o *WindowPick) Request(ctx context.Context, windows []Window, screen string) (Picked, bool, error) {
-	r, err := OpenSession(ctx, o.gate, o.app.Invoke, nil, func(_ map[string]render.StillImage, ch chan windowResult) {
+	r, err := OpenSession(ctx, o.gate, AppLoop(o.app), nil, func(_ map[string]render.StillImage, ch chan windowResult) {
 		o.show(ch, windows, screen)
 	}, o.cancel)
 	return r.picked, r.ok, err

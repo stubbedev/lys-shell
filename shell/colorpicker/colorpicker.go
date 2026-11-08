@@ -146,7 +146,7 @@ func HistoryPath() string {
 // regionoverlay.ErrBusy. Call it from any goroutine but the loop's.
 func (p *Picker) Request(ctx context.Context, frames regionoverlay.Frames, opts Options) (Pick, bool, error) {
 	show := func(frames map[string]render.StillImage, ch chan result) { p.show(frames, ch, opts) }
-	r, err := regionoverlay.OpenSession(ctx, p.gate, p.app.Invoke, frames, show, p.cancel)
+	r, err := regionoverlay.OpenSession(ctx, p.gate, regionoverlay.AppLoop(p.app), frames, show, p.cancel)
 	if err != nil {
 		return Pick{}, false, err
 	}
