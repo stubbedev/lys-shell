@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-lib/third_party/wayland/wl"
 	"github.com/stubbedev/lys-lib/vinput"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
@@ -28,6 +29,7 @@ type harness struct {
 	clock   *fakeclock.Clock
 	thumb   *Thumbnail
 	ptr     *vinput.Device
+	layer   *app.LayerWindow
 	edited  []Shot
 	deleted []Shot
 	done    []Shot
@@ -43,6 +45,7 @@ func newHarness(t *testing.T) *harness {
 			if err != nil {
 				return nil, err
 			}
+			h.layer = w
 			return w, nil
 		},
 		KeySym: a.KeySym,
@@ -94,6 +97,8 @@ func (h *harness) show(s Shot, cfg config.ScreenshotConfig) {
 	}
 	if cfg.ThumbnailMs > 0 {
 		apptest.Until(h.t, h.a, "the thumbnail is laid out", func() bool { return h.thumb.cur != nil && h.thumb.cur.view.Bounds().W > 0 })
+		surface := apptest.On(h.a, func() *wl.Surface { return h.layer.HostSurface() })
+		apptest.Drawn(h.t, h.a, surface, func() { h.thumb.cur.view.Invalidate() })
 	}
 }
 
@@ -272,13 +277,16 @@ func TestDraggingDeliversTheFileAndThePNG(t *testing.T) {
 	h := newHarness(t)
 	s := shot(t, 400, 300)
 	target := &dropTarget{accept: transfer.MimeURIList, got: make(chan []byte, 1)}
+	var win *app.Window
 	if err := apptest.On(h.a, func() error {
-		_, err := h.a.NewWindow(app.WindowConfig{Title: "drop", AppID: "drop", Root: target})
+		var err error
+		win, err = h.a.NewWindow(app.WindowConfig{Title: "drop", AppID: "drop", Root: target})
 		return err
 	}); err != nil {
 		t.Fatal(err)
 	}
-	apptest.Until(t, h.a, "the drop target is mapped", func() bool { return target.Bounds().W > 0 })
+	apptest.Until(t, h.a, "the drop target is laid out", func() bool { return target.Bounds().W > 0 })
+	apptest.Drawn(t, h.a, apptest.On(h.a, win.HostSurface), target.Invalidate)
 
 	h.show(s, thumbConfig(5000))
 	if got, want := string(h.dragTo(target)), transfer.FileURI(s.Path)+"\r\n"; got != want {
