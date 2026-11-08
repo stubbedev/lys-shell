@@ -124,9 +124,13 @@ func newHarness(t *testing.T) *harness {
 		Home: hs.home,
 		User: "u",
 	})
+	t.Cleanup(func() { hs.do(func() {}) })
 	return hs
 }
 
+// do runs fn on the fake loop. A test ends only once the loop is idle:
+// a dialog that answered may still be closing on it, and the next test's
+// real loop shares lys-ui's package state.
 func (hs *harness) do(fn func()) {
 	treetest.Loop.Lock()
 	defer treetest.Loop.Unlock()
