@@ -22,12 +22,12 @@ github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
-github.com/stubbedev/lys-lib v0.3.13 h1:5avrUfCGHftRolOTE21LdF/vAHsxWjzPYgg6dzhq7mg=
-github.com/stubbedev/lys-lib v0.3.13/go.mod h1:uMuMAmarcuddaEYxIM6QNtMM/fDbM0DVS31U/iSq7/o=
+github.com/stubbedev/lys-lib v0.3.15-0.20261108163854-5a73eeab2d2c h1:NrNtpwojS5sF95QQRCS9dJ0czyiLP73/EDJKDxbYe2A=
+github.com/stubbedev/lys-lib v0.3.15-0.20261108163854-5a73eeab2d2c/go.mod h1:uMuMAmarcuddaEYxIM6QNtMM/fDbM0DVS31U/iSq7/o=
 github.com/stubbedev/lys-secrets v0.3.15 h1:abUTV7BTsIDClW+D8MN2CnOo2OEe1W3SO1Ms372qlLs=
 github.com/stubbedev/lys-secrets v0.3.15/go.mod h1:QjWkTNpUVFoqrE2uImkdtibsQEfN2aeoHEe0B0fHNCA=
-github.com/stubbedev/lys-ui v0.2.18 h1:uyaRsxR/okwgJejzoQ2wz5w2HD0+OPBnGeQvf6+i6bA=
-github.com/stubbedev/lys-ui v0.2.18/go.mod h1:maPJ74fOGf9FWHalIvgSSxdiMFq9KsbQ/PJOr2AXCU4=
+github.com/stubbedev/lys-ui v0.2.19-0.20261108170000-3a25e8c18505 h1:AP0S5JAqYHznlzp4cSbi9MEIjbV6Hq3gQCWsYeuoTgE=
+github.com/stubbedev/lys-ui v0.2.19-0.20261108170000-3a25e8c18505/go.mod h1:fmbTRYXpsrJb0QuOC7GD4UMefXY2Q2k/ddIYB0dOWuo=
 github.com/stubbedev/memory-go v0.5.0 h1:xo2HTc/1vhHuafiKCPveaGIQO2aEgH56IUJi+M+hieo=
 github.com/stubbedev/memory-go v0.5.0/go.mod h1:o5etMTWH5bhekxgE/iH/zndRj4U5Wl7BIVD+olGUuzw=
 go.yaml.in/yaml/v3 v3.0.6 h1:zcDfvjXEqTQmpjniUBLc91xYJMB2c4QOFxEF/LCEckM=
