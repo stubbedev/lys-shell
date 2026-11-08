@@ -45,6 +45,15 @@ type DockConfig struct {
 	// which windows cover it needs lys-wm; elsewhere the dock shows only
 	// while the pointer is on it.
 	AutoHide bool `cfg:"auto-hide"`
+	// How long an auto-hiding dock stays after the pointer leaves it, or
+	// after a window comes to cover it, before it hides (milliseconds).
+	AutoHideDelayMs uint32 `cfg:"auto-hide-delay-ms"`
+	// Grow the icon under the pointer, and its neighbors halfway, so the
+	// hovered app stands out.
+	HoverZoom bool `cfg:"hover-zoom"`
+	// Size the hovered app's icon grows to. Accepts a scale multiplier or
+	// pixels (e.g. `"72px"`); one no larger than `icon-size` leaves it as is.
+	HoverZoomSize Size `cfg:"hover-zoom-size"`
 	// Apps always on the dock, in order, by desktop entry id without
 	// `.desktop` (e.g. `"firefox"`, `"org.gnome.Nautilus"`), the app id
 	// their windows report.
@@ -56,13 +65,16 @@ type DockConfig struct {
 // DefaultsDock returns the schema defaults.
 func DefaultsDock() DockConfig {
 	return DockConfig{
-		Enabled:  false,
-		Monitors: []string{"*"},
-		Edge:     DockEdgeBottom,
-		IconSize: Scale(2),
-		AutoHide: false,
-		Pinned:   []string{},
-		Icon:     "ld-app-window-symbolic",
+		Enabled:         false,
+		Monitors:        []string{"*"},
+		Edge:            DockEdgeBottom,
+		IconSize:        Scale(2),
+		AutoHide:        false,
+		AutoHideDelayMs: defaultAutoHideDelayMs,
+		HoverZoom:       true,
+		HoverZoomSize:   Scale(3),
+		Pinned:          []string{},
+		Icon:            "ld-app-window-symbolic",
 	}
 }
 

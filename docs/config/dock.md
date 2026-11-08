@@ -25,6 +25,9 @@ covers the dock needs lys-wm.
 | `edge` | [`DockEdge`](/config/types#dock-edge) | `"bottom"` | Screen edge the dock sits on. |
 | `icon-size` | [`Size`](/config/types#size) | `2` | Size of each app's icon. Accepts a scale multiplier or pixels (e.g. `"48px"`). |
 | `auto-hide` | bool | `false` | Hide the dock while a window covers it, revealing it when the pointer reaches its edge. When on, the dock reserves no space. Seeing which windows cover it needs lys-wm; elsewhere the dock shows only while the pointer is on it. |
+| `auto-hide-delay-ms` | u32 | `300` | How long an auto-hiding dock stays after the pointer leaves it, or after a window comes to cover it, before it hides (milliseconds). |
+| `hover-zoom` | bool | `true` | Grow the icon under the pointer, and its neighbors halfway, so the hovered app stands out. |
+| `hover-zoom-size` | [`Size`](/config/types#size) | `3` | Size the hovered app's icon grows to. Accepts a scale multiplier or pixels (e.g. `"72px"`); one no larger than `icon-size` leaves it as is. |
 | `pinned` | array of string | `[]` | Apps always on the dock, in order, by desktop entry id without `.desktop` (e.g. `"firefox"`, `"org.gnome.Nautilus"`), the app id their windows report. |
 | `icon` | string | `"ld-app-window-symbolic"` | Icon for an app without a desktop entry icon. |
 
@@ -38,6 +41,9 @@ dock:
   edge: bottom
   icon-size: 2.0
   auto-hide: false
+  auto-hide-delay-ms: 300
+  hover-zoom: true
+  hover-zoom-size: 3.0
   pinned: []
   icon: ld-app-window-symbolic
 ```

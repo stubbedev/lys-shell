@@ -163,7 +163,7 @@ func PlainBar() BarConfig {
 		Location:                  LocationTop,
 		Exclusive:                 true,
 		AutoHide:                  AutoHideNever,
-		AutoHideDelayMs:           300,
+		AutoHideDelayMs:           defaultAutoHideDelayMs,
 		Layer:                     LayerTop,
 		BG:                        mustColor("bg-surface"),
 		BackgroundOpacity:         100,
@@ -324,6 +324,10 @@ const (
 )
 
 var _ = registerEnum(AutoHideNever, AutoHideAlways, AutoHideWindowsOverlap, AutoHideFullscreen)
+
+// defaultAutoHideDelayMs is how long an auto-hiding bar or dock stays
+// after it stops being needed.
+const defaultAutoHideDelayMs uint32 = 300
 
 // AutoHideOn is the auto-hide mode of a monitor showing layout: the
 // layout's own, else the bar's.

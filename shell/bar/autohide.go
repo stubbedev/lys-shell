@@ -187,9 +187,9 @@ func barExclusive(bar config.BarConfig, layout config.BarLayout) bool {
 	return bar.Exclusive && bar.AutoHideOn(layout) == config.AutoHideNever
 }
 
-// autoHideDelay is bar.auto-hide-delay-ms.
-func autoHideDelay(bar config.BarConfig) time.Duration {
-	return time.Duration(bar.AutoHideDelayMs) * time.Millisecond
+// autoHideDelay is an auto-hide-delay-ms setting.
+func autoHideDelay(ms uint32) time.Duration {
+	return time.Duration(ms) * time.Millisecond
 }
 
 // startAutoHide gives the bar its reveal controller: hovering the bar
@@ -198,7 +198,7 @@ func autoHideDelay(bar config.BarConfig) time.Duration {
 func (w *barWindow) startAutoHide(ctx ModuleContext, layout config.BarLayout, after func(time.Duration, func()) func()) {
 	w.hide = &autoHide{
 		mode:       ctx.Config.Bar.AutoHideOn(layout),
-		delay:      autoHideDelay(ctx.Config.Bar),
+		delay:      autoHideDelay(ctx.Config.Bar.AutoHideDelayMs),
 		after:      after,
 		covered:    func() (bool, bool) { on, _, known := w.windows(); return on, known },
 		fullscreen: func() (bool, bool) { _, on, known := w.windows(); return on, known },

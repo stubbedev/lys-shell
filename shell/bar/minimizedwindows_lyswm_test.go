@@ -291,7 +291,7 @@ func TestTheDockOnLysWM(t *testing.T) {
 		hub = newTaskHub(countingToplevels{appToplevels{a}, &rects}, a.Invoke)
 		hub.followGeometry(geometry, geometry.Ticks(), a.Invoke)
 		ctx.Tasks = hub
-		d = newDock(ctx, cfg, out)
+		d = newDock(ctx, cfg, out, loopAfter(a))
 		layer, err := a.NewLayer(app.LayerConfig{Output: out, Layer: app.LayerTop, Anchor: dockAnchor(cfg.Edge), Keyboard: app.KeyboardNone, Namespace: "lys-shell-test-dock", Root: d.surface})
 		d.attach(layer)
 		return err
@@ -391,8 +391,9 @@ func TestTheDockSurfaceReservesItsEdgeUnlessItAutoHides(t *testing.T) {
 	var reserved int
 	until(t, "the tiled probe ending above the dock", func() error {
 		bottom, err := height()
-		if err == nil && bottom >= full-revealPx {
-			err = fmt.Errorf("the probe reaches %d of %d", bottom, full)
+		thick := onLiveLoop(shell, func() int { return window.(*dockWindow).dock.thickness() })
+		if err == nil && (thick == 0 || bottom > full-thick) {
+			err = fmt.Errorf("the probe reaches %d of %d past a %dpx dock", bottom, full, thick)
 		}
 		reserved = full - bottom
 		return err

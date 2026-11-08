@@ -17,6 +17,15 @@ settings-dock-icon-size = Icon Size
 settings-dock-auto-hide = Auto-hide
     .description = Hide the dock while a window covers it and reveal it at the screen edge; reserves no space
 
+settings-dock-auto-hide-delay-ms = Auto-hide Delay
+    .description = How long the dock stays after the pointer leaves it or a window covers it, in milliseconds
+
+settings-dock-hover-zoom = Zoom on Hover
+    .description = Grow the icon under the pointer, and its neighbors halfway
+
+settings-dock-hover-zoom-size = Zoom Size
+    .description = Size the hovered app's icon grows to
+
 settings-dock-pinned = Pinned Apps
     .description = Apps always on the dock, by desktop entry id
 

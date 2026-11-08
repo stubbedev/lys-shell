@@ -1070,7 +1070,7 @@ func (w *barWindow) Rebuild(layout config.BarLayout) error {
 	if err := w.layer.SetExclusive(exclusive); err != nil {
 		return fmt.Errorf("set exclusive %v: %w", exclusive, err)
 	}
-	w.hide.setMode(cfg.Bar.AutoHideOn(layout), autoHideDelay(cfg.Bar))
+	w.hide.setMode(cfg.Bar.AutoHideOn(layout), autoHideDelay(cfg.Bar.AutoHideDelayMs))
 	ctx := w.host.context(w.output)
 	w.gen.retire()
 	w.gen = ctx.gen

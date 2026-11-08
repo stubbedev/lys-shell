@@ -5,6 +5,7 @@ import (
 	"log"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/stubbedev/lys-lib/intconv"
 	"github.com/stubbedev/lys-lib/render"
@@ -131,11 +132,14 @@ type dock struct {
 	cfg     config.DockConfig
 	hub     *taskHub
 	output  *app.Output
-	surface *widget.Box
+	surface *dockSurface
 	panel   *arrangedBox
 	reveal  *widget.DrawingArea
 	axis    widget.Axis
 	px      int
+	zoom    dockZoom
+	// hovered is the app whose entry is under the pointer, empty for none.
+	hovered string
 	entries map[string]*dockEntry
 	shown   []dockApp
 	host    app.Host
@@ -145,10 +149,12 @@ type dock struct {
 	hide *autoHide
 	// preview shows an app's windows on a hover rest over its entry.
 	preview *windowPreview
-	// size is the panel's size as last shown, which a hidden dock keeps
-	// for what would cover it and for its reveal strip.
-	size  widget.Size
-	stops []func()
+	// size is the panel's size as last laid out shown and unzoomed, which
+	// a hidden dock keeps for what would cover it and for its reveal strip.
+	size widget.Size
+	// rested hears each change of size.
+	rested func()
+	stops  []func()
 }
 
 type dockEntry struct {
@@ -157,7 +163,8 @@ type dockEntry struct {
 	app       dockApp
 }
 
-func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output) *dock {
+// newDock builds output's dock; after runs its delayed hides on the loop.
+func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output, after func(time.Duration, func()) func()) *dock {
 	d := &dock{
 		ctx:     ctx,
 		cfg:     cfg,
@@ -171,6 +178,10 @@ func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output) *dock
 		d.axis = widget.Column
 	}
 	d.px = taskIconPx(cfg.IconSize, ctx.Config)
+	d.zoom = dockZoom{base: d.px}
+	if cfg.HoverZoom {
+		d.zoom.peak = taskIconPx(cfg.HoverZoomSize, ctx.Config)
+	}
 	d.panel = &arrangedBox{Box: widget.NewBox(d.axis, trayItemGap(ctx), 0), arranged: d.claim}
 	d.panel.AddClass("dock", string(cfg.Edge))
 	d.reveal = widget.NewDrawingArea(revealPx, revealPx)
@@ -180,12 +191,15 @@ func newDock(ctx ModuleContext, cfg config.DockConfig, output *app.Output) *dock
 	if d.axis == widget.Column {
 		across = widget.Row
 	}
-	d.surface = widget.NewBox(across, 0, 0)
+	d.surface = &dockSurface{Box: widget.NewBox(across, 0, 0), d: d}
+	edgeAlign(d.panel.Box, cfg.Edge)
 	d.surface.AddClass("dock-surface")
-	d.surface.Append(d.panel, false)
+	d.surface.Append(d.panel, true)
 	d.surface.Append(d.reveal, false)
 	d.hide = &autoHide{
 		mode:       dockMode(cfg),
+		delay:      autoHideDelay(cfg.AutoHideDelayMs),
+		after:      after,
 		covered:    func() (bool, bool) { on, _, known := d.windows(); return on, known },
 		fullscreen: func() (bool, bool) { _, on, known := d.windows(); return on, known },
 		apply:      d.applyHidden,
@@ -245,6 +259,10 @@ func (d *dock) render() {
 		d.panel.Append(e, false)
 	}
 	d.shown = apps
+	if !slices.Contains(ids, d.hovered) {
+		d.hovered = ""
+	}
+	d.applyZoom()
 	d.syncHidden()
 }
 
@@ -268,6 +286,7 @@ func (d *dock) newEntry() *dockEntry {
 		return true
 	})
 	e.SetOnHoverWithin(func(on bool) {
+		d.hoverEntry(e.app.appID, on)
 		d.preview.hover(on && len(e.app.windows) > 1, e, func() ([]previewWindow, previewActions) { return dockPreview(e.app) })
 	})
 	return e
@@ -323,7 +342,13 @@ func launchApp(app taskApp) {
 
 // claim names each app's entry as the minimize rectangle of its windows.
 func (d *dock) claim() {
-	if d.host == nil || d.hide.hidden {
+	if d.hide.hidden {
+		return
+	}
+	if d.hovered == "" {
+		d.measured(widget.Size{W: d.panel.Bounds().W, H: d.panel.Bounds().H})
+	}
+	if d.host == nil {
 		return
 	}
 	claims := map[taskWindow]rectClaim{}
@@ -353,14 +378,8 @@ func (d *dock) windows() (covering, fullscreen, known bool) {
 	return windowsOn(d.hub, d.output.Name, dockArea(d.cfg.Edge, out, d.size))
 }
 
-// syncHidden measures the shown dock and lets the reveal controller
-// decide again.
-func (d *dock) syncHidden() {
-	if !d.hide.hidden {
-		d.size = widget.SizeWithin(d.panel, widget.Size{W: int(d.output.LogicalW), H: int(d.output.LogicalH)})
-	}
-	d.hide.sync()
-}
+// syncHidden lets the reveal controller decide again.
+func (d *dock) syncHidden() { d.hide.sync() }
 
 // applyHidden swaps the entries for the reveal strip, or back.
 func (d *dock) applyHidden(hide bool) {
@@ -374,6 +393,138 @@ func (d *dock) applyHidden(hide bool) {
 	}
 	d.panel.SetVisible(!hide)
 	d.reveal.SetVisible(hide)
+	d.fitHeadroom()
+}
+
+// dockZoom is how entries grow under the pointer: the hovered one to
+// peak, its neighbors halfway; a peak no larger than base is no zoom.
+type dockZoom struct{ base, peak int }
+
+func (z dockZoom) on() bool { return z.peak > z.base }
+
+// px is the icon size of an entry steps entries from the hovered one.
+func (z dockZoom) px(steps int) int {
+	if !z.on() {
+		return z.base
+	}
+	switch steps {
+	case 0:
+		return z.peak
+	case 1:
+		return (z.base + z.peak) / 2
+	}
+	return z.base
+}
+
+// growth is how much a zoomed dock outgrows its resting size along its
+// edge and across it.
+func (z dockZoom) growth() (along, across int) {
+	if !z.on() {
+		return 0, 0
+	}
+	return z.px(0) - z.base + 2*(z.px(1)-z.base), z.peak - z.base
+}
+
+// hoverEntry zooms around the app whose entry the pointer entered, and
+// back once it left without entering another.
+func (d *dock) hoverEntry(appID string, on bool) {
+	switch {
+	case on:
+		d.hovered = appID
+	case d.hovered == appID:
+		d.hovered = ""
+	default:
+		return
+	}
+	d.applyZoom()
+}
+
+// applyZoom sizes every entry's icon for its distance from the hovered
+// one.
+func (d *dock) applyZoom() {
+	at := slices.IndexFunc(d.shown, func(a dockApp) bool { return a.appID == d.hovered })
+	for i, a := range d.shown {
+		steps := -1
+		if at >= 0 {
+			steps = max(i-at, at-i)
+		}
+		d.entries[a.appID].resize(d.zoom.px(steps))
+	}
+}
+
+// measure sizes the resting panel as its styles lay it out, before the
+// first frame, so the surface reserves its edge from the start.
+func (d *dock) measure() {
+	d.measured(widget.SizeWithin(d.panel, widget.Size{W: int(d.output.LogicalW), H: int(d.output.LogicalH)}))
+}
+
+// measured takes the resting size of the laid-out panel, settling the
+// headroom and the reveal decision after the frame when it changed.
+func (d *dock) measured(size widget.Size) {
+	if size == d.size {
+		return
+	}
+	d.size = size
+	d.ctx.Invoke(func() {
+		d.fitHeadroom()
+		d.hide.sync()
+		if d.rested != nil {
+			d.rested()
+		}
+	})
+}
+
+// fitHeadroom keeps the shown surface large enough for the zoomed
+// entries, so hovering never resizes it; a hidden dock is its strip.
+func (d *dock) fitHeadroom() {
+	along, across := d.zoom.growth()
+	if d.hide.hidden || along == 0 {
+		d.surface.SetSizeRequest(0, 0)
+		return
+	}
+	if d.axis == widget.Row {
+		d.surface.SetSizeRequest(d.size.W+along, d.size.H+across)
+	} else {
+		d.surface.SetSizeRequest(d.size.W+across, d.size.H+along)
+	}
+}
+
+// thickness is how far the resting dock reaches out from its edge.
+func (d *dock) thickness() int {
+	if d.axis == widget.Row {
+		return d.size.H
+	}
+	return d.size.W
+}
+
+// edgeAlign seats w against edge, centered along it.
+func edgeAlign(w *widget.Box, edge config.DockEdge) {
+	switch edge {
+	case config.DockEdgeBottom:
+		w.SetHAlign(widget.AlignCenter)
+		w.SetVAlign(widget.AlignEnd)
+	case config.DockEdgeLeft:
+		w.SetHAlign(widget.AlignStart)
+		w.SetVAlign(widget.AlignCenter)
+	case config.DockEdgeRight:
+		w.SetHAlign(widget.AlignEnd)
+		w.SetVAlign(widget.AlignCenter)
+	}
+}
+
+// dockSurface is the dock's root: it takes pointer input on the entries
+// alone, so the headroom kept for zoom passes clicks to what is beneath.
+type dockSurface struct {
+	*widget.Box
+	d *dock
+}
+
+// InputRegion is the shown panel, or all of a hidden dock's strip.
+func (s *dockSurface) InputRegion() []render.Rect {
+	if s.d.hide.hidden {
+		return nil
+	}
+	return []render.Rect{s.d.panel.Bounds()}
 }
 
 // dockHost opens the docks of the shell's mount generation.
@@ -398,7 +549,7 @@ func (h *dockHost) open(output *app.Output, cfg config.DockConfig) (surfaceLayer
 		Keyboard:  app.KeyboardNone,
 		Namespace: "lys-shell-dock-" + output.Name,
 		Root:      w.root,
-		OnResize:  w.resized,
+		OnResize:  func(int, int) { w.reserve() },
 	})
 	if err != nil {
 		w.dock.close()
@@ -406,6 +557,7 @@ func (h *dockHost) open(output *app.Output, cfg config.DockConfig) (surfaceLayer
 	}
 	w.layer = layer
 	w.dock.attach(layer)
+	w.reserve()
 	return w, nil
 }
 
@@ -428,22 +580,22 @@ func (w *dockWindow) build(ctx ModuleContext, cfg config.DockConfig) {
 		}
 	}
 	w.cfg = cfg
-	w.dock = newDock(ctx, cfg, w.output)
+	w.dock = newDock(ctx, cfg, w.output, loopAfter(w.host.app))
+	w.dock.rested = w.reserve
 	w.root.Clear()
 	w.root.Append(w.dock.surface, false)
+	w.dock.measure()
 }
 
-// resized reserves the dock's thickness while it does not auto-hide.
-func (w *dockWindow) resized(width, height int) {
+// reserve keeps the resting dock's thickness clear of windows while it
+// does not auto-hide, never the headroom kept for zoom.
+func (w *dockWindow) reserve() {
 	if w.layer == nil {
 		return
 	}
 	zone := int32(0)
 	if !w.cfg.AutoHide {
-		zone = intconv.Clamp[int32](height)
-		if w.cfg.Edge.IsVertical() {
-			zone = intconv.Clamp[int32](width)
-		}
+		zone = intconv.Clamp[int32](w.dock.thickness())
 	}
 	if err := w.layer.SetExclusiveZone(zone); err != nil {
 		log.Printf("dock %s: exclusive zone %d: %v", w.output.Name, zone, err)
@@ -463,8 +615,7 @@ func (w *dockWindow) Rebuild(cfg config.DockConfig) error {
 	ctx.Connector = w.output.Name
 	w.build(ctx, cfg)
 	w.dock.attach(w.layer)
-	width, height := w.layer.Size()
-	w.resized(width, height)
+	w.reserve()
 	return nil
 }
 

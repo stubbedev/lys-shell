@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/render"
@@ -24,20 +25,24 @@ type dockRig struct {
 	d        *dock
 	src      *fakeToplevels
 	geom     *fakeGeometry
-	ticks    chan struct{}
+	timers   []*pendingTimer
 	launched []string
 }
 
 func newDockRig(t *testing.T, cfg config.DockConfig, windows ...*fakeWindow) *dockRig {
 	t.Helper()
 	ctx := newTestContext(t, config.Defaults())
-	r := &dockRig{src: &fakeToplevels{list: windows}, geom: &fakeGeometry{}, ticks: make(chan struct{})}
+	r := &dockRig{src: &fakeToplevels{list: windows}, geom: &fakeGeometry{}}
 	ctx.Tasks = newTaskHub(r.src, func(fn func()) { fn() })
 	ctx.Tasks.apps.goOff = func(func()) {}
 	ctx.Tasks.apps.known["firefox"] = taskApp{found: true, name: "Firefox", icon: "firefox"}
 	ctx.Tasks.geom = r.geom
 	out := &app.Output{Name: "DP-1", LogicalW: 1000, LogicalH: 800}
-	r.d = newDock(ctx, cfg, out)
+	r.d = newDock(ctx, cfg, out, func(d time.Duration, fn func()) func() {
+		t := &pendingTimer{d: d, fn: fn}
+		r.timers = append(r.timers, t)
+		return func() { t.stopped = true }
+	})
 	r.d.launch = func(a taskApp) { r.launched = append(r.launched, a.name) }
 	r.d.attach(namedHost{name: "dock"})
 	t.Cleanup(r.d.close)
@@ -139,6 +144,8 @@ func TestAnAutoHidingDockHidesUnderAWindowAndRevealsAtTheEdge(t *testing.T) {
 	if r.d.hide.hidden {
 		t.Fatal("the dock hides with nothing covering it")
 	}
+	r.d.surface.Measure(widget.Column, widget.Unknown)
+	r.d.surface.Arrange(render.Rect{Y: 700, W: 1000, H: 100})
 	top := 0
 	r.geom.windows = []lyswm.Window{
 		{ID: 1, Output: "DP-1", Rect: lyswm.Rect{Width: 1000, Height: 800}, Stack: &top},
@@ -146,6 +153,10 @@ func TestAnAutoHidingDockHidesUnderAWindowAndRevealsAtTheEdge(t *testing.T) {
 	}
 	r.d.hub.geometryChanged()
 	r.d.hub.geometryChanged()
+	if r.d.hide.hidden {
+		t.Fatal("the dock hid as soon as a window covered it, before its delay")
+	}
+	r.fire()
 	if !r.d.hide.hidden || r.d.panel.Visible() || !r.d.reveal.Visible() || r.d.hide.hides != 1 {
 		t.Fatalf("covered: hidden %v, hides %d", r.d.hide.hidden, r.d.hide.hides)
 	}
@@ -158,6 +169,16 @@ func TestAnAutoHidingDockHidesUnderAWindowAndRevealsAtTheEdge(t *testing.T) {
 		t.Fatalf("hovered: hidden %v, reveals %d", r.d.hide.hidden, r.d.hide.reveals)
 	}
 	pointer.Leave()
+	if r.d.hide.hidden {
+		t.Fatal("the dock hid the moment the pointer left it")
+	}
+	pointer.Move(widget.Point{X: strip.X + strip.W/2, Y: strip.Y + strip.H/2})
+	r.fire()
+	if r.d.hide.hidden || r.d.hide.hides != 1 {
+		t.Fatalf("the pointer back within the delay: hidden %v, hides %d", r.d.hide.hidden, r.d.hide.hides)
+	}
+	pointer.Leave()
+	r.fire()
 	if !r.d.hide.hidden || r.d.hide.hides != 2 {
 		t.Fatalf("left: hidden %v, hides %d", r.d.hide.hidden, r.d.hide.hides)
 	}
@@ -184,6 +205,7 @@ func TestAnAutoHidingDockWithoutGeometryShowsOnlyUnderThePointer(t *testing.T) {
 	r := newDockRig(t, cfg)
 	r.d.hub.geom = nil
 	r.d.hub.geometryChanged()
+	r.fire()
 	if !r.d.hide.hidden {
 		t.Fatal("without geometry the dock stays shown")
 	}
@@ -243,7 +265,10 @@ func TestADockLaunchesAPinnedAppFromItsDesktopEntry(t *testing.T) {
 	ctx.Tasks = newTaskHub(&fakeToplevels{}, ctx.Invoke)
 	var d *dock
 	onHeadlessLoop(func() bool {
-		d = newDock(ctx, cfg, &app.Output{Name: "DP-1"})
+		d = newDock(ctx, cfg, &app.Output{Name: "DP-1"}, func(time.Duration, func()) func() {
+			t.Error("a dock that does not auto-hide started a hide timer")
+			return func() {}
+		})
 		return true
 	})
 	t.Cleanup(func() { onHeadlessLoop(func() bool { d.close(); return true }) })
@@ -256,4 +281,123 @@ func TestADockLaunchesAPinnedAppFromItsDesktopEntry(t *testing.T) {
 		got, err := os.ReadFile(marker)
 		return err == nil && string(got) == "once\n"
 	})
+}
+
+// fire runs the rig's hide timers that are still live.
+func (r *dockRig) fire() {
+	timers := r.timers
+	r.timers = nil
+	for _, t := range timers {
+		if !t.stopped {
+			t.fn()
+		}
+	}
+}
+
+// Hovering an entry grows its icon to the zoom size and its neighbors
+// halfway, leaving the rest; leaving the dock shrinks them all back.
+// With hover-zoom off, or a zoom size no larger than the icons, nothing
+// grows.
+func TestHoveringADockEntryZoomsItAndItsNeighbors(t *testing.T) {
+	cfg := config.DefaultsDock()
+	cfg.Pinned = []string{"a", "b", "c", "d"}
+	cfg.IconSize = config.Px(40)
+	cfg.HoverZoomSize = config.Px(80)
+	r := newDockRig(t, cfg)
+	sizes := func() []int {
+		out := make([]int, len(r.d.shown))
+		for i, a := range r.d.shown {
+			out[i] = r.d.entries[a.appID].px
+		}
+		return out
+	}
+	r.d.hoverEntry("b", true)
+	if got := sizes(); !slices.Equal(got, []int{60, 80, 60, 40}) {
+		t.Fatalf("hovering b sized the icons %v", got)
+	}
+	r.d.hoverEntry("b", false)
+	r.d.hoverEntry("d", true)
+	if got := sizes(); !slices.Equal(got, []int{40, 40, 60, 80}) {
+		t.Fatalf("moving to d sized the icons %v", got)
+	}
+	r.d.hoverEntry("b", false)
+	if got := sizes(); !slices.Equal(got, []int{40, 40, 60, 80}) {
+		t.Fatalf("a late leave of b undid d's zoom: %v", got)
+	}
+	r.d.hoverEntry("d", false)
+	if got := sizes(); !slices.Equal(got, []int{40, 40, 40, 40}) {
+		t.Fatalf("leaving the dock left the icons %v", got)
+	}
+
+	for name, tweak := range map[string]func(*config.DockConfig){
+		"hover-zoom off":       func(c *config.DockConfig) { c.HoverZoom = false },
+		"zoom size not larger": func(c *config.DockConfig) { c.HoverZoomSize = config.Px(40) },
+	} {
+		off := cfg
+		tweak(&off)
+		r := newDockRig(t, off)
+		r.d.hoverEntry("b", true)
+		for _, a := range r.d.shown {
+			if px := r.d.entries[a.appID].px; px != 40 {
+				t.Fatalf("%s: hovering b sized %s to %d", name, a.appID, px)
+			}
+		}
+		if along, across := r.d.zoom.growth(); along != 0 || across != 0 {
+			t.Fatalf("%s: the dock keeps %dx%d headroom", name, along, across)
+		}
+	}
+}
+
+// A shown zooming dock keeps headroom for its zoomed entries and takes
+// input only on its panel, so the headroom passes clicks through; a
+// hidden one is its strip, input everywhere on it, as wide as the
+// panel it last showed.
+func TestAZoomingDockKeepsHeadroomAndTakesInputOnItsPanel(t *testing.T) {
+	cfg := config.DefaultsDock()
+	cfg.AutoHide = true
+	cfg.Pinned = []string{"a", "b"}
+	cfg.IconSize = config.Px(40)
+	cfg.HoverZoomSize = config.Px(80)
+	r := newDockRig(t, cfg)
+	r.d.surface.Measure(widget.Column, widget.Unknown)
+	r.d.surface.Arrange(render.Rect{W: 1000, H: 200})
+	rest := r.d.size
+	if rest.W == 0 || rest.H == 0 {
+		t.Fatalf("the laid-out dock measured %v", rest)
+	}
+	along, across := r.d.zoom.growth()
+	if got := r.d.surface.SizeRequest(); got != (widget.Size{W: rest.W + along, H: rest.H + across}) {
+		t.Fatalf("the shown dock requests %v, want its %v rest plus %dx%d headroom", got, rest, along, across)
+	}
+	if got := r.d.surface.InputRegion(); len(got) != 1 || got[0] != r.d.panel.Bounds() {
+		t.Fatalf("the shown dock takes input on %v, want only its panel %v", got, r.d.panel.Bounds())
+	}
+	if got := r.d.panel.Bounds(); got.Y+got.H != 200 || got.X+got.W/2 != 500 {
+		t.Fatalf("the panel sits at %v, want centered on the bottom edge of 1000x200", got)
+	}
+
+	r.d.hoverEntry("a", true)
+	r.d.surface.Measure(widget.Column, widget.Unknown)
+	r.d.surface.Arrange(render.Rect{W: 1000, H: 200})
+	if r.d.size != rest {
+		t.Fatalf("zooming changed the resting size to %v from %v", r.d.size, rest)
+	}
+	r.d.hoverEntry("a", false)
+
+	r.d.hide.setHovered(false)
+	r.d.hub.geom = nil
+	r.d.hub.geometryChanged()
+	r.fire()
+	if !r.d.hide.hidden {
+		t.Fatal("the dock did not hide")
+	}
+	if got := r.d.surface.SizeRequest(); got != (widget.Size{}) {
+		t.Fatalf("the hidden dock still requests %v", got)
+	}
+	if got := r.d.surface.InputRegion(); got != nil {
+		t.Fatalf("the hidden dock limits input to %v", got)
+	}
+	if w := widget.SizeWithin(r.d.reveal, widget.Size{W: 1000, H: 200}).W; w != rest.W {
+		t.Fatalf("the strip is %d wide, want the panel's %d", w, rest.W)
+	}
 }

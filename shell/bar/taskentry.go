@@ -69,10 +69,11 @@ func taskIconPx(size config.Size, cfg *config.Config) int {
 // app icon, which it rebuilds only when the icon changes.
 type taskButton struct {
 	*widget.Button
-	slot   *widget.Box
-	icon   string
-	px     int
-	invoke func(func())
+	slot     *widget.Box
+	icon     string
+	fallback string
+	px       int
+	invoke   func(func())
 }
 
 // newTaskButton builds an entry of px icons; marks, when given, sit over
@@ -98,9 +99,25 @@ func (b *taskButton) setIcon(name, fallback string) {
 	if name == b.icon {
 		return
 	}
-	b.icon = name
+	b.icon, b.fallback = name, fallback
+	b.showIcon()
+}
+
+// resize shows the icon at px, the dock's hover zoom.
+func (b *taskButton) resize(px int) {
+	if px == b.px {
+		return
+	}
+	b.px = px
+	widgets.Pin(b.slot, px, px)
+	if b.icon != "" {
+		b.showIcon()
+	}
+}
+
+func (b *taskButton) showIcon() {
 	b.slot.Clear()
-	b.slot.Append(widgets.Center(taskIcon(name, fallback, b.px, b.invoke)), true)
+	b.slot.Append(widgets.Center(taskIcon(b.icon, b.fallback, b.px, b.invoke)), true)
 }
 
 func taskIcon(name, fallback string, px int, invoke func(func())) *widget.Icon {

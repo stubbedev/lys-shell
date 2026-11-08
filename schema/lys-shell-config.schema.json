@@ -2874,6 +2874,11 @@
           "default": false,
           "description": "Hide the dock while a window covers it, revealing it when the\npointer reaches its edge. When on, the dock reserves no space. Seeing\nwhich windows cover it needs lys-wm; elsewhere the dock shows only\nwhile the pointer is on it."
         },
+        "auto-hide-delay-ms": {
+          "$ref": "#/$defs/uint32",
+          "default": 300,
+          "description": "How long an auto-hiding dock stays after the pointer leaves it, or\nafter a window comes to cover it, before it hides (milliseconds)."
+        },
         "edge": {
           "$ref": "#/$defs/DockEdge",
           "default": "bottom",
@@ -2883,6 +2888,16 @@
           "$ref": "#/$defs/boolean",
           "default": false,
           "description": "Show the dock."
+        },
+        "hover-zoom": {
+          "$ref": "#/$defs/boolean",
+          "default": true,
+          "description": "Grow the icon under the pointer, and its neighbors halfway, so the\nhovered app stands out."
+        },
+        "hover-zoom-size": {
+          "$ref": "#/$defs/Size",
+          "default": 3.0,
+          "description": "Size the hovered app's icon grows to. Accepts a scale multiplier or\npixels (e.g. `\"72px\"`); one no larger than `icon-size` leaves it as is."
         },
         "icon": {
           "$ref": "#/$defs/string",
@@ -12110,8 +12125,11 @@
       "$ref": "#/$defs/DockConfig",
       "default": {
         "auto-hide": false,
+        "auto-hide-delay-ms": 300,
         "edge": "bottom",
         "enabled": false,
+        "hover-zoom": true,
+        "hover-zoom-size": 3.0,
         "icon": "ld-app-window-symbolic",
         "icon-size": 2.0,
         "monitors": [
