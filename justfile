@@ -79,12 +79,12 @@ lint:
 # Run the test suite in a random order, so a test that leans on state an
 # earlier one left behind fails instead of passing by declaration order.
 test *args:
-    {{go}} test -shuffle=on ./... {{args}}
+    {{go}} test ${LYS_TEST_ARGS--shuffle=on} ./... {{args}}
 
 # Run the test suite under the race detector. It needs cgo (a C
 # toolchain), which the shipped CGO_ENABLED=0 build never does.
 race:
-    CGO_ENABLED=1 {{go}} test -race -shuffle=on ./...
+    CGO_ENABLED=1 {{go}} test -race ${LYS_TEST_ARGS--shuffle=on} ./...
 
 # The committed config schema must be what the binary generates.
 schema-check:

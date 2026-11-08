@@ -1,6 +1,8 @@
 name: CI
 
 on:
+    schedule:
+        - cron: "17 3 * * 0"
     push:
         branches: [master]
         paths:
@@ -40,7 +42,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@bf3da3ebd3253f33f2f7696b4284986772da635f
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
             # Ubuntu keeps unconfined programs out of user namespaces, which
@@ -62,7 +64,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@bf3da3ebd3253f33f2f7696b4284986772da635f
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
             # Ubuntu keeps unconfined programs out of user namespaces, which
@@ -90,7 +92,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@bf3da3ebd3253f33f2f7696b4284986772da635f
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Build binaries
@@ -145,7 +147,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@bf3da3ebd3253f33f2f7696b4284986772da635f
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
             - name: Build package
@@ -187,7 +189,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@bf3da3ebd3253f33f2f7696b4284986772da635f
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
             - name: The shell on a live Hyprland
@@ -202,7 +204,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: stubbedev/lys-ci/.github/actions/nix-setup@a8e349536974213f8abf2fc082e72e0731262fbb
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@bf3da3ebd3253f33f2f7696b4284986772da635f
               with:
                 github-token: ${{ secrets.GITHUB_TOKEN }}
             - name: The shell on a live lys-wm
