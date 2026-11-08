@@ -281,7 +281,11 @@ func (v *notificationView) follow(life context.Context) {
 		return
 	}
 	history, stopHistory := v.svc.HistoryChanges()
-	rebuilds := latestOnLoop[struct{}]{post: v.ctx.Invoke, show: func(struct{}) { v.rebuild() }}
+	rebuilds := latestOnLoop[struct{}]{post: v.ctx.Invoke, show: func(struct{}) {
+		if life.Err() == nil {
+			v.rebuild()
+		}
+	}}
 	go func() {
 		defer stopHistory()
 		for {
