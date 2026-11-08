@@ -18,6 +18,8 @@ import (
 )
 
 func TestEditorSaveWritesAndCopiesWithoutStallingTheLoop(t *testing.T) {
+	cfg := config.Defaults()
+	ctx := styledContext(t, cfg)
 	a := apptest.Run(t)
 	history, err := clipboard.DefaultHistory(clipboard.DefaultBudget(), clipboard.DefaultPinnedBudget())
 	if err != nil {
@@ -33,10 +35,10 @@ func TestEditorSaveWritesAndCopiesWithoutStallingTheLoop(t *testing.T) {
 		t.Fatalf("the shell's clipboard on sway: %v", err)
 	}
 	t.Cleanup(func() { apptest.On(a, func() bool { clip.Close(); return true }) })
-	cfg := config.Defaults()
-	ctx := styledContext(t, cfg)
-	svc := newCaptureServices(a, a.Session().Outputs, func() *config.Config { return cfg }, nil, clip, ctx.Font, ctx.Theme.Sheet)
-	t.Cleanup(svc.close)
+	svc := apptest.On(a, func() *captureServices {
+		return newCaptureServices(a, a.Session().Outputs, func() *config.Config { return cfg }, nil, clip, ctx.Font, ctx.Theme.Sheet)
+	})
+	t.Cleanup(func() { apptest.On(a, func() bool { svc.close(); return true }) })
 
 	path := filepath.Join(t.TempDir(), "shot.png")
 	capture := image.NewRGBA(image.Rect(0, 0, 64, 48))
