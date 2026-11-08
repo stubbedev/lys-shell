@@ -6,8 +6,8 @@ package config
 // Bar chrome: per-monitor layout, spacing, colors, and button styling.
 type BarConfig struct {
 	// Per-monitor bar layouts. Each entry targets a monitor by connector name
-	// (e.g., `"DP-1"`) or `"*"` for all monitors. See [`BarLayout`] for the
-	// full shape, including layout inheritance via `extends`.
+	// (e.g., `"DP-1"`) or `"*"` for all monitors, and may inherit from another
+	// entry with `extends`.
 	//
 	// ## Example
 	//

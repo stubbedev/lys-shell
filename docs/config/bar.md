@@ -13,7 +13,7 @@ Bar chrome: per-monitor layout, spacing, colors, and button styling.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `layout` | array of [`BarLayout`](/config/types#bar-layout) | `[...]` | Per-monitor bar layouts. Each entry targets a monitor by connector name (e.g., `"DP-1"`) or `"*"` for all monitors. See [`BarLayout`] for the full shape, including layout inheritance via `extends`. |
+| `layout` | array of [`BarLayout`](/config/types#bar-layout) | `[...]` | Per-monitor bar layouts. Each entry targets a monitor by connector name (e.g., `"DP-1"`) or `"*"` for all monitors, and may inherit from another entry with `extends`. |
 | `scale` | [`ScaleFactor`](/config/types#scale-factor) | `1` | Bar-specific scale multiplier for spacing, radius, and other bar elements. |
 | `inset-edge` | [`Size`](/config/types#size) | `0.5` | Gap between bar and its attached screen edge. |
 | `inset-ends` | [`Size`](/config/types#size) | `0.5` | Gap at the bar's ends. |

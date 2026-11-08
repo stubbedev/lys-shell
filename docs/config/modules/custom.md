@@ -36,7 +36,7 @@ bar:
 | `label-max-length` | u32 | `0` | Maximum label length in characters before truncation. |
 | `border-show` | bool | `false` | Display border around button. |
 | `color-map` | unknown | `null` | Map of per-state color overrides keyed by the `alt` field value. |
-| `on-action` | unknown | `null` | Shell command to run after any click/scroll action completes. |
+| `on-action` | unknown | `null` | Shell command to run after any click or scroll action. |
 
 ::: details More about `id`
 
@@ -188,9 +188,8 @@ color-map:
 
 ::: details More about `on-action`
 
-Executes after the action handler finishes, and its output updates
-the display immediately. Useful for reflecting state changes without
-waiting for the next poll interval.
+Its output updates the display at once, without waiting for the next
+poll. After scrolls it runs once, 50ms after the last one.
 
 #### Example
 
@@ -227,42 +226,44 @@ on-action: |
 
 ::: details More about `left-click`
 
-Supports shell commands and dropdown toggles:
+Supports shell commands, dropdown toggles and brightness steps:
 - `"pavucontrol"` — runs a shell command
 - `"dropdown:audio"` — toggles the named dropdown panel
+- `"brightness:+5"`, `"brightness:-5"` — steps every backlight
+- `"brightness:toggle"` — turns every backlight off, or back on
 - `""` — no action (default)
 
-If `on-action` is set, it runs after shell commands complete.
+If `on-action` is set, it runs after this action.
 
 :::
 
 ::: details More about `right-click`
 
-Supports shell commands and dropdown toggles (see `left-click`).
-If `on-action` is set, it runs after shell commands complete.
+Takes the same actions as `left-click`.
+If `on-action` is set, it runs after this action.
 
 :::
 
 ::: details More about `middle-click`
 
-Supports shell commands and dropdown toggles (see `left-click`).
-If `on-action` is set, it runs after shell commands complete.
+Takes the same actions as `left-click`.
+If `on-action` is set, it runs after this action.
 
 :::
 
 ::: details More about `scroll-up`
 
-Supports shell commands and dropdown toggles (see `left-click`).
-Scroll events are debounced (50ms) to coalesce rapid scrolls.
-If `on-action` is set, it runs after shell commands complete.
+Takes the same actions as `left-click`.
+If `on-action` is set, it runs 50ms after the last of a burst of
+scrolls.
 
 :::
 
 ::: details More about `scroll-down`
 
-Supports shell commands and dropdown toggles (see `left-click`).
-Scroll events are debounced (50ms) to coalesce rapid scrolls.
-If `on-action` is set, it runs after shell commands complete.
+Takes the same actions as `left-click`.
+If `on-action` is set, it runs 50ms after the last of a burst of
+scrolls.
 
 :::
 
@@ -359,8 +360,8 @@ Only applies to `watch` mode. Ignored in `poll` mode.
 
 Only applies to `watch` mode. Ignored in `poll` mode.
 
-Used when `restart-policy` is `on-exit` or `on-failure`.
-Delay increases exponentially on rapid failures, capped at 30 seconds.
+The wait before each restart when `restart-policy` is `on-exit` or
+`on-failure`.
 
 :::
 

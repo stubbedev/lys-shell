@@ -69,8 +69,8 @@ type CustomModuleDefinition struct {
 	//
 	// Only applies to `watch` mode. Ignored in `poll` mode.
 	//
-	// Used when `restart-policy` is `on-exit` or `on-failure`.
-	// Delay increases exponentially on rapid failures, capped at 30 seconds.
+	// The wait before each restart when `restart-policy` is `on-exit` or
+	// `on-failure`.
 	RestartIntervalMs RestartDelay `cfg:"restart-interval-ms,default"`
 	// Format string for the label using Jinja2 template syntax.
 	//
@@ -224,40 +224,41 @@ type CustomModuleDefinition struct {
 	ColorMap *map[string]StateColors `cfg:"color-map,default"`
 	// Action performed on left click.
 	//
-	// Supports shell commands and dropdown toggles:
+	// Supports shell commands, dropdown toggles and brightness steps:
 	// - `"pavucontrol"` — runs a shell command
 	// - `"dropdown:audio"` — toggles the named dropdown panel
+	// - `"brightness:+5"`, `"brightness:-5"` — steps every backlight
+	// - `"brightness:toggle"` — turns every backlight off, or back on
 	// - `""` — no action (default)
 	//
-	// If `on-action` is set, it runs after shell commands complete.
+	// If `on-action` is set, it runs after this action.
 	LeftClick ClickAction `cfg:"left-click,default"`
 	// Action performed on right click.
 	//
-	// Supports shell commands and dropdown toggles (see `left-click`).
-	// If `on-action` is set, it runs after shell commands complete.
+	// Takes the same actions as `left-click`.
+	// If `on-action` is set, it runs after this action.
 	RightClick ClickAction `cfg:"right-click,default"`
 	// Action performed on middle click.
 	//
-	// Supports shell commands and dropdown toggles (see `left-click`).
-	// If `on-action` is set, it runs after shell commands complete.
+	// Takes the same actions as `left-click`.
+	// If `on-action` is set, it runs after this action.
 	MiddleClick ClickAction `cfg:"middle-click,default"`
 	// Action performed on scroll up.
 	//
-	// Supports shell commands and dropdown toggles (see `left-click`).
-	// Scroll events are debounced (50ms) to coalesce rapid scrolls.
-	// If `on-action` is set, it runs after shell commands complete.
+	// Takes the same actions as `left-click`.
+	// If `on-action` is set, it runs 50ms after the last of a burst of
+	// scrolls.
 	ScrollUp ClickAction `cfg:"scroll-up,default"`
 	// Action performed on scroll down.
 	//
-	// Supports shell commands and dropdown toggles (see `left-click`).
-	// Scroll events are debounced (50ms) to coalesce rapid scrolls.
-	// If `on-action` is set, it runs after shell commands complete.
+	// Takes the same actions as `left-click`.
+	// If `on-action` is set, it runs 50ms after the last of a burst of
+	// scrolls.
 	ScrollDown ClickAction `cfg:"scroll-down,default"`
-	// Shell command to run after any click/scroll action completes.
+	// Shell command to run after any click or scroll action.
 	//
-	// Executes after the action handler finishes, and its output updates
-	// the display immediately. Useful for reflecting state changes without
-	// waiting for the next poll interval.
+	// Its output updates the display at once, without waiting for the next
+	// poll. After scrolls it runs once, 50ms after the last one.
 	//
 	// ## Example
 	//

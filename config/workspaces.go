@@ -121,8 +121,7 @@ type WorkspaceClicks struct {
 //
 // Keys are written as strings, so `"1"` parses into the workspace
 // with ID `1`. Negative IDs refer to Hyprland's special workspaces. Keys
-// that don't appear in the map fall back to the default behaviour set by
-// [`HyprlandWorkspacesConfig::display_mode`].
+// that don't appear in the map fall back to `display-mode`.
 //
 // ## Examples
 //

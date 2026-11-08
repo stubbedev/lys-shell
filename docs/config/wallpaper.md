@@ -30,7 +30,7 @@ Wallpaper rendering, cycling, and per-monitor overrides.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `monitors` | array of [`MonitorWallpaperConfig`](/config/types#monitor-wallpaper-config) | `[]` | Per-monitor wallpaper and fit mode settings. Each entry targets a monitor by connector name. See [`MonitorWallpaperConfig`] for the available fields. |
+| `monitors` | array of [`MonitorWallpaperConfig`](/config/types#monitor-wallpaper-config) | `[]` | Per-monitor wallpaper and fit mode settings. Each entry targets a monitor by connector name. |
 
 ::: details More about `monitors`
 

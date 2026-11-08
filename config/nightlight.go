@@ -27,39 +27,30 @@ type NightlightConfig struct {
 	// Automatically ease the filter on at dusk and off at dawn, following the
 	// sun at the machine's location.
 	//
-	// The schedule anchors to civil dawn and civil dusk, when the sun is 6
-	// degrees below the horizon, with each transition centred on the event.
-	// Where the sun never crosses that line (polar day and polar night) the
-	// filter stays off or on with no transition.
+	// Transitions are centred on civil dawn and dusk (sun 6 degrees below the
+	// horizon). During polar day or night the filter stays off or on.
 	//
-	// The location comes from GeoClue, unless `latitude` and `longitude` are
-	// both set: explicit coordinates win, and GeoClue is then never asked. A
-	// spelled-out 0, 0 counts as unset. The last GeoClue fix is remembered in
-	// the state directory. With no location at all, or with only one coordinate
-	// or one off the globe, the schedule does not run: the module says why in
-	// its tooltip and in the log, and the filter stays as it is.
+	// The location is `latitude` and `longitude` when both are set (0, 0
+	// counts as unset), otherwise GeoClue's, whose last fix is kept in the
+	// state directory. Without a usable location the schedule does not run;
+	// the tooltip and the log say why.
 	//
-	// GeoClue answers a client only once an agent serves the user, and only
-	// GNOME and a few other desktops run one. With none running, lys-shell
-	// registers as the agent itself for the length of the lookup, which GeoClue
-	// allows only for names on its whitelist. The deb and rpm install that as
-	// `/etc/geoclue/conf.d/50-lys-shell.conf`, and the NixOS module's
-	// `autoInstallDependencies` sets it up too. From the release archive, install
-	// the archive's `geoclue-lys-shell.conf` at that path yourself and run
-	// `sudo systemctl restart geoclue`. GeoClue older than 2.7 does not read
-	// `conf.d`: put the file's `lys-shell` entry in `/etc/geoclue/geoclue.conf`
-	// and add `lys-shell` to `whitelist` under `[agent]` there. A `whitelist` in a
-	// drop-in replaces the main file's, so the shipped file repeats upstream's
-	// list; if you have changed yours, add your agents to the drop-in.
+	// When no GeoClue agent runs, lys-shell registers as one during the
+	// lookup, which needs it on GeoClue's agent whitelist. The deb and rpm
+	// install `/etc/geoclue/conf.d/50-lys-shell.conf`, and the NixOS module's
+	// `autoInstallDependencies` sets it up. From the tarball, install its
+	// `geoclue-lys-shell.conf` at that path and restart geoclue. GeoClue
+	// before 2.7 reads no `conf.d`: add the file's `lys-shell` entry to
+	// `/etc/geoclue/geoclue.conf` and `lys-shell` to `whitelist` under
+	// `[agent]`. A drop-in `whitelist` replaces the main file's, so the
+	// shipped one repeats upstream's list; add any agents you rely on.
 	//
-	// The log names what to check when the lookup fails. No answer usually means
-	// the whitelist above. No fix after that usually means GeoClue has no source
-	// that can place the machine, as upstream's default config names no Wi-Fi
-	// location service: set `url` under `[wifi]`, describe the location in
-	// `/etc/geolocation` for the static source, or set `latitude` and `longitude`.
+	// When GeoClue answers but finds no fix, it has no source that can place
+	// the machine: set `url` under `[wifi]`, describe the location in
+	// `/etc/geolocation`, or set `latitude` and `longitude`.
 	//
 	// A manual click cancels a running transition, applies at once, and holds
-	// until the next transition begins, after which the schedule resumes.
+	// until the next transition begins.
 	AutoSchedule bool `cfg:"auto-schedule"`
 	// Length of the transition between day and night, in whole minutes, centred
 	// on civil dawn or dusk. 0 switches at once. Range: 0-120.

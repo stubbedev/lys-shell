@@ -37,8 +37,7 @@ type WallpaperConfig struct {
 	// `Wallpapers` folder of `XDG_PICTURES_DIR`.
 	PickerDirectories []string `cfg:"picker-directories"`
 	// Per-monitor wallpaper and fit mode settings. Each entry targets a
-	// monitor by connector name. See [`MonitorWallpaperConfig`] for the
-	// available fields.
+	// monitor by connector name.
 	//
 	// ## Example
 	//

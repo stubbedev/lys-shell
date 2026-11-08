@@ -880,7 +880,7 @@
               "show": true
             }
           ],
-          "description": "Per-monitor bar layouts. Each entry targets a monitor by connector name\n(e.g., `\"DP-1\"`) or `\"*\"` for all monitors. See [`BarLayout`] for the\nfull shape, including layout inheritance via `extends`.\n\n## Example\n\n```yaml\nbar:\n  layout:\n    - monitor: \"*\"\n      left: [dashboard]\n      center: [clock]\n      right: [battery, network, volume, systray]\n    - monitor: HDMI-1\n      extends: \"*\"\n      right: [volume, systray]\n```"
+          "description": "Per-monitor bar layouts. Each entry targets a monitor by connector name\n(e.g., `\"DP-1\"`) or `\"*\"` for all monitors, and may inherit from another\nentry with `extends`.\n\n## Example\n\n```yaml\nbar:\n  layout:\n    - monitor: \"*\"\n      left: [dashboard]\n      center: [clock]\n      right: [battery, network, volume, systray]\n    - monitor: HDMI-1\n      extends: \"*\"\n      right: [volume, systray]\n```"
         },
         "location": {
           "$ref": "#/$defs/Location",
@@ -2617,12 +2617,12 @@
         "left-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
-          "description": "Action performed on left click.\n\nSupports shell commands and dropdown toggles:\n- `\"pavucontrol\"` — runs a shell command\n- `\"dropdown:audio\"` — toggles the named dropdown panel\n- `\"\"` — no action (default)\n\nIf `on-action` is set, it runs after shell commands complete."
+          "description": "Action performed on left click.\n\nSupports shell commands, dropdown toggles and brightness steps:\n- `\"pavucontrol\"` — runs a shell command\n- `\"dropdown:audio\"` — toggles the named dropdown panel\n- `\"brightness:+5\"`, `\"brightness:-5\"` — steps every backlight\n- `\"brightness:toggle\"` — turns every backlight off, or back on\n- `\"\"` — no action (default)\n\nIf `on-action` is set, it runs after this action."
         },
         "middle-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
-          "description": "Action performed on middle click.\n\nSupports shell commands and dropdown toggles (see `left-click`).\nIf `on-action` is set, it runs after shell commands complete."
+          "description": "Action performed on middle click.\n\nTakes the same actions as `left-click`.\nIf `on-action` is set, it runs after this action."
         },
         "mode": {
           "$ref": "#/$defs/ExecutionMode",
@@ -2631,7 +2631,7 @@
         },
         "on-action": {
           "default": null,
-          "description": "Shell command to run after any click/scroll action completes.\n\nExecutes after the action handler finishes, and its output updates\nthe display immediately. Useful for reflecting state changes without\nwaiting for the next poll interval.\n\n## Example\n\n```yaml\n# Volume control with immediate feedback\nscroll-up: pactl set-sink-volume @DEFAULT_SINK@ +5%\nscroll-down: pactl set-sink-volume @DEFAULT_SINK@ -5%\non-action: |\n  vol=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\\d+(?=%)' | head -1)\n  echo \"{\\\"percentage\\\": $vol}\"\n```",
+          "description": "Shell command to run after any click or scroll action.\n\nIts output updates the display at once, without waiting for the next\npoll. After scrolls it runs once, 50ms after the last one.\n\n## Example\n\n```yaml\n# Volume control with immediate feedback\nscroll-up: pactl set-sink-volume @DEFAULT_SINK@ +5%\nscroll-down: pactl set-sink-volume @DEFAULT_SINK@ -5%\non-action: |\n  vol=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -oP '\\d+(?=%)' | head -1)\n  echo \"{\\\"percentage\\\": $vol}\"\n```",
           "type": [
             "string",
             "null"
@@ -2640,7 +2640,7 @@
         "restart-interval-ms": {
           "$ref": "#/$defs/RestartDelay",
           "default": 1000,
-          "description": "Base restart delay in milliseconds for watch mode.\n\nOnly applies to `watch` mode. Ignored in `poll` mode.\n\nUsed when `restart-policy` is `on-exit` or `on-failure`.\nDelay increases exponentially on rapid failures, capped at 30 seconds."
+          "description": "Base restart delay in milliseconds for watch mode.\n\nOnly applies to `watch` mode. Ignored in `poll` mode.\n\nThe wait before each restart when `restart-policy` is `on-exit` or\n`on-failure`."
         },
         "restart-policy": {
           "$ref": "#/$defs/RestartPolicy",
@@ -2650,17 +2650,17 @@
         "right-click": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
-          "description": "Action performed on right click.\n\nSupports shell commands and dropdown toggles (see `left-click`).\nIf `on-action` is set, it runs after shell commands complete."
+          "description": "Action performed on right click.\n\nTakes the same actions as `left-click`.\nIf `on-action` is set, it runs after this action."
         },
         "scroll-down": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
-          "description": "Action performed on scroll down.\n\nSupports shell commands and dropdown toggles (see `left-click`).\nScroll events are debounced (50ms) to coalesce rapid scrolls.\nIf `on-action` is set, it runs after shell commands complete."
+          "description": "Action performed on scroll down.\n\nTakes the same actions as `left-click`.\nIf `on-action` is set, it runs 50ms after the last of a burst of\nscrolls."
         },
         "scroll-up": {
           "$ref": "#/$defs/ClickAction",
           "default": "",
-          "description": "Action performed on scroll up.\n\nSupports shell commands and dropdown toggles (see `left-click`).\nScroll events are debounced (50ms) to coalesce rapid scrolls.\nIf `on-action` is set, it runs after shell commands complete."
+          "description": "Action performed on scroll up.\n\nTakes the same actions as `left-click`.\nIf `on-action` is set, it runs 50ms after the last of a burst of\nscrolls."
         },
         "tooltip-format": {
           "default": null,
@@ -6350,7 +6350,7 @@
         "custom": {
           "$ref": "#/$defs/Array_of_CustomModuleDefinition",
           "default": [],
-          "description": "Custom user-defined modules, each backed by a shell command. See\n[`CustomModuleDefinition`] for all fields (id, command, interval, click\nactions, icons, etc.). Reference them in a layout with `custom-<id>`.\n\n## Example\n\n```yaml\nmodules:\n  custom:\n    - id: gpu-temp\n      command: nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader\n      interval-ms: 5000\n      icon-name: ld-thermometer-symbolic\n    - id: weather\n      command: curl -s wttr.in/?format=%t\n      interval-ms: 600000\n```"
+          "description": "Custom user-defined modules, each backed by a shell command. Reference\nthem in a layout with `custom-<id>`.\n\n## Example\n\n```yaml\nmodules:\n  custom:\n    - id: gpu-temp\n      command: nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader\n      interval-ms: 5000\n      icon-name: ld-thermometer-symbolic\n    - id: weather\n      command: curl -s wttr.in/?format=%t\n      interval-ms: 600000\n```"
         },
         "dashboard": {
           "$ref": "#/$defs/DashboardConfig",
@@ -7612,7 +7612,7 @@
         "auto-schedule": {
           "$ref": "#/$defs/boolean",
           "default": false,
-          "description": "Automatically ease the filter on at dusk and off at dawn, following the\nsun at the machine's location.\n\nThe schedule anchors to civil dawn and civil dusk, when the sun is 6\ndegrees below the horizon, with each transition centred on the event.\nWhere the sun never crosses that line (polar day and polar night) the\nfilter stays off or on with no transition.\n\nThe location comes from GeoClue, unless `latitude` and `longitude` are\nboth set: explicit coordinates win, and GeoClue is then never asked. A\nspelled-out 0, 0 counts as unset. The last GeoClue fix is remembered in\nthe state directory. With no location at all, or with only one coordinate\nor one off the globe, the schedule does not run: the module says why in\nits tooltip and in the log, and the filter stays as it is.\n\nGeoClue answers a client only once an agent serves the user, and only\nGNOME and a few other desktops run one. With none running, lys-shell\nregisters as the agent itself for the length of the lookup, which GeoClue\nallows only for names on its whitelist. The deb and rpm install that as\n`/etc/geoclue/conf.d/50-lys-shell.conf`, and the NixOS module's\n`autoInstallDependencies` sets it up too. From the release archive, install\nthe archive's `geoclue-lys-shell.conf` at that path yourself and run\n`sudo systemctl restart geoclue`. GeoClue older than 2.7 does not read\n`conf.d`: put the file's `lys-shell` entry in `/etc/geoclue/geoclue.conf`\nand add `lys-shell` to `whitelist` under `[agent]` there. A `whitelist` in a\ndrop-in replaces the main file's, so the shipped file repeats upstream's\nlist; if you have changed yours, add your agents to the drop-in.\n\nThe log names what to check when the lookup fails. No answer usually means\nthe whitelist above. No fix after that usually means GeoClue has no source\nthat can place the machine, as upstream's default config names no Wi-Fi\nlocation service: set `url` under `[wifi]`, describe the location in\n`/etc/geolocation` for the static source, or set `latitude` and `longitude`.\n\nA manual click cancels a running transition, applies at once, and holds\nuntil the next transition begins, after which the schedule resumes."
+          "description": "Automatically ease the filter on at dusk and off at dawn, following the\nsun at the machine's location.\n\nTransitions are centred on civil dawn and dusk (sun 6 degrees below the\nhorizon). During polar day or night the filter stays off or on.\n\nThe location is `latitude` and `longitude` when both are set (0, 0\ncounts as unset), otherwise GeoClue's, whose last fix is kept in the\nstate directory. Without a usable location the schedule does not run;\nthe tooltip and the log say why.\n\nWhen no GeoClue agent runs, lys-shell registers as one during the\nlookup, which needs it on GeoClue's agent whitelist. The deb and rpm\ninstall `/etc/geoclue/conf.d/50-lys-shell.conf`, and the NixOS module's\n`autoInstallDependencies` sets it up. From the tarball, install its\n`geoclue-lys-shell.conf` at that path and restart geoclue. GeoClue\nbefore 2.7 reads no `conf.d`: add the file's `lys-shell` entry to\n`/etc/geoclue/geoclue.conf` and `lys-shell` to `whitelist` under\n`[agent]`. A drop-in `whitelist` replaces the main file's, so the\nshipped one repeats upstream's list; add any agents you rely on.\n\nWhen GeoClue answers but finds no fix, it has no source that can place\nthe machine: set `url` under `[wifi]`, describe the location in\n`/etc/geolocation`, or set `latitude` and `longitude`.\n\nA manual click cancels a running transition, applies at once, and holds\nuntil the next transition begins."
         },
         "border-color": {
           "$ref": "#/$defs/ColorValue",
@@ -11166,7 +11166,7 @@
         "monitors": {
           "$ref": "#/$defs/Array_of_MonitorWallpaperConfig",
           "default": [],
-          "description": "Per-monitor wallpaper and fit mode settings. Each entry targets a\nmonitor by connector name. See [`MonitorWallpaperConfig`] for the\navailable fields.\n\n## Example\n\n```yaml\nwallpaper:\n  monitors:\n    - name: DP-1\n      wallpaper: /home/me/pictures/wall-primary.png\n      fit-mode: fill\n    - name: HDMI-1\n      wallpaper: /home/me/pictures/wall-secondary.png\n      fit-mode: fit\n```"
+          "description": "Per-monitor wallpaper and fit mode settings. Each entry targets a\nmonitor by connector name.\n\n## Example\n\n```yaml\nwallpaper:\n  monitors:\n    - name: DP-1\n      wallpaper: /home/me/pictures/wall-primary.png\n      fit-mode: fill\n    - name: HDMI-1\n      wallpaper: /home/me/pictures/wall-secondary.png\n      fit-mode: fit\n```"
         },
         "picker-directories": {
           "$ref": "#/$defs/Array_of_string",
@@ -11774,7 +11774,7 @@
     },
     "WorkspaceMap": {
       "additionalProperties": false,
-      "description": "Per-workspace icon and color overrides, keyed by workspace ID.\n\nKeys are written as strings, so `\"1\"` parses into the workspace\nwith ID `1`. Negative IDs refer to Hyprland's special workspaces. Keys\nthat don't appear in the map fall back to the default behaviour set by\n[`HyprlandWorkspacesConfig::display_mode`].\n\n## Examples\n\n```yaml\n# under modules.hyprland-workspaces.workspace-map\n\"1\": {label: Web, icon: ld-globe-symbolic, color: \"#4a90d9\"}\n\"2\": {icon: ld-terminal-symbolic}\n\"3\": {icon: ld-code-symbolic, color: accent}\n\"4\": {label: Chat, icon: ld-message-square-symbolic, color: status-success}\n\n# Negative IDs target Hyprland special workspaces\n\"-99\": {icon: ld-scratch-symbolic}\n```",
+      "description": "Per-workspace icon and color overrides, keyed by workspace ID.\n\nKeys are written as strings, so `\"1\"` parses into the workspace\nwith ID `1`. Negative IDs refer to Hyprland's special workspaces. Keys\nthat don't appear in the map fall back to `display-mode`.\n\n## Examples\n\n```yaml\n# under modules.hyprland-workspaces.workspace-map\n\"1\": {label: Web, icon: ld-globe-symbolic, color: \"#4a90d9\"}\n\"2\": {icon: ld-terminal-symbolic}\n\"3\": {icon: ld-code-symbolic, color: accent}\n\"4\": {label: Chat, icon: ld-message-square-symbolic, color: status-success}\n\n# Negative IDs target Hyprland special workspaces\n\"-99\": {icon: ld-scratch-symbolic}\n```",
       "patternProperties": {
         "^-?\\d+$": {
           "$ref": "#/$defs/WorkspaceStyle"

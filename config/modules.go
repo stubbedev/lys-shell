@@ -88,9 +88,8 @@ type ModulesConfig struct {
 	WindowTitle WindowTitleConfig `cfg:"window-title"`
 	// World clock module.
 	WorldClock WorldClockConfig `cfg:"world-clock"`
-	// Custom user-defined modules, each backed by a shell command. See
-	// [`CustomModuleDefinition`] for all fields (id, command, interval, click
-	// actions, icons, etc.). Reference them in a layout with `custom-<id>`.
+	// Custom user-defined modules, each backed by a shell command. Reference
+	// them in a layout with `custom-<id>`.
 	//
 	// ## Example
 	//
