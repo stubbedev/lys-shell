@@ -27,6 +27,7 @@ fhs_interpreter := if arch() == "aarch64" { "/lib/ld-linux-aarch64.so.1" } else 
 build:
     CGO_ENABLED=0 {{go}} build -trimpath -ldflags "-s -w -I {{fhs_interpreter}}" -o {{dist}}/ ./cmd/lys-shell ./cmd/lys-lock
     install -m 0644 "$({{go}} list -m -f '{{{{.Dir}}' github.com/stubbedev/lys-desktop)/service/bitwarden/generator/eff_large_wordlist.NOTICE" {{dist}}/
+    {{go}} tool install-icons {{dist}}/icons/hicolor/scalable/actions
     {{go}} run ./internal/tools/distcheck {{dist}}/lys-shell {{dist}}/lys-lock
     mkdir -p {{dist}}/completions
     {{go}} run ./cmd/lys-shell completions bash > {{dist}}/completions/completions.bash

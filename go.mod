@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-desktop v0.0.0-20261108172414-4fb847c24b62
+	github.com/stubbedev/lys-desktop v0.0.0-20261108180514-33d4e66383f2
 	github.com/stubbedev/lys-lib v0.3.15-0.20261108170839-b9361bb635d5
 	github.com/stubbedev/lys-secrets v0.3.16-0.20261108170907-e6e5dc236295
 	github.com/stubbedev/lys-ui v0.2.19-0.20261108170851-7a09fc304065
@@ -33,3 +33,5 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
+
+tool github.com/stubbedev/lys-desktop/cmd/install-icons

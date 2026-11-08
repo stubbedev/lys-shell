@@ -14,9 +14,9 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-desktop/icons"
+	"github.com/stubbedev/lys-desktop/resources"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
-	"github.com/stubbedev/lys-shell/resources"
 )
 
 // newIconManager is the handlers' IconManager::new (a variable so tests

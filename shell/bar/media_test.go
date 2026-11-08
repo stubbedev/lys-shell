@@ -518,7 +518,7 @@ func TestMediaTransportButtonsAreUnpaddedPointers(t *testing.T) {
 		if got := widget.SizeWithin(tc.b, availSize(200, 200)); got != want {
 			t.Errorf("%s measures %v, want an unpadded button's %v (programmatic padding)", tc.glyph, got, want)
 		}
-		if got := widget.CursorNameOf(tc.b); got != "pointer" {
+		if got := widget.HoverCursor(tc.b); got != "pointer" {
 			t.Errorf("%s cursor = %q, want pointer", tc.glyph, got)
 		}
 	}

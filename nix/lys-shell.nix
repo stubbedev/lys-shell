@@ -71,7 +71,7 @@ buildGo127Module {
   # first import of a package not vendored yet both change it, since only
   # imported packages are vendored; `just vendor-hash` recomputes it (a
   # stale one is reused, not reported, the derivation being fixed-output).
-  vendorHash = "sha256-F8t7reMjDz6mk4EzsylL1r6egGl04SZePLvXuQv2S6o=";
+  vendorHash = "sha256-wzTWXga9oVuhptcGWopNKs33cIr+SB5NhqMEfbUCOCw=";
 
   subPackages = [
     "cmd/lys-shell"
@@ -109,8 +109,7 @@ buildGo127Module {
     # Handler for the globalprotectcallback: URI scheme (GlobalProtect
     # SAML sign-in answers).
     install -Dm0644 resources/dev.stubbe.lys.vpn-sso-callback.desktop -t $out/share/applications
-    install -Dm0644 resources/icons/hicolor/scalable/actions/*.svg \
-      -t $out/share/icons/hicolor/scalable/actions
+    go tool install-icons $out/share/icons/hicolor/scalable/actions
     # Reference copy of the systemd user unit; the modules define their own.
     install -Dm0644 resources/lys-shell.service -t $out/share/lys-shell
 

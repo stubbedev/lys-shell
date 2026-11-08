@@ -16,7 +16,7 @@
 
 "area:icons":
     - changed-files:
-          - any-glob-to-any-file: ["internal/icons/**", "resources/icons/**"]
+          - any-glob-to-any-file: ["internal/icons/**"]
 
 "area:i18n":
     - changed-files:

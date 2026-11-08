@@ -30,14 +30,13 @@ func TestShellLinksNoLoginScreen(t *testing.T) {
 		t.Fatalf("go list -deps: %v: %s", err, stderr.Bytes())
 	}
 	deps := strings.Fields(string(out))
-	const module = "github.com/stubbedev/lys-shell/"
 	forbidden := []string{"github.com/stubbedev/lys-login/", "github.com/stubbedev/lys-secrets/internal/", "github.com/stubbedev/lys-secrets/secretstest"}
 	for _, dep := range deps {
 		if slices.ContainsFunc(forbidden, func(prefix string) bool { return strings.HasPrefix(dep, prefix) }) {
 			t.Errorf("lys-shell imports %s", dep)
 		}
 	}
-	found := slices.Contains(deps, module+"shell/lockclient")
+	found := slices.Contains(deps, "github.com/stubbedev/lys-desktop/shell/lockclient")
 	if !found {
 		t.Error("lys-shell does not import shell/lockclient: the check above lists nothing")
 	}

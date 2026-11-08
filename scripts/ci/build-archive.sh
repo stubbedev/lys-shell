@@ -26,7 +26,7 @@ done
 cp "${BIN_DIR}/completions/completions.bash" "${BIN_DIR}/completions/_lys-shell" "${BIN_DIR}/completions/lys-shell.fish" "${STAGING}/completions/"
 
 cp LICENSE "${BIN_DIR}/eff_large_wordlist.NOTICE" "${STAGING}/"
-cp -R resources/icons/hicolor "${STAGING}/icons/"
+cp -R "${BIN_DIR}/icons/hicolor" "${STAGING}/icons/"
 cp resources/lys-shell.service \
 	resources/dev.stubbe.lys.vpn-sso-callback.desktop \
 	resources/lys-shell.portal \

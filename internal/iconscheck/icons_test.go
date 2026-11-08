@@ -1,4 +1,4 @@
-package resources_test
+package iconscheck_test
 
 import (
 	"go/ast"
@@ -6,7 +6,7 @@ import (
 	"go/token"
 	"io/fs"
 	"maps"
-	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -15,15 +15,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/resources"
+	"github.com/stubbedev/lys-desktop/resources"
 )
 
 // iconName is a full theme icon name as the shell writes one.
 var iconName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*-symbolic$`)
-
-// brandIcons are the bundled logos that are no Lucide glyph: Simple
-// Icons' brands, and the distro logos Simple Icons lacks.
-var brandIcons = []string{"cm-cachyos-symbolic", "cm-nobara-symbolic"}
 
 // bundledIcons are the icon names resources.Icons carries.
 func bundledIcons(t *testing.T) map[string]bool {
@@ -104,11 +100,16 @@ func unbundled(names map[string]string, bundled map[string]bool) []string {
 // is one lys-shell bundles: none points at a set it no longer ships or
 // at a desktop theme that may not be installed.
 func TestEveryIconTheCodeNamesIsBundled(t *testing.T) {
-	root, err := filepath.Abs("..")
+	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
 	}
 	names := moduleIconNames(t, root)
+	desktop, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "github.com/stubbedev/lys-desktop").Output()
+	if err != nil {
+		t.Fatalf("locate the lys-desktop module: %v", err)
+	}
+	maps.Copy(names, moduleIconNames(t, strings.TrimSpace(string(desktop))))
 	if len(names) < 100 {
 		t.Fatalf("found only %d icon names in the module; the scan is broken", len(names))
 	}
@@ -132,34 +133,5 @@ func TestUnbundledReportsWhatTheBundleLacks(t *testing.T) {
 	want := []string{"folder-symbolic at p.go:2:36", "tb-minus-symbolic at p.go:2:15"}
 	if !slices.Equal(got, want) {
 		t.Errorf("unbundled = %q, want %q", got, want)
-	}
-}
-
-// The bundle is Lucide's UI glyphs and brand logos only: Lucide has no
-// brands, so those are Simple Icons' and the distro logos it lacks.
-func TestBundledIconsAreLucideOrBrands(t *testing.T) {
-	for _, name := range slices.Sorted(maps.Keys(bundledIcons(t))) {
-		if strings.HasPrefix(name, "ld-") || strings.HasPrefix(name, "si-") || slices.Contains(brandIcons, name) {
-			continue
-		}
-		t.Errorf("%s is neither Lucide nor a brand logo", name)
-	}
-}
-
-// Each icon set the bundle draws from ships its licence beside it, and
-// no licence outlives its set.
-func TestBundledLicencesMatchTheSets(t *testing.T) {
-	entries, err := os.ReadDir("icons")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var licences []string
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), "-LICENSE") {
-			licences = append(licences, e.Name())
-		}
-	}
-	if want := []string{"LUCIDE-LICENSE", "SIMPLE-ICONS-LICENSE"}; !slices.Equal(licences, want) {
-		t.Errorf("licences = %v, want %v", licences, want)
 	}
 }

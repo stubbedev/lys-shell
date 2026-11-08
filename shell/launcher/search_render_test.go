@@ -18,6 +18,7 @@ import (
 	"github.com/stubbedev/lys-desktop/desktopentry"
 	"github.com/stubbedev/lys-desktop/i18n"
 	"github.com/stubbedev/lys-desktop/icons"
+	"github.com/stubbedev/lys-desktop/resources"
 	"github.com/stubbedev/lys-desktop/shell/apptheme"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/anim"
@@ -79,7 +80,11 @@ func alphaAt(data []byte, x, y int) byte { return data[(y*renderW+x)*4+3] }
 
 func useBundledIcons(t *testing.T) {
 	t.Helper()
-	widget.SetIconSearchPaths([]string{"../../resources/icons"})
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, resources.Icons); err != nil {
+		t.Fatal(err)
+	}
+	widget.SetIconSearchPaths([]string{filepath.Join(dir, "icons")})
 	widget.SetIconNamespace(icons.IconsSubdir, icons.AllPrefixes())
 	t.Cleanup(func() { widget.SetIconSearchPaths(nil) })
 }

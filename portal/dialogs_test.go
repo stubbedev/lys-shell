@@ -2,14 +2,17 @@ package portal
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"os/user"
+	"path"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strconv"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/resources"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
@@ -243,7 +246,7 @@ func TestRequestInstallTokenFollowsTheAllowlist(t *testing.T) {
 // draw on any icon theme.
 func TestConsentIconsAreBundled(t *testing.T) {
 	for _, name := range []string{screenshotIcon, remoteDesktopIcon, shortcutsIcon} {
-		if _, err := os.Stat(filepath.Join("..", "resources", "icons", "hicolor", "scalable", "actions", name+".svg")); err != nil {
+		if _, err := fs.Stat(resources.Icons, path.Join(resources.IconsDir, name+".svg")); err != nil {
 			t.Errorf("consent icon %q is not bundled: %v", name, err)
 		}
 	}

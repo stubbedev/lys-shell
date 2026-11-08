@@ -10,8 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-desktop/icons"
 	"github.com/stubbedev/lys-desktop/icons/icontest"
-
-	"github.com/stubbedev/lys-shell/resources"
+	"github.com/stubbedev/lys-desktop/resources"
 )
 
 // TestIconsCLIMatchesRust replays testdata/icons/steps.txt, the session

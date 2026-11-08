@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-desktop/resources"
 	"github.com/stubbedev/lys-desktop/service/clipboard"
 	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-desktop/styling"
@@ -622,7 +625,7 @@ func rowCount(w widget.Widget) int {
 
 func assertBundledIcon(t *testing.T, name string) {
 	t.Helper()
-	if _, err := os.Stat(filepath.Join("..", "..", "resources", "icons", "hicolor", "scalable", "actions", name+".svg")); err != nil {
+	if _, err := fs.Stat(resources.Icons, path.Join(resources.IconsDir, name+".svg")); err != nil {
 		t.Errorf("icon %q is not bundled: %v", name, err)
 	}
 }
