@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-desktop v0.0.0-20261108181812-279e1cf35d4c
+	github.com/stubbedev/lys-desktop v0.0.0-20261108184833-48f461a1e687
 	github.com/stubbedev/lys-lib v0.3.15-0.20261108181347-7a8c33f6efd8
 	github.com/stubbedev/lys-secrets v0.3.16-0.20261108181645-747bc0efda16
 	github.com/stubbedev/lys-ui v0.2.19-0.20261108181740-e2ea7b956a2a
