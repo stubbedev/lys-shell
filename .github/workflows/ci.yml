@@ -210,10 +210,25 @@ jobs:
             - name: The shell on a live lys-wm
               run: nix build -L --accept-flake-config .#checks.x86_64-linux.lys-shell-lys-wm-vm
 
+    lys-wm-screencast-vm:
+        name: lys-wm screencast VM
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - uses: stubbedev/lys-ci/.github/actions/nix-setup@bf3da3ebd3253f33f2f7696b4284986772da635f
+              with:
+                github-token: ${{ secrets.GITHUB_TOKEN }}
+            - name: A screen shared through the portal, on lys-wm
+              run: nix build -L --accept-flake-config .#checks.x86_64-linux.lys-shell-lys-wm-screencast-vm
+
     ci-status:
         name: CI Status
         if: always()
-        needs: [check, race, package, rpm, nix, hyprland-vm, lys-wm-vm]
+        needs: [check, race, package, rpm, nix, hyprland-vm, lys-wm-vm, lys-wm-screencast-vm]
         runs-on: ubuntu-latest
         steps:
             - name: Check results
@@ -224,7 +239,8 @@ jobs:
                         "${{ needs.rpm.result }}" != "success" || \
                         "${{ needs.nix.result }}" != "success" || \
                         "${{ needs.hyprland-vm.result }}" != "success" || \
-                        "${{ needs.lys-wm-vm.result }}" != "success" ]]; then
+                        "${{ needs.lys-wm-vm.result }}" != "success" || \
+                        "${{ needs.lys-wm-screencast-vm.result }}" != "success" ]]; then
                     echo "One or more checks did not pass"
                     exit 1
                   fi

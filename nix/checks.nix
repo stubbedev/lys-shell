@@ -26,6 +26,14 @@
             inherit self;
             inherit (inputs) lys-wm lys-login;
           };
+          # A screen shared through this shell's portal, on lys-wm's harness.
+          lys-shell-lys-wm-screencast-vm = inputs.lys-wm.lib.screencast {
+            inherit pkgs;
+            module = inputs.lys-wm.nixosModules.default;
+            lysShell = self.nixosModules.default;
+            portal = "lys-shell";
+            seconds = 10;
+          };
         }
         // {
           # Every wrapped binary finds the Vulkan loader: lys-ui renders on
