@@ -371,6 +371,7 @@ func lookContext(t *testing.T) ModuleContext {
 	t.Helper()
 	ctx := fixtureContext(t)
 	ctx.Notifications = notifications.NewService()
+	t.Cleanup(func() { ctx.Notifications.FlushWrites(5 * time.Second) })
 	ctx.Notifications.SetDND(true)
 	ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true, CanGoPrevious: true})

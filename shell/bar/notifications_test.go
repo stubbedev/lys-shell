@@ -3,6 +3,7 @@ package bar
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
 
@@ -60,6 +61,7 @@ func TestNotificationModuleFollowsService(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	ctx.Notifications = notifications.NewService()
+	t.Cleanup(func() { ctx.Notifications.FlushWrites(5 * time.Second) })
 
 	module, err := Create("notifications", ctx)
 	if err != nil {

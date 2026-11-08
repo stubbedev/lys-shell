@@ -140,6 +140,7 @@ func TestDashboardQuickActionsDriveTheServices(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Notifications = notifications.NewService()
+	t.Cleanup(func() { ctx.Notifications.FlushWrites(5 * time.Second) })
 	ctx.Notifications.SetDND(false)
 	ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})
