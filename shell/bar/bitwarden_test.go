@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
