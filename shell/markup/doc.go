@@ -107,7 +107,7 @@ func (d *Doc) nextNumber() int {
 
 // Undo takes the newest mark back, reporting whether there was one.
 func (d *Doc) Undo() bool {
-	if d.applied == 0 {
+	if !d.CanUndo() {
 		return false
 	}
 	d.applied--
@@ -116,12 +116,18 @@ func (d *Doc) Undo() bool {
 
 // Redo reapplies the mark undo took back last, reporting whether there was one.
 func (d *Doc) Redo() bool {
-	if d.applied == len(d.marks) {
+	if !d.CanRedo() {
 		return false
 	}
 	d.applied++
 	return true
 }
+
+// CanUndo reports whether a mark is in effect to take back.
+func (d *Doc) CanUndo() bool { return d.applied > 0 }
+
+// CanRedo reports whether undo took back a mark to reapply.
+func (d *Doc) CanRedo() bool { return d.applied < len(d.marks) }
 
 // Crop is the part of the image that is kept: the newest crop, else all of it.
 func (d *Doc) Crop() image.Rectangle {

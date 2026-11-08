@@ -90,7 +90,7 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 			})
 		},
 	}}
-	s.shots = newShotUI(application, outputs, current, focus.FocusedOutput, sans, copyImage)
+	s.shots = newShotUI(application, outputs, current, focus.FocusedOutput, sans, put)
 	s.shots.wire(s.host)
 	windows := regionoverlay.NewWindowPick(application, gate, outputs, font, sheet)
 	s.picker = sharepicker.New(application, sharepicker.Deps{Config: current, Font: sans, Sheet: sheet, Describe: describeApp}, gate, region, windows)

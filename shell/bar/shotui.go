@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/transfer"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/config"
@@ -26,16 +27,16 @@ type shotUI struct {
 	current func() *config.Config
 	focused func() (string, bool)
 	font    render.Font
-	copy    func(image.Image) (func(), error)
+	copy    func(transfer.Content) (func(), error)
 
 	thumb   *shotthumb.Thumbnail
 	holders map[render.ImageID]int
 	saved   map[render.ImageID]screenshot.Saved
 }
 
-// newShotUI shows saved captures; copyOnLoop puts an image on the
+// newShotUI shows saved captures; copyOnLoop puts content on the
 // clipboard and is called on the loop.
-func newShotUI(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, copyOnLoop func(image.Image) (func(), error)) *shotUI {
+func newShotUI(application *app.Application, outputs func() []*app.Output, current func() *config.Config, focused func() (string, bool), font render.Font, copyOnLoop func(transfer.Content) (func(), error)) *shotUI {
 	u := &shotUI{
 		app: application, outputs: outputs, current: current, focused: focused, font: font, copy: copyOnLoop,
 		holders: map[render.ImageID]int{}, saved: map[render.ImageID]screenshot.Saved{},
@@ -119,27 +120,50 @@ func (u *shotUI) discard(shot shotthumb.Shot) {
 
 func (u *shotUI) edit(shot shotthumb.Shot) {
 	u.holders[shot.Image.ID]++
-	save := func(img *image.RGBA, path string) error {
-		if err := screenshot.WritePNG(img, path); err != nil {
-			return err
-		}
-		if _, err := u.copy(img); err != nil {
-			log.Printf("screenshot: copying the edited image: %v", err)
-		}
-		return nil
-	}
 	_, err := markup.Open(markup.Deps{
 		App:     u.app,
 		Font:    u.font,
 		Px:      toolbarPx,
 		Palette: markupPalette(u.current().Styling),
-		Save:    save,
-		SaveAs:  func(img *image.RGBA, path string) error { return screenshot.WritePNG(img, path) },
+		Save:    u.writer(true),
+		SaveAs:  u.writer(false),
 		Closed:  func() { u.release(shot) },
 	}, shot.Image, shot.Path)
 	if err != nil {
 		log.Printf("screenshot: markup editor: %v", err)
 		u.release(shot)
+	}
+}
+
+// writer encodes and writes an edited image off the loop and, when
+// copies, puts it on the clipboard back on the loop. A failed copy is
+// logged: the image is saved all the same.
+func (u *shotUI) writer(copies bool) markup.Writer {
+	return func(img *image.RGBA, path string, done func(error)) {
+		go func() {
+			err := screenshot.WritePNG(img, path)
+			var content transfer.Content
+			var encodeErr error
+			if err == nil && copies {
+				content, encodeErr = transfer.Image(img)
+			}
+			u.app.Invoke(func() {
+				if err == nil && copies {
+					u.copyEdited(content, encodeErr)
+				}
+				done(err)
+			})
+		}()
+	}
+}
+
+func (u *shotUI) copyEdited(content transfer.Content, encodeErr error) {
+	err := encodeErr
+	if err == nil {
+		_, err = u.copy(content)
+	}
+	if err != nil {
+		log.Printf("screenshot: copying the edited image: %v", err)
 	}
 }
 

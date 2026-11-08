@@ -1,6 +1,7 @@
 package markup
 
 import (
+	"fmt"
 	"image"
 	"log"
 	"path/filepath"
@@ -21,6 +22,7 @@ const (
 	editorAppID = "lys-shell-markup"
 	swatchPx    = 18
 	canvasPad   = 16
+	ghostAlpha  = 0.5
 )
 
 var (
@@ -39,13 +41,19 @@ type Deps struct {
 	Px   float64
 	// Palette is the colors the toolbar offers, the first one picked.
 	Palette []render.Color
-	// Save writes the flattened image over path, atomically, and copies it.
-	Save func(img *image.RGBA, path string) error
-	// SaveAs writes the flattened image to a path the user picked.
-	SaveAs func(img *image.RGBA, path string) error
+	// Save writes the flattened image over path, atomically, and copies
+	// it, off the loop; done runs on the loop with the outcome.
+	Save Writer
+	// SaveAs writes the flattened image to a path the user picked, as
+	// Save does.
+	SaveAs Writer
 	// Closed runs once the window is gone, whatever closed it.
 	Closed func()
 }
+
+// Writer writes img to path without blocking the loop and calls done on
+// the loop once it is written or has failed.
+type Writer func(img *image.RGBA, path string, done func(error))
 
 // Editor is one open markup window. Its methods run on the loop goroutine.
 type Editor struct {
@@ -58,8 +66,11 @@ type Editor struct {
 	color render.Color
 	size  int
 
-	tools  map[Tool]*widget.ToggleButton
-	closed bool
+	tools      map[Tool]*widget.ToggleButton
+	undo, redo *widget.Button
+	status     *widget.Label
+	saving     bool
+	closed     bool
 }
 
 // Open shows the editor over base, the captured image saved at path. It
@@ -69,7 +80,7 @@ func Open(d Deps, base render.StillImage, path string) (*Editor, error) {
 	if len(d.Palette) > 0 {
 		e.color = d.Palette[0]
 	}
-	e.view = &canvasView{e: e}
+	e.view = newCanvasView(e)
 	root := widget.NewBox(widget.Column, 0, 0)
 	root.Append(e.toolbar(), false)
 	root.Append(e.view, true)
@@ -123,56 +134,88 @@ func (e *Editor) SetTool(t Tool) {
 	if b, ok := e.tools[t]; ok && !b.Active() {
 		b.SetActive(true)
 	}
+	e.view.Invalidate()
 }
 
 // Save flattens the marks into the image, writes it over the capture and
-// closes the editor; a failed write keeps it open and is returned.
-func (e *Editor) Save() error {
-	e.view.commitText()
-	if err := e.d.Save(Flatten(e.doc, e.d.Font), e.path); err != nil {
-		return err
-	}
-	e.Close()
-	return nil
-}
+// closes the editor once written; a failed write keeps it open with the
+// error shown.
+func (e *Editor) Save() { e.write(e.d.Save, e.path) }
 
-// SaveAs asks where to save a copy and writes it there.
+// SaveAs asks where to save a copy and writes it there as Save does.
 func (e *Editor) SaveAs() {
 	e.view.commitText()
-	img := Flatten(e.doc, e.d.Font)
 	_, err := e.d.App.SaveFileDialog(e.win, app.SaveDialogConfig{
 		Title:     i18n.T("screenshot-editor-save-as"),
 		StartDir:  filepath.Dir(e.path),
 		StartName: filepath.Base(e.path),
-		OnSave: func(path string) {
-			if err := e.d.SaveAs(img, path); err != nil {
-				log.Printf("markup: %v", err)
-				return
-			}
-			e.Close()
-		},
+		OnSave:    func(path string) { e.write(e.d.SaveAs, path) },
 	})
 	if err != nil {
-		log.Printf("markup: save as: %v", err)
+		e.fail(fmt.Errorf("save as: %w", err))
 	}
+}
+
+// Saving reports whether a write is under way; the editor takes no
+// edits until it ends.
+func (e *Editor) Saving() bool { return e.saving }
+
+func (e *Editor) write(w Writer, path string) {
+	if e.saving || e.closed {
+		return
+	}
+	e.view.commitText()
+	e.saving = true
+	e.status.SetText("")
+	w(Flatten(e.doc, e.d.Font), path, func(err error) {
+		e.saving = false
+		if e.closed {
+			return
+		}
+		if err != nil {
+			e.fail(err)
+			return
+		}
+		e.Close()
+	})
+}
+
+func (e *Editor) fail(err error) {
+	log.Printf("markup: %v", err)
+	e.status.SetText(err.Error())
 }
 
 // Undo takes the newest mark back.
 func (e *Editor) Undo() {
 	e.view.commitText()
 	if e.doc.Undo() {
-		e.view.Invalidate()
+		e.changed()
 	}
 }
 
 // Redo reapplies the last mark undo took back.
 func (e *Editor) Redo() {
 	if e.doc.Redo() {
-		e.view.Invalidate()
+		e.changed()
 	}
 }
 
+func (e *Editor) push(m Mark) {
+	if e.doc.Push(m) {
+		e.changed()
+	}
+}
+
+func (e *Editor) changed() {
+	e.undo.SetEnabled(e.doc.CanUndo())
+	e.redo.SetEnabled(e.doc.CanRedo())
+	e.view.Invalidate()
+}
+
 func (e *Editor) key(a app.Accel) bool {
+	if e.saving {
+		return true
+	}
 	ctrl := a.Mods&app.ModCtrl != 0
 	shift := a.Mods&app.ModShift != 0
 	switch {
@@ -185,11 +228,11 @@ func (e *Editor) key(a app.Accel) bool {
 	case e.view.typing != nil:
 		return false
 	case a.Sym == xkb.KeyReturn || a.Sym == xkb.KeyKPEnter:
-		if err := e.Save(); err != nil {
-			log.Printf("markup: %v", err)
-		}
+		e.Save()
 	case a.Sym == xkb.KeyEscape:
-		e.Close()
+		if !e.view.cancelDrag() {
+			e.Close()
+		}
 	default:
 		return false
 	}
@@ -253,14 +296,17 @@ func (e *Editor) toolbar() widget.Widget {
 		bar.Append(b, false)
 	}
 	bar.Append(separator(), false)
-	bar.Append(actionButton("ld-undo-2-symbolic", "screenshot-editor-undo", px, e.Undo), false)
-	bar.Append(actionButton("ld-redo-2-symbolic", "screenshot-editor-redo", px, e.Redo), false)
-	bar.Append(widget.NewBox(widget.Row, 0, 0), true)
-	bar.Append(actionButton("ld-save-symbolic", "screenshot-editor-save", px, func() {
-		if err := e.Save(); err != nil {
-			log.Printf("markup: %v", err)
-		}
-	}), false)
+	e.undo = actionButton("ld-undo-2-symbolic", "screenshot-editor-undo", px, e.Undo)
+	e.redo = actionButton("ld-redo-2-symbolic", "screenshot-editor-redo", px, e.Redo)
+	e.undo.SetEnabled(false)
+	e.redo.SetEnabled(false)
+	bar.Append(e.undo, false)
+	bar.Append(e.redo, false)
+	e.status = widget.NewLabel(e.d.Font, e.d.Px, "", 0)
+	e.status.SetEllipsize(widget.EllipsizeEnd)
+	e.status.SetAlignment(render.AlignEnd)
+	bar.Append(e.status, true)
+	bar.Append(actionButton("ld-save-symbolic", "screenshot-editor-save", px, e.Save), false)
 	return bar
 }
 
@@ -330,13 +376,54 @@ type canvasView struct {
 	e       *Editor
 	pending *Mark
 	typing  *Mark
+	hover   *image.Point
+}
+
+func newCanvasView(e *Editor) *canvasView {
+	c := &canvasView{e: e}
+	c.SetOnHoverWithin(func(on bool) {
+		if !on && c.hover != nil {
+			c.hover = nil
+			c.Invalidate()
+		}
+	})
+	return c
 }
 
 func (c *canvasView) Measure(widget.Axis, int) widget.Sizes { return widget.Sizes{} }
 
 func (c *canvasView) HitTest(p widget.Point) widget.Widget { return c.HitLeaf(c, p) }
 
-func (c *canvasView) CursorName() string { return "crosshair" }
+// CursorName is the caret for typing a text mark and the crosshair for
+// placing every other mark.
+func (c *canvasView) CursorName() string {
+	if c.e != nil && c.e.tool == ToolText {
+		return "text"
+	}
+	return "crosshair"
+}
+
+// HoverMove follows the pointer over the image, where a marker shows the
+// mark a click would place.
+func (c *canvasView) HoverMove(p widget.Point) {
+	if c.e == nil {
+		return
+	}
+	ip, on := c.overImage(p)
+	if !on {
+		if c.hover != nil {
+			c.hover = nil
+			c.Invalidate()
+		}
+		return
+	}
+	if c.hover == nil || *c.hover != ip {
+		c.hover = &ip
+		if c.e.tool == ToolMarker {
+			c.Invalidate()
+		}
+	}
+}
 
 func (c *canvasView) KeyAction(a widget.KeyAction, _ widget.Mods) {
 	if c.typing == nil {
@@ -369,9 +456,20 @@ func (c *canvasView) commitText() {
 	if c.typing == nil || c.e == nil {
 		return
 	}
-	c.e.doc.Push(*c.typing)
+	m := *c.typing
 	c.typing = nil
+	c.e.push(m)
 	c.Invalidate()
+}
+
+// cancelDrag drops the mark a drag is drawing, reporting whether one was.
+func (c *canvasView) cancelDrag() bool {
+	if c.pending == nil {
+		return false
+	}
+	c.pending = nil
+	c.Invalidate()
+	return true
 }
 
 func (c *canvasView) fit() View {
@@ -396,8 +494,14 @@ func (c *canvasView) imagePoint(p widget.Point) image.Point {
 	return image.Pt(min(max(ip.X, b.Min.X), b.Max.X), min(max(ip.Y, b.Min.Y), b.Max.Y))
 }
 
+// overImage is the image pixel under p, and whether p is over the image.
+func (c *canvasView) overImage(p widget.Point) (image.Point, bool) {
+	ip := c.fit().Image(float64(p.X), float64(p.Y))
+	return ip, ip.In(c.e.doc.Base().Bounds())
+}
+
 func (c *canvasView) PressAt(p widget.Point) {
-	if c.e == nil {
+	if c.e == nil || c.e.saving {
 		return
 	}
 	c.commitText()
@@ -409,7 +513,7 @@ func (c *canvasView) PressAt(p widget.Point) {
 		c.typing = &m
 	case ToolMarker:
 		m.Points = m.Points[:1]
-		c.e.doc.Push(m)
+		c.e.push(m)
 	case ToolFreehand:
 		m.Points = m.Points[:1]
 		c.pending = &m
@@ -438,9 +542,18 @@ func (c *canvasView) PressEnd() {
 	if c.pending == nil || c.e == nil {
 		return
 	}
-	c.e.doc.Push(*c.pending)
+	m := *c.pending
 	c.pending = nil
+	c.e.push(m)
 	c.Invalidate()
+}
+
+// ghost is the marker a click would place under the pointer.
+func (c *canvasView) ghost() (Mark, bool) {
+	if c.e.tool != ToolMarker || c.hover == nil || c.pending != nil {
+		return Mark{}, false
+	}
+	return c.e.doc.Prepare(Mark{Tool: ToolMarker, Points: []image.Point{*c.hover}, Color: c.e.color, Size: c.e.size}), true
 }
 
 func (c *canvasView) Paint(cv *render.Canvas) {
@@ -454,6 +567,11 @@ func (c *canvasView) Paint(cv *render.Canvas) {
 	Paint(cv, doc.Marks(), v, c.e.d.Font)
 	if c.pending != nil && c.pending.Tool != ToolCrop {
 		PaintMark(cv, doc.Prepare(*c.pending), v, c.e.d.Font)
+	}
+	if g, ok := c.ghost(); ok {
+		prev := cv.PushAlpha(ghostAlpha)
+		PaintMark(cv, g, v, c.e.d.Font)
+		cv.PopAlpha(prev)
 	}
 	if c.typing != nil {
 		PaintMark(cv, *c.typing, v, c.e.d.Font)
