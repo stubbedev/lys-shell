@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
@@ -140,7 +141,7 @@ func TestDashboardQuickActionsDriveTheServices(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	ctx.Notifications = notifications.NewService()
 	ctx.Notifications.SetDND(false)
-	ctx.IdleInhibit = idleinhibit.NewState(idleinhibit.Duration{})
+	ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})
 	v := dashboardDropdown(ctx).(*dashboardView)
 	if len(v.refreshers) == 0 {

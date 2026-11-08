@@ -1,4 +1,4 @@
-package recorder
+package devicechoice
 
 import (
 	"os"

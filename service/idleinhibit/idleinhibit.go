@@ -4,10 +4,7 @@
 package idleinhibit
 
 import (
-	"errors"
-	"fmt"
 	"maps"
-	"math"
 	"strconv"
 	"sync"
 	"time"
@@ -15,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-lib/intconv"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 // D-Bus identity.
@@ -23,36 +21,6 @@ const (
 	ServicePath = "/dev/stubbe/lys/IdleInhibit"
 )
 
-// MaxMinutes is the longest duration: its seconds, which the timer
-// counts and the Remaining property reports, still fit a uint32.
-const MaxMinutes = math.MaxUint32 / 60
-
-// ErrDurationRange is a duration outside 0-MaxMinutes.
-var ErrDurationRange = errors.New("idle inhibit duration out of range")
-
-// Duration is a timed inhibition's length in whole minutes, 0 for
-// indefinite. NewDuration is the only way to a non-zero one, so it
-// never exceeds MaxMinutes.
-type Duration struct{ minutes uint32 }
-
-// NewDuration validates minutes, refusing a negative count or one above
-// MaxMinutes with ErrDurationRange.
-func NewDuration(minutes int64) (Duration, error) {
-	if minutes < 0 || minutes > MaxMinutes {
-		return Duration{}, fmt.Errorf("%w: %d minutes, valid 0-%d", ErrDurationRange, minutes, MaxMinutes)
-	}
-	return Duration{minutes: uint32(minutes)}, nil
-}
-
-// Minutes is the length in minutes, 0 for indefinite.
-func (d Duration) Minutes() uint32 { return d.minutes }
-
-// Seconds is the length in seconds, 0 for indefinite.
-func (d Duration) Seconds() uint32 { return d.minutes * 60 }
-
-// Indefinite reports the zero duration, which has no timer.
-func (d Duration) Indefinite() bool { return d.minutes == 0 }
-
 // State is the reactive state: whether the user's inhibition runs,
 // the stored duration in minutes (0 = indefinite), the seconds left on
 // the timer when one is running, and the holds apps (through the
@@ -60,7 +28,7 @@ func (d Duration) Indefinite() bool { return d.minutes == 0 }
 type State struct {
 	mu            sync.Mutex
 	active        bool
-	duration      Duration
+	duration      inhibitduration.Duration
 	remainingSecs uint32
 	timerStop     chan struct{}
 	holds         map[uint32]Hold
@@ -75,7 +43,7 @@ type Hold struct {
 }
 
 // NewState starts with the given duration and inhibition off.
-func NewState(duration Duration) *State {
+func NewState(duration inhibitduration.Duration) *State {
 	return &State{duration: duration}
 }
 
@@ -87,7 +55,7 @@ func (s *State) Active() bool {
 }
 
 // Duration returns the stored duration.
-func (s *State) Duration() Duration {
+func (s *State) Duration() inhibitduration.Duration {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.duration
@@ -200,7 +168,7 @@ func (s *State) Disable() {
 }
 
 // SetDuration stores the duration; an active run restarts on it.
-func (s *State) SetDuration(duration Duration) {
+func (s *State) SetDuration(duration inhibitduration.Duration) {
 	s.mu.Lock()
 	s.setDurationLocked(duration)
 	s.mu.Unlock()
@@ -209,7 +177,7 @@ func (s *State) SetDuration(duration Duration) {
 
 // setDurationLocked stores the duration and restarts an active run on
 // it. The caller holds mu.
-func (s *State) setDurationLocked(duration Duration) {
+func (s *State) setDurationLocked(duration inhibitduration.Duration) {
 	s.duration = duration
 	if !s.active {
 		return
@@ -226,7 +194,7 @@ func (s *State) setDurationLocked(duration Duration) {
 // ErrDurationRange and the duration stays.
 func (s *State) AdjustDuration(deltaMinutes int32) error {
 	s.mu.Lock()
-	next, err := NewDuration(max(int64(s.duration.minutes)+int64(deltaMinutes), 0))
+	next, err := inhibitduration.NewDuration(max(int64(s.duration.Minutes())+int64(deltaMinutes), 0))
 	if err != nil {
 		s.mu.Unlock()
 		return err
@@ -343,7 +311,7 @@ func pad2(v uint32) string {
 // Snapshot is the status view the CLI prints.
 type Snapshot struct {
 	Active     bool
-	Duration   Duration
+	Duration   inhibitduration.Duration
 	RemainingS uint32
 }
 

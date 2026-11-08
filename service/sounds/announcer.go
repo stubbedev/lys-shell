@@ -9,29 +9,8 @@ import (
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/sounds/soundpolicy"
 )
-
-// Mode is which notifications make a sound.
-type Mode uint8
-
-// The modes.
-const (
-	Off Mode = iota
-	Critical
-	All
-)
-
-// Policy is the sound configuration.
-type Policy struct {
-	Mode Mode
-	// Default is the theme sound a notification without a sound hint
-	// plays, and what a sound name the theme lacks falls back to.
-	Default string
-	// MuteApps are app-name or desktop-entry globs that never sound.
-	MuteApps []string
-	// Volume is the sounds' linear level, 1 playing them as recorded.
-	Volume float64
-}
 
 // Player plays a sample through the audio server's cache, loading it on
 // the first play (*pulse.Service).
@@ -52,7 +31,7 @@ type Announcer struct {
 	decode func(string) (native.Sample, error)
 
 	mu      sync.Mutex
-	policy  Policy
+	policy  soundpolicy.Policy
 	found   map[string]string
 	missed  map[string]bool
 	decodes int
@@ -60,12 +39,12 @@ type Announcer struct {
 
 // NewAnnouncer plays notification sounds of svc through player, sound
 // names resolving in theme; muted reports the default sink muted.
-func NewAnnouncer(svc *notifications.Service, player Player, theme Theme, muted func() bool, policy Policy) *Announcer {
+func NewAnnouncer(svc *notifications.Service, player Player, theme Theme, muted func() bool, policy soundpolicy.Policy) *Announcer {
 	return &Announcer{svc: svc, player: player, theme: theme, muted: muted, decode: Decode, policy: policy, found: map[string]string{}, missed: map[string]bool{}}
 }
 
 // SetPolicy replaces the sound configuration.
-func (a *Announcer) SetPolicy(p Policy) {
+func (a *Announcer) SetPolicy(p soundpolicy.Policy) {
 	a.mu.Lock()
 	a.policy = p
 	a.mu.Unlock()
@@ -118,9 +97,9 @@ func (a *Announcer) load(path string) (native.Sample, error) {
 	return a.decode(path)
 }
 
-func (a *Announcer) sound(policy Policy, n *notifications.Notification) (path, event string, ok bool) {
+func (a *Announcer) sound(policy soundpolicy.Policy, n *notifications.Notification) (path, event string, ok bool) {
 	switch {
-	case policy.Mode == Off, policy.Mode == Critical && n.Urgency != notifications.UrgencyCritical:
+	case policy.Mode == soundpolicy.Off, policy.Mode == soundpolicy.Critical && n.Urgency != notifications.UrgencyCritical:
 		return "", "", false
 	case n.SuppressSound, !a.svc.Audible(n), a.muted():
 		return "", "", false

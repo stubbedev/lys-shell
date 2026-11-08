@@ -7,11 +7,11 @@ import (
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
-	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
 )
 
 func TestMicrophoneSources(t *testing.T) {
-	if got := microphoneSources(nil); len(got) != 1 || got[0] != (recorder.DeviceChoice{ID: "", Label: "Default"}) {
+	if got := microphoneSources(nil); len(got) != 1 || got[0] != (devicechoice.DeviceChoice{ID: "", Label: "Default"}) {
 		t.Errorf("no service = %v", got)
 	}
 	srv := pulsetest.New(t)
@@ -25,7 +25,7 @@ func TestMicrophoneSources(t *testing.T) {
 	}
 	defer func() { _ = svc.Close() }()
 	got := microphoneSources(svc)
-	want := []recorder.DeviceChoice{{ID: "", Label: "Default"}, {ID: "mic", Label: "Microphone"}, {ID: "usb", Label: "usb"}}
+	want := []devicechoice.DeviceChoice{{ID: "", Label: "Default"}, {ID: "mic", Label: "Microphone"}, {ID: "usb", Label: "usb"}}
 	if len(got) != len(want) {
 		t.Fatalf("= %v, want %v", got, want)
 	}

@@ -6,6 +6,8 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 // Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the
@@ -160,7 +162,7 @@ func (d *Daemon) SetRemaining(minutes uint32) *dbus.Error {
 // SetDuration stores the duration in minutes, refusing one above
 // MaxMinutes with InvalidArgs.
 func (d *Daemon) SetDuration(minutes uint32) *dbus.Error {
-	duration, err := NewDuration(int64(minutes))
+	duration, err := inhibitduration.NewDuration(int64(minutes))
 	if err != nil {
 		return dbusx.InvalidArgs(err.Error())
 	}

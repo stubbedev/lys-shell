@@ -10,11 +10,12 @@ import (
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
-func inhibitMinutes(t *testing.T, minutes int64) idleinhibit.Duration {
+func inhibitMinutes(t *testing.T, minutes int64) inhibitduration.Duration {
 	t.Helper()
-	d, err := idleinhibit.NewDuration(minutes)
+	d, err := inhibitduration.NewDuration(minutes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +35,7 @@ func TestIdleInhibitLabel(t *testing.T) {
 		t.Errorf("= %q", got)
 	}
 	// On, indefinite: the infinity sign for both.
-	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", true, idleinhibit.Duration{}, 0); got != i18n.T("bar-idle-inhibit-on")+" ∞ ∞" {
+	if got := idleInhibitLabel("{{ state }} {{ remaining }} {{ duration }}", true, inhibitduration.Duration{}, 0); got != i18n.T("bar-idle-inhibit-on")+" ∞ ∞" {
 		t.Errorf("= %q", got)
 	}
 }
@@ -142,7 +143,7 @@ type namedHost struct {
 // toggle or an app's hold, moves it when its bar closes, and drops it
 // when nothing asks any more.
 func TestIdleHolderFollowsTheStateAcrossBars(t *testing.T) {
-	state := idleinhibit.NewState(idleinhibit.Duration{})
+	state := idleinhibit.NewState(inhibitduration.Duration{})
 	var bound []app.Host
 	live := 0
 	h := &idleHolder{state: state, inhibit: func(host app.Host) (func(), error) {

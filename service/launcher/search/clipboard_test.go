@@ -14,6 +14,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/charnames"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
@@ -29,7 +30,7 @@ type fakeHistory struct {
 
 func newFakeHistory(t *testing.T, selections ...[2]string) *fakeHistory {
 	t.Helper()
-	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes*4, clipboard.MaxEntryBytes*4)
+	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes*4, historybudget.MaxEntryBytes*4)
 	if err != nil {
 		t.Fatal(err)
 	}

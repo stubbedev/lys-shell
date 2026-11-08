@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 // fakeSunset is a scripted sunsetEnv: a fake filter, a settable clock,
@@ -65,8 +66,8 @@ func (f *fakeSunset) env(t *testing.T) sunsetEnv {
 		},
 		now:      func() time.Time { return f.clock },
 		stateDir: t.TempDir(),
-		locate: func(context.Context) (nightlight.Location, error) {
-			return nightlight.Location{}, errors.New("no GeoClue in this test")
+		locate: func(context.Context) (nightschedule.Location, error) {
+			return nightschedule.Location{}, errors.New("no GeoClue in this test")
 		},
 		clockJumps: func(ctx context.Context, _ func()) error {
 			<-ctx.Done()
@@ -128,9 +129,9 @@ func unpinnedConfig() *config.Config {
 	return cfg
 }
 
-func mustLocation(t *testing.T, latitude, longitude float64) nightlight.Location {
+func mustLocation(t *testing.T, latitude, longitude float64) nightschedule.Location {
 	t.Helper()
-	loc, err := nightlight.NewLocation(latitude, longitude)
+	loc, err := nightschedule.NewLocation(latitude, longitude)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,7 +403,7 @@ func TestNightlightPinnedCoordinatesBeatGeoClue(t *testing.T) {
 			var asked atomic.Int32
 			located := make(chan struct{}, 8)
 			sydney := mustLocation(t, -33.87, 151.21)
-			env.locate = func(context.Context) (nightlight.Location, error) {
+			env.locate = func(context.Context) (nightschedule.Location, error) {
 				asked.Add(1)
 				located <- struct{}{}
 				return sydney, nil
@@ -576,7 +577,7 @@ func TestNightlightShowsABadCoordinatePair(t *testing.T) {
 	fake := &fakeSunset{clock: sunsetNight}
 	env := fake.env(t)
 	var asked atomic.Int32
-	env.locate = func(context.Context) (nightlight.Location, error) {
+	env.locate = func(context.Context) (nightschedule.Location, error) {
 		asked.Add(1)
 		return mustLocation(t, 55.6, 12.5), nil
 	}

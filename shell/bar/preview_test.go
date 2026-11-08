@@ -17,11 +17,12 @@ import (
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/network/secrets"
 	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
 	"github.com/stubbedev/lys-shell/service/weather"
 )
 
@@ -139,7 +140,7 @@ func dropdownFixtures() []dropdownFixture {
 		{"calendar", "calendar", func(_ *testing.T, ctx *ModuleContext) widget.Widget { return calendarDropdown(*ctx) }},
 		{"dashboard", "dashboard", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
 			ctx.Notifications = notifications.NewService()
-			ctx.IdleInhibit = idleinhibit.NewState(idleinhibit.Duration{})
+			ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 			ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})
 			return dashboardDropdown(*ctx)
 		}},
@@ -217,7 +218,7 @@ func dropdownFixtures() []dropdownFixture {
 			return notificationDropdown(*ctx)
 		}},
 		{"recorder", "recorder", func(t *testing.T, ctx *ModuleContext) widget.Widget {
-			rc, _, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
+			rc, _, _ := recorderTestCtx(t, []devicechoice.DeviceChoice{{ID: "", Label: "Automatic"}})
 			ctx.Config, ctx.SetConfig, ctx.Recorder = rc.Config, rc.SetConfig, rc.Recorder
 			return recorderDropdown(*ctx)
 		}},

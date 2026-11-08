@@ -1,6 +1,10 @@
 package notifications
 
-import "time"
+import (
+	"time"
+
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
+)
 
 // Verdict is what do-not-disturb lets a notification do.
 type Verdict uint8
@@ -21,7 +25,7 @@ func (s *Service) Verdict(n *Notification) Verdict {
 }
 
 func (s *Service) verdictLocked(n *Notification) Verdict {
-	if !s.focusLocked().On || s.focus.rules.allows(n) {
+	if !s.focusLocked().On || allows(s.focus.rules, n) {
 		return Popup
 	}
 	return HistoryOnly
@@ -77,7 +81,7 @@ func (s *Service) SetDNDUntil(until time.Time) {
 }
 
 // SetFocusRules replaces the do-not-disturb rules.
-func (s *Service) SetFocusRules(r FocusRules) {
+func (s *Service) SetFocusRules(r notifypolicy.FocusRules) {
 	s.mu.Lock()
 	s.focus.rules = r
 	s.refocusUnlock(false)

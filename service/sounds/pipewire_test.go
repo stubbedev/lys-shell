@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
+	"github.com/stubbedev/lys-shell/service/sounds/soundpolicy"
 )
 
 const pipewirePulseConf = `
@@ -152,7 +153,7 @@ func TestANotificationSoundPlaysOnAPrivatePipeWire(t *testing.T) {
 	}
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	svc := notifications.NewService()
-	a := NewAnnouncer(svc, audio, NewTheme("", []string{data}), func() bool { return false }, Policy{Mode: All, Default: "message-new-instant"})
+	a := NewAnnouncer(svc, audio, NewTheme("", []string{data}), func() bool { return false }, soundpolicy.Policy{Mode: soundpolicy.All, Default: "message-new-instant"})
 	a.Announce(&notifications.Notification{ID: 1, AppName: "chat", SoundName: "message-new-instant"})
 	a.Announce(&notifications.Notification{ID: 2, AppName: "chat", SoundName: "message-new-instant"})
 	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/idle"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 )
 
 // IdleConfig is the idle section: the shell's built-in idle policy.
@@ -65,19 +65,19 @@ func DefaultsIdle() IdleConfig {
 }
 
 // Policy is the section as the idle service runs it.
-func (c IdleConfig) Policy() idle.Policy {
-	var p idle.Policy
-	p.Timeouts[idle.Dim] = c.Dim.timeouts()
-	p.Timeouts[idle.Lock] = c.Lock.timeouts()
-	p.Timeouts[idle.ScreenOff] = c.ScreenOff.timeouts()
-	p.Timeouts[idle.Suspend] = c.Suspend.timeouts()
+func (c IdleConfig) Policy() idlepolicy.Policy {
+	var p idlepolicy.Policy
+	p.Timeouts[idlepolicy.Dim] = c.Dim.timeouts()
+	p.Timeouts[idlepolicy.Lock] = c.Lock.timeouts()
+	p.Timeouts[idlepolicy.ScreenOff] = c.ScreenOff.timeouts()
+	p.Timeouts[idlepolicy.Suspend] = c.Suspend.timeouts()
 	p.DimPercent = c.DimPercent.share
 	p.LockBeforeSleep = c.LockBeforeSleep
 	return p
 }
 
-func (t IdleTimeouts) timeouts() idle.Timeouts {
-	return idle.Timeouts{AC: t.AC.timeout, Battery: t.Battery.timeout}
+func (t IdleTimeouts) timeouts() idlepolicy.Timeouts {
+	return idlepolicy.Timeouts{AC: t.AC.timeout, Battery: t.Battery.timeout}
 }
 
 // idleNever is the spelling of a stage that does not run.
@@ -87,17 +87,17 @@ const idleNever = "never"
 // the compositor's idle notification counts rather than clamped.
 //
 // Idle time as a duration (`90s`, `5m`, `1h30m`) from 1s up, or `never`.
-type IdleTimeout struct{ timeout idle.Timeout }
+type IdleTimeout struct{ timeout idlepolicy.Timeout }
 
 func parseIdleTimeout(raw string) (IdleTimeout, error) {
 	if raw == idleNever {
-		return IdleTimeout{timeout: idle.Never}, nil
+		return IdleTimeout{timeout: idlepolicy.Never}, nil
 	}
 	d, err := time.ParseDuration(raw)
 	if err != nil {
 		return IdleTimeout{}, fmt.Errorf("idle timeout %q: want a duration such as 5m, or %s: %w", raw, idleNever, err)
 	}
-	t, err := idle.NewTimeout(d)
+	t, err := idlepolicy.NewTimeout(d)
 	if err != nil {
 		return IdleTimeout{}, err
 	}
@@ -113,7 +113,7 @@ func mustIdleTimeout(raw string) IdleTimeout {
 }
 
 // Timeout is the validated timeout.
-func (t IdleTimeout) Timeout() idle.Timeout { return t.timeout }
+func (t IdleTimeout) Timeout() idlepolicy.Timeout { return t.timeout }
 
 // UnmarshalConfig implements Unmarshaler.
 func (t *IdleTimeout) UnmarshalConfig(v any) error {
@@ -135,7 +135,7 @@ func (t IdleTimeout) MarshalConfig() any {
 	if !ok {
 		return idleNever
 	}
-	return idle.FormatDuration(d)
+	return idlepolicy.FormatDuration(d)
 }
 
 func (IdleTimeout) configSchema(*schemaGen) Schema {
@@ -149,10 +149,10 @@ func (IdleTimeout) configSchema(*schemaGen) Schema {
 // IdleDimPercent is the share of its level a dimmed backlight keeps.
 //
 // Percentage from 1 to 100.
-type IdleDimPercent struct{ share idle.DimPercent }
+type IdleDimPercent struct{ share idlepolicy.DimPercent }
 
 func mustIdleDimPercent(percent int64) IdleDimPercent {
-	d, err := idle.NewDimPercent(percent)
+	d, err := idlepolicy.NewDimPercent(percent)
 	if err != nil {
 		panic(err)
 	}
@@ -165,7 +165,7 @@ func (d *IdleDimPercent) UnmarshalConfig(v any) error {
 	if err != nil {
 		return err
 	}
-	share, err := idle.NewDimPercent(percent)
+	share, err := idlepolicy.NewDimPercent(percent)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 	"github.com/stubbedev/lys-shell/service/logind"
 )
 
@@ -38,7 +39,7 @@ var ErrNoLogind = errors.New("idle: logind is not connected")
 
 // Dim lowers every backlight to share of its level; the restore puts back
 // each level exactly as it was.
-func (s System) Dim(share DimPercent) (func() error, error) {
+func (s System) Dim(share idlepolicy.DimPercent) (func() error, error) {
 	if s.Backlights == nil {
 		return nil, nil
 	}

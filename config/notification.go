@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/stubbedev/lys-shell/service/notifications"
-	"github.com/stubbedev/lys-shell/service/sounds"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
+	"github.com/stubbedev/lys-shell/service/sounds/soundpolicy"
 )
 
 // NotificationConfig is ported from crates/wayle-config/src/schemas/modules/notification/mod.rs.
@@ -177,8 +177,8 @@ func DefaultsNotification() NotificationConfig {
 		SoundMuteApps:      []string{},
 		SoundVolume:        100,
 		IconSource:         IconSourceAutomatic,
-		HistoryMemory:      NotificationHistoryMemory{limit: notifications.DefaultMemoryLimit()},
-		HistoryStored:      NotificationHistoryStored{limit: notifications.DefaultStoredLimit()},
+		HistoryMemory:      NotificationHistoryMemory{limit: notifypolicy.DefaultMemoryLimit()},
+		HistoryStored:      NotificationHistoryStored{limit: notifypolicy.DefaultStoredLimit()},
 		PopupPosition:      PopupPositionTopRight,
 		PopupMaxVisible:    5,
 		PopupStackingOrder: StackingOrderNewestFirst,
@@ -323,10 +323,10 @@ const (
 // the history keeps in memory, refused at load outside its range.
 //
 // Notifications kept in memory.
-type NotificationHistoryMemory struct{ limit notifications.MemoryLimit }
+type NotificationHistoryMemory struct{ limit notifypolicy.MemoryLimit }
 
 // Limit is the validated bound.
-func (m NotificationHistoryMemory) Limit() notifications.MemoryLimit { return m.limit }
+func (m NotificationHistoryMemory) Limit() notifypolicy.MemoryLimit { return m.limit }
 
 // UnmarshalConfig implements Unmarshaler.
 func (m *NotificationHistoryMemory) UnmarshalConfig(v any) error {
@@ -334,7 +334,7 @@ func (m *NotificationHistoryMemory) UnmarshalConfig(v any) error {
 	if err != nil {
 		return err
 	}
-	limit, err := notifications.NewMemoryLimit(n)
+	limit, err := notifypolicy.NewMemoryLimit(n)
 	if err != nil {
 		return err
 	}
@@ -346,17 +346,17 @@ func (m *NotificationHistoryMemory) UnmarshalConfig(v any) error {
 func (m NotificationHistoryMemory) MarshalConfig() any { return int64(m.limit.Count()) }
 
 func (NotificationHistoryMemory) configSchema(*schemaGen) Schema {
-	return uint32RangeSchema(typeOf[NotificationHistoryMemory](), notifications.MinHistoryMemory, notifications.MaxHistoryMemory)
+	return uint32RangeSchema(typeOf[NotificationHistoryMemory](), notifypolicy.MinHistoryMemory, notifypolicy.MaxHistoryMemory)
 }
 
 // NotificationHistoryStored is how many notifications the history keeps
 // on disk, refused at load outside its range.
 //
 // Notifications kept on disk.
-type NotificationHistoryStored struct{ limit notifications.StoredLimit }
+type NotificationHistoryStored struct{ limit notifypolicy.StoredLimit }
 
 // Limit is the validated bound.
-func (m NotificationHistoryStored) Limit() notifications.StoredLimit { return m.limit }
+func (m NotificationHistoryStored) Limit() notifypolicy.StoredLimit { return m.limit }
 
 // UnmarshalConfig implements Unmarshaler.
 func (m *NotificationHistoryStored) UnmarshalConfig(v any) error {
@@ -364,7 +364,7 @@ func (m *NotificationHistoryStored) UnmarshalConfig(v any) error {
 	if err != nil {
 		return err
 	}
-	limit, err := notifications.NewStoredLimit(n)
+	limit, err := notifypolicy.NewStoredLimit(n)
 	if err != nil {
 		return err
 	}
@@ -376,7 +376,7 @@ func (m *NotificationHistoryStored) UnmarshalConfig(v any) error {
 func (m NotificationHistoryStored) MarshalConfig() any { return int64(m.limit.Count()) }
 
 func (NotificationHistoryStored) configSchema(*schemaGen) Schema {
-	return uint32RangeSchema(typeOf[NotificationHistoryStored](), notifications.MinHistoryStored, notifications.MaxHistoryStored)
+	return uint32RangeSchema(typeOf[NotificationHistoryStored](), notifypolicy.MinHistoryStored, notifypolicy.MaxHistoryStored)
 }
 
 // NotificationSounds is which notifications play a sound.
@@ -397,11 +397,11 @@ const (
 var _ = registerEnum(NotificationSoundsOff, NotificationSoundsCritical, NotificationSoundsAll)
 
 // SoundPolicy is the sound keys as the announcer applies them.
-func (c NotificationConfig) SoundPolicy() sounds.Policy {
-	modes := map[NotificationSounds]sounds.Mode{
-		NotificationSoundsOff:      sounds.Off,
-		NotificationSoundsCritical: sounds.Critical,
-		NotificationSoundsAll:      sounds.All,
+func (c NotificationConfig) SoundPolicy() soundpolicy.Policy {
+	modes := map[NotificationSounds]soundpolicy.Mode{
+		NotificationSoundsOff:      soundpolicy.Off,
+		NotificationSoundsCritical: soundpolicy.Critical,
+		NotificationSoundsAll:      soundpolicy.All,
 	}
-	return sounds.Policy{Mode: modes[c.Sounds], Default: c.SoundDefault, MuteApps: c.SoundMuteApps, Volume: float64(c.SoundVolume) / 100}
+	return soundpolicy.Policy{Mode: modes[c.Sounds], Default: c.SoundDefault, MuteApps: c.SoundMuteApps, Volume: float64(c.SoundVolume) / 100}
 }

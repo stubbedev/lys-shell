@@ -1,13 +1,14 @@
 package clipboard
 
 import (
-	"errors"
 	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/stubbedev/lys-ui/transfer"
+
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 )
 
 const textMime = "text/plain;charset=utf-8"
@@ -33,7 +34,7 @@ func mustHistory(t *testing.T, capacity, maxBytes, budget int) *History {
 
 func defaultHistory(t *testing.T) *History {
 	t.Helper()
-	return mustHistory(t, DefaultCapacity, MaxEntryBytes, DefaultBudget().Bytes())
+	return mustHistory(t, DefaultCapacity, historybudget.MaxEntryBytes, historybudget.DefaultBudget().Bytes())
 }
 
 // push remembers data, failing the test on an error.
@@ -97,7 +98,7 @@ func TestTheSameBytesUnderADifferentMimeIsADifferentEntry(t *testing.T) {
 }
 
 func TestTheOldestEntryFallsOffTheEnd(t *testing.T) {
-	h := mustHistory(t, 2, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 2, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	push(t, h, textMime, []byte("one"))
 	push(t, h, textMime, []byte("two"))
 	push(t, h, textMime, []byte("three"))
@@ -132,7 +133,7 @@ func TestSelectionsNotWorthRememberingAreRefused(t *testing.T) {
 }
 
 func TestAZeroCapacityHistoryRemembersNothing(t *testing.T) {
-	h := mustHistory(t, 0, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 0, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 
 	if _, ok := push(t, h, textMime, []byte("one")); ok || h.Len() != 0 {
 		t.Fatal("a zero-capacity history remembered something")
@@ -149,7 +150,7 @@ func TestNegativeBoundsAreAnError(t *testing.T) {
 }
 
 func TestAnAgedOutOrRemovedIDResolvesToNothing(t *testing.T) {
-	h := mustHistory(t, 1, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 1, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	old, _ := push(t, h, textMime, []byte("one"))
 	current, _ := push(t, h, textMime, []byte("two"))
 
@@ -498,7 +499,7 @@ func TestEveryDroppedEntryIsFreed(t *testing.T) {
 }
 
 func TestAListedEntryOutlivesItsEviction(t *testing.T) {
-	h := mustHistory(t, 1, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 1, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	push(t, h, URIListMime, []byte("file:///tmp/a.png\n"))
 	snap := h.Entries()
 
@@ -551,25 +552,8 @@ func TestBudgetsSmallerThanAnEntryAreRefused(t *testing.T) {
 	}
 }
 
-func TestBudgetRange(t *testing.T) {
-	for _, mib := range []int64{MinBudgetMiB, DefaultBudgetMiB, MaxBudgetMiB} {
-		b, err := NewBudget(mib)
-		if err != nil || b.MiB() != mib || b.Bytes() != int(mib)*MiB {
-			t.Errorf("%d MiB: %+v, %v", mib, b, err)
-		}
-	}
-	if b := DefaultBudget(); b.MiB() != DefaultBudgetMiB {
-		t.Errorf("default budget = %d MiB", b.MiB())
-	}
-	for _, mib := range []int64{MinBudgetMiB - 1, MaxBudgetMiB + 1, 0, -1} {
-		if _, err := NewBudget(mib); !errors.Is(err, ErrBudgetRange) {
-			t.Errorf("%d MiB: err = %v, want ErrBudgetRange", mib, err)
-		}
-	}
-	if MinBudgetMiB*MiB != MaxEntryBytes {
-		t.Errorf("the least budget, %d MiB, is not the largest entry, %d bytes", MinBudgetMiB, MaxEntryBytes)
-	}
-	if _, err := DefaultHistory(Budget{}, DefaultPinnedBudget()); err == nil {
+func TestAZeroBudgetBuildsNoHistory(t *testing.T) {
+	if _, err := DefaultHistory(historybudget.Budget{}, historybudget.DefaultPinnedBudget()); err == nil {
 		t.Error("a zero budget built a history")
 	}
 }

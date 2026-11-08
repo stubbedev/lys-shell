@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 // NotificationDndConfig is modules.notifications.dnd.
@@ -43,12 +43,12 @@ func DefaultsNotificationDnd() NotificationDndConfig {
 }
 
 // Rules is the section as the notification service applies it.
-func (c NotificationDndConfig) Rules() notifications.FocusRules {
-	schedule := make([]notifications.Window, len(c.Schedule))
+func (c NotificationDndConfig) Rules() notifypolicy.FocusRules {
+	schedule := make([]notifypolicy.Window, len(c.Schedule))
 	for i, w := range c.Schedule {
 		schedule[i] = w.window
 	}
-	return notifications.FocusRules{
+	return notifypolicy.FocusRules{
 		AllowCritical:   c.AllowCritical,
 		AllowApps:       c.AllowApps,
 		Schedule:        schedule,
@@ -98,7 +98,7 @@ func (d Weekday) weekday() time.Weekday {
 //
 // A stretch of time on some days of the week: `days` (every day when
 // left out), `from` and `to` as `HH:MM`.
-type DndWindow struct{ window notifications.Window }
+type DndWindow struct{ window notifypolicy.Window }
 
 // dndWindowFields is a DndWindow as written.
 type dndWindowFields struct {
@@ -111,11 +111,11 @@ type dndWindowFields struct {
 }
 
 func parseDndWindow(f dndWindowFields) (DndWindow, error) {
-	from, err := notifications.ParseClockTime(f.From)
+	from, err := notifypolicy.ParseClockTime(f.From)
 	if err != nil {
 		return DndWindow{}, fmt.Errorf("from: %w", err)
 	}
-	to, err := notifications.ParseClockTime(f.To)
+	to, err := notifypolicy.ParseClockTime(f.To)
 	if err != nil {
 		return DndWindow{}, fmt.Errorf("to: %w", err)
 	}
@@ -123,11 +123,11 @@ func parseDndWindow(f dndWindowFields) (DndWindow, error) {
 	if len(days) == 0 {
 		days = weekdays
 	}
-	var set notifications.DaySet
+	var set notifypolicy.DaySet
 	for _, d := range days {
 		set = set.With(d.weekday())
 	}
-	w, err := notifications.NewWindow(set, from, to)
+	w, err := notifypolicy.NewWindow(set, from, to)
 	if err != nil {
 		return DndWindow{}, err
 	}

@@ -15,9 +15,11 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-shell/service/pulse"
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
+	"github.com/stubbedev/lys-shell/service/sounds/soundpolicy"
 )
 
 type rig struct {
@@ -46,7 +48,7 @@ func (s *syncBuffer) String() string {
 	return s.b.String()
 }
 
-func newRig(t *testing.T, policy Policy) *rig {
+func newRig(t *testing.T, policy soundpolicy.Policy) *rig {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("PATH", "")
@@ -101,7 +103,7 @@ func h(kv ...any) map[string]dbus.Variant {
 }
 
 func TestASoundNamePlaysItsThemeFileOnceDecoded(t *testing.T) {
-	r := newRig(t, Policy{Mode: All, Default: "dialog-warning", Volume: 0.5})
+	r := newRig(t, soundpolicy.Policy{Mode: soundpolicy.All, Default: "dialog-warning", Volume: 0.5})
 	r.notify("chat", h("sound-name", "message-new-instant"))
 	r.notify("chat", h("sound-name", "message-new-instant"))
 	plays := r.srv.Plays()
@@ -124,13 +126,13 @@ func TestASoundNamePlaysItsThemeFileOnceDecoded(t *testing.T) {
 }
 
 func TestSuppressedDoNotDisturbedSharedMutedAndMutedAppsPlayNothing(t *testing.T) {
-	r := newRig(t, Policy{Mode: All, Default: "message-new-instant", MuteApps: []string{"spam*"}})
+	r := newRig(t, soundpolicy.Policy{Mode: soundpolicy.All, Default: "message-new-instant", MuteApps: []string{"spam*"}})
 	r.notify("chat", h("suppress-sound", true))
 	r.notify("spammer", nil)
 	r.muted = true
 	r.notify("chat", nil)
 	r.muted = false
-	r.svc.SetFocusRules(notifications.FocusRules{AllowCritical: true})
+	r.svc.SetFocusRules(notifypolicy.FocusRules{AllowCritical: true})
 	r.svc.SetDND(true)
 	r.notify("chat", nil)
 	r.svc.SetDND(false)
@@ -147,13 +149,13 @@ func TestSuppressedDoNotDisturbedSharedMutedAndMutedAppsPlayNothing(t *testing.T
 }
 
 func TestCriticalModeSoundsOnlyCriticalOnes(t *testing.T) {
-	r := newRig(t, Policy{Mode: Critical, Default: "message-new-instant"})
+	r := newRig(t, soundpolicy.Policy{Mode: soundpolicy.Critical, Default: "message-new-instant"})
 	r.notify("chat", nil)
 	r.notify("battery", h("urgency", byte(2)))
 	if n := len(r.srv.Plays()); n != 1 {
 		t.Fatalf("critical mode played %d sounds, want only the critical one", n)
 	}
-	r.a.SetPolicy(Policy{Mode: Off, Default: "message-new-instant"})
+	r.a.SetPolicy(soundpolicy.Policy{Mode: soundpolicy.Off, Default: "message-new-instant"})
 	r.notify("battery", h("urgency", byte(2)))
 	if n := len(r.srv.Plays()); n != 1 {
 		t.Fatal("off still played")
@@ -161,7 +163,7 @@ func TestCriticalModeSoundsOnlyCriticalOnes(t *testing.T) {
 }
 
 func TestAMissingNamePlaysTheDefaultAndLogsOnce(t *testing.T) {
-	r := newRig(t, Policy{Mode: All, Default: "dialog-warning"})
+	r := newRig(t, soundpolicy.Policy{Mode: soundpolicy.All, Default: "dialog-warning"})
 	for range 3 {
 		r.notify("chat", h("sound-name", "no-such-sound"))
 	}
@@ -175,7 +177,7 @@ func TestAMissingNamePlaysTheDefaultAndLogsOnce(t *testing.T) {
 }
 
 func TestAServerThatForgotItsSamplesAfterAReconnectGetsThemAgain(t *testing.T) {
-	r := newRig(t, Policy{Mode: All, Default: "message-new-instant"})
+	r := newRig(t, soundpolicy.Policy{Mode: soundpolicy.All, Default: "message-new-instant"})
 	r.notify("chat", nil)
 	if r.srv.Uploads() != 1 {
 		t.Fatal("no upload")

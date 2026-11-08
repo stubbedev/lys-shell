@@ -10,7 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/internal/jinja"
-	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
@@ -45,7 +45,7 @@ func TestEveryModuleRendersExactlyItsDeclaredPlaceholders(t *testing.T) {
 		"modules.cpu.format":            renderedNames(cpuContext(sysinfo.CPU{})),
 		"modules.ram.format":            renderedNames(ramContext(sysinfo.Memory{})),
 		"modules.storage.format":        renderedNames(storageContext(sysinfo.Storage{})),
-		"modules.idle-inhibit.format":   renderedNames(idleInhibitVars(false, idleinhibit.Duration{}, 0)),
+		"modules.idle-inhibit.format":   renderedNames(idleInhibitVars(false, inhibitduration.Duration{}, 0)),
 		"modules.keybind-mode.format":   renderedNames(keybindModeVars("")),
 		"modules.keyboard-input.format": renderedNames(keyboardLayoutVars("us", nil)),
 		"modules.mail.format":           renderedNames(mailVars(3)),

@@ -14,12 +14,14 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/idle"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 type countingDim struct{ dims, undims atomic.Int32 }
 
-func (c *countingDim) Dim(idle.DimPercent) (func() error, error) {
+func (c *countingDim) Dim(idlepolicy.DimPercent) (func() error, error) {
 	c.dims.Add(1)
 	return func() error { c.undims.Add(1); return nil }, nil
 }
@@ -35,7 +37,7 @@ type inhibitRig struct {
 func startInhibitRig(t *testing.T) *inhibitRig {
 	t.Helper()
 	a := apptest.Run(t)
-	state := idleinhibit.NewState(idleinhibit.Duration{})
+	state := idleinhibit.NewState(inhibitduration.Duration{})
 	holder := &idleHolder{state: state, inhibit: a.InhibitIdle}
 	var anchor *widget.Box
 	if err := apptest.On(a, func() error {
@@ -66,17 +68,17 @@ func startInhibitRig(t *testing.T) *inhibitRig {
 	rig := &inhibitRig{state: state, actions: &countingDim{}}
 	svc := idle.New(comp, rig.actions)
 	t.Cleanup(func() { _ = svc.Close() })
-	share, err := idle.NewDimPercent(50)
+	share, err := idlepolicy.NewDimPercent(50)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := idle.NewTimeout(time.Second)
+	second, err := idlepolicy.NewTimeout(time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := idle.Policy{DimPercent: share}
-	p.Timeouts[idle.Dim] = idle.Timeouts{AC: second, Battery: second}
-	if err := svc.Configure(p, true, idle.AC); err != nil {
+	p := idlepolicy.Policy{DimPercent: share}
+	p.Timeouts[idlepolicy.Dim] = idlepolicy.Timeouts{AC: second, Battery: second}
+	if err := svc.Configure(p, true, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	return rig
@@ -158,20 +160,20 @@ func (w *fixedWatcher) Watch(_ time.Duration, idle, _ func()) (func(), error) {
 }
 
 func TestIdleTooltipNamesTheNextStageAndWhoHoldsIdle(t *testing.T) {
-	state := idleinhibit.NewState(idleinhibit.Duration{})
+	state := idleinhibit.NewState(inhibitduration.Duration{})
 	if got := idleTooltip(nil, state); got != i18n.T("bar-idle-policy-off") {
 		t.Errorf("no policy: %q", got)
 	}
 	w := &fixedWatcher{}
 	svc := idle.New(w, &countingDim{})
 	p := config.DefaultsIdle().Policy()
-	if err := svc.Configure(p, false, idle.AC); err != nil {
+	if err := svc.Configure(p, false, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	if got := idleTooltip(svc, state); got != i18n.T("bar-idle-policy-off") {
 		t.Errorf("disabled policy: %q", got)
 	}
-	if err := svc.Configure(p, true, idle.AC); err != nil {
+	if err := svc.Configure(p, true, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	if got := idleTooltip(svc, state); got != i18n.T("bar-idle-next", i18n.Str("stage", "dim"), i18n.Str("after", "4m")) {

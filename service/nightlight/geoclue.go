@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
 
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 // GeoClue2 names (geoclue.rs).
@@ -51,7 +52,7 @@ type geoclueWaits struct {
 // daemon, not allowed as an agent, denied, timeout, a fix of 0, 0) is an
 // error, which leaves the schedule on the last location it had, or on
 // none.
-func QueryLocation(ctx context.Context, conn *dbus.Conn) (Location, error) {
+func QueryLocation(ctx context.Context, conn *dbus.Conn) (nightschedule.Location, error) {
 	return queryLocation(ctx, conn, geoclueWaits{agent: agentGrace, fix: fixTimeout})
 }
 
@@ -121,10 +122,10 @@ func registerAgent(ctx context.Context, conn *dbus.Conn, manager dbus.BusObject)
 	}
 }
 
-func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (Location, error) {
+func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (nightschedule.Location, error) {
 	clientPath, err := getClient(ctx, conn, waits.agent)
 	if err != nil {
-		return Location{}, err
+		return nightschedule.Location{}, err
 	}
 	defer deleteClient(conn, clientPath)
 	client := conn.Object(geoclueService, clientPath)
@@ -134,14 +135,14 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (Lo
 	// DesktopId is mandatory before Start; without a requested accuracy
 	// the daemon yields nothing.
 	if err := set("DesktopId", version.Name); err != nil {
-		return Location{}, fmt.Errorf("geoclue: desktop id: %w", err)
+		return nightschedule.Location{}, fmt.Errorf("geoclue: desktop id: %w", err)
 	}
 	if err := set("RequestedAccuracyLevel", accuracyCity); err != nil {
-		return Location{}, fmt.Errorf("geoclue: accuracy: %w", err)
+		return nightschedule.Location{}, fmt.Errorf("geoclue: accuracy: %w", err)
 	}
 	match := []dbus.MatchOption{dbus.WithMatchObjectPath(clientPath), dbus.WithMatchInterface(geoclueClient), dbus.WithMatchMember("LocationUpdated")}
 	if err := conn.AddMatchSignal(match...); err != nil {
-		return Location{}, fmt.Errorf("geoclue: match: %w", err)
+		return nightschedule.Location{}, fmt.Errorf("geoclue: match: %w", err)
 	}
 	defer func() { _ = conn.RemoveMatchSignal(match...) }()
 	signals := make(chan *dbus.Signal, 4)
@@ -149,7 +150,7 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (Lo
 	defer conn.RemoveSignal(signals)
 	stop := func() { _ = client.CallWithContext(context.Background(), geoclueClient+".Stop", 0).Err }
 	if err := client.CallWithContext(ctx, geoclueClient+".Start", 0).Err; err != nil {
-		return Location{}, fmt.Errorf("geoclue: start: %w", err)
+		return nightschedule.Location{}, fmt.Errorf("geoclue: start: %w", err)
 	}
 	defer stop()
 	deadline := time.NewTimer(waits.fix)
@@ -157,9 +158,9 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (Lo
 	for {
 		select {
 		case <-ctx.Done():
-			return Location{}, fmt.Errorf("geoclue: wait for a location fix: %w", ctx.Err())
+			return nightschedule.Location{}, fmt.Errorf("geoclue: wait for a location fix: %w", ctx.Err())
 		case <-deadline.C:
-			return Location{}, fmt.Errorf("geoclue: no location fix within %s: the likely cause, not a certain one, is that GeoClue has no source that can place this machine; check the wifi url and the static source in %s, or set latitude and longitude", waits.fix, geoclueConfigFiles)
+			return nightschedule.Location{}, fmt.Errorf("geoclue: no location fix within %s: the likely cause, not a certain one, is that GeoClue has no source that can place this machine; check the wifi url and the static source in %s, or set latitude and longitude", waits.fix, geoclueConfigFiles)
 		case sig := <-signals:
 			if sig.Path != clientPath || sig.Name != geoclueClient+".LocationUpdated" || len(sig.Body) != 2 {
 				continue
@@ -174,18 +175,18 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (Lo
 }
 
 // readLocation reads the Latitude and Longitude of a Location object.
-func readLocation(ctx context.Context, obj dbus.BusObject) (Location, error) {
+func readLocation(ctx context.Context, obj dbus.BusObject) (nightschedule.Location, error) {
 	latitude, err := readCoordinate(ctx, obj, "Latitude")
 	if err != nil {
-		return Location{}, err
+		return nightschedule.Location{}, err
 	}
 	longitude, err := readCoordinate(ctx, obj, "Longitude")
 	if err != nil {
-		return Location{}, err
+		return nightschedule.Location{}, err
 	}
-	loc, err := NewLocation(latitude, longitude)
+	loc, err := nightschedule.NewLocation(latitude, longitude)
 	if err != nil {
-		return Location{}, fmt.Errorf("geoclue: %w", err)
+		return nightschedule.Location{}, fmt.Errorf("geoclue: %w", err)
 	}
 	return loc, nil
 }

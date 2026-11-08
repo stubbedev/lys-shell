@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/vinput"
 
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 	"github.com/stubbedev/lys-shell/swaytest"
 )
 
@@ -30,7 +31,7 @@ func (a *recordingActions) Calls() []string {
 	return slices.Clone(a.calls)
 }
 
-func (a *recordingActions) Dim(DimPercent) (func() error, error) {
+func (a *recordingActions) Dim(idlepolicy.DimPercent) (func() error, error) {
 	a.record("dim")
 	return func() error { a.record("undim"); return nil }, nil
 }
@@ -90,15 +91,15 @@ func awaitCalls(t *testing.T, a *recordingActions, want []string) {
 	}
 }
 
-func secondsPolicy(t *testing.T, stages ...Stage) Policy {
+func secondsPolicy(t *testing.T, stages ...idlepolicy.Stage) idlepolicy.Policy {
 	t.Helper()
-	share, err := NewDimPercent(50)
+	share, err := idlepolicy.NewDimPercent(50)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := Policy{DimPercent: share}
+	p := idlepolicy.Policy{DimPercent: share}
 	for i, stage := range stages {
-		p.Timeouts[stage] = Timeouts{AC: timeout(t, time.Duration(i+1)*time.Second), Battery: timeout(t, time.Duration(i+1)*time.Second)}
+		p.Timeouts[stage] = idlepolicy.Timeouts{AC: timeout(t, time.Duration(i+1)*time.Second), Battery: timeout(t, time.Duration(i+1)*time.Second)}
 	}
 	return p
 }
@@ -108,7 +109,7 @@ func TestAnIdleSessionWalksEveryStageOnTheCompositor(t *testing.T) {
 	a := &recordingActions{out: c}
 	s := New(c, a)
 	t.Cleanup(func() { _ = s.Close() })
-	if err := s.Configure(secondsPolicy(t, Dim, Lock, ScreenOff, Suspend), true, AC); err != nil {
+	if err := s.Configure(secondsPolicy(t, idlepolicy.Dim, idlepolicy.Lock, idlepolicy.ScreenOff, idlepolicy.Suspend), true, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	awaitCalls(t, a, []string{"dim", "lock", "screen-off", "suspend"})
@@ -146,13 +147,13 @@ func TestInputBeforeATimeoutHoldsItsStage(t *testing.T) {
 	a := &recordingActions{out: c}
 	s := New(c, a)
 	t.Cleanup(func() { _ = s.Close() })
-	share, err := NewDimPercent(50)
+	share, err := idlepolicy.NewDimPercent(50)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := Policy{DimPercent: share}
-	p.Timeouts[Dim] = Timeouts{AC: timeout(t, 2*time.Second), Battery: timeout(t, time.Second)}
-	if err := s.Configure(p, true, AC); err != nil {
+	p := idlepolicy.Policy{DimPercent: share}
+	p.Timeouts[idlepolicy.Dim] = idlepolicy.Timeouts{AC: timeout(t, 2*time.Second), Battery: timeout(t, time.Second)}
+	if err := s.Configure(p, true, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	pointer, err := vinput.Dial("", vinput.Options{})
@@ -172,7 +173,7 @@ func TestInputBeforeATimeoutHoldsItsStage(t *testing.T) {
 	if got := a.Calls(); len(got) != 0 {
 		t.Fatalf("input every 500ms still ran %v on a 2s timeout", got)
 	}
-	if err := s.SetPowerSource(Battery); err != nil {
+	if err := s.SetPowerSource(idlepolicy.Battery); err != nil {
 		t.Fatal(err)
 	}
 	awaitCalls(t, a, []string{"dim"})

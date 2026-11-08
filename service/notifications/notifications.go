@@ -22,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/feed"
 	"github.com/stubbedev/lys-shell/internal/glob"
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 // D-Bus identity and server information.
@@ -181,8 +182,8 @@ type Service struct {
 	recent []*Notification
 	// total counts the whole history, stored ones included.
 	total  int
-	memory MemoryLimit
-	stored StoredLimit
+	memory notifypolicy.MemoryLimit
+	stored notifypolicy.StoredLimit
 	// expiry holds the history-expiry timers (remove-expired), stored
 	// notifications outside recent included.
 	expiry map[uint32]*expiryTimer
@@ -236,8 +237,8 @@ func NewService() *Service {
 	return &Service{
 		storeTail:     idle,
 		next:          0,
-		memory:        DefaultMemoryLimit(),
-		stored:        DefaultStoredLimit(),
+		memory:        notifypolicy.DefaultMemoryLimit(),
+		stored:        notifypolicy.DefaultStoredLimit(),
 		expiry:        make(map[uint32]*expiryTimer),
 		timers:        make(map[uint32]*popupTimer),
 		popupDuration: DefaultPopupDuration,
@@ -325,7 +326,7 @@ func (s *Service) Count() int {
 
 // SetHistoryLimits bounds the history: memory newest entries stay in
 // memory, stored on disk. Lowering either applies at once.
-func (s *Service) SetHistoryLimits(memory MemoryLimit, stored StoredLimit) {
+func (s *Service) SetHistoryLimits(memory notifypolicy.MemoryLimit, stored notifypolicy.StoredLimit) {
 	s.mu.Lock()
 	s.memory, s.stored = memory, stored
 	s.evictLocked()
@@ -342,7 +343,7 @@ func (s *Service) pruneLocked() int {
 	if s.store == nil {
 		return 0
 	}
-	prune := max(0, s.total-s.stored.n)
+	prune := max(0, s.total-s.stored.Count())
 	s.total -= prune
 	return prune
 }
@@ -351,7 +352,7 @@ func (s *Service) pruneLocked() int {
 // Without a store they leave the history; with one they stay on disk,
 // their expiries armed. The caller holds mu.
 func (s *Service) evictLocked() {
-	for len(s.recent) > s.memory.n {
+	for len(s.recent) > s.memory.Count() {
 		n := s.recent[0]
 		s.recent[0] = nil
 		s.recent = s.recent[1:]
@@ -931,14 +932,14 @@ func (s *Service) AttachStore(st *Store) error {
 	if err != nil {
 		return fmt.Errorf("notifications: restoring the history: %w", err)
 	}
-	if excess := total - stored.n; excess > 0 {
+	if excess := total - stored.Count(); excess > 0 {
 		pruned, err := st.Prune(excess)
 		if err != nil {
 			return fmt.Errorf("notifications: restoring the history: %w", err)
 		}
 		total -= pruned
 	}
-	newest, err := st.Page(nil, memory.n)
+	newest, err := st.Page(nil, memory.Count())
 	if err != nil {
 		return fmt.Errorf("notifications: restoring the history: %w", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/idle"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 )
 
 func TestIdleTimeoutParsesDurationsAndNever(t *testing.T) {
@@ -39,23 +39,23 @@ func TestIdleTimeoutRefusesWhatItCannotCount(t *testing.T) {
 		if err == nil {
 			t.Errorf("%v accepted", raw)
 		}
-		if s, ok := raw.(string); ok && (s == "0s" || s == "500ms" || s == "-5m") && !errors.Is(err, idle.ErrTimeoutRange) {
+		if s, ok := raw.(string); ok && (s == "0s" || s == "500ms" || s == "-5m") && !errors.Is(err, idlepolicy.ErrTimeoutRange) {
 			t.Errorf("%q: %v, want ErrTimeoutRange", s, err)
 		}
 	}
 	var d IdleDimPercent
-	if err := d.UnmarshalConfig(int64(0)); !errors.Is(err, idle.ErrDimPercentRange) {
+	if err := d.UnmarshalConfig(int64(0)); !errors.Is(err, idlepolicy.ErrDimPercentRange) {
 		t.Errorf("dim-percent 0: %v", err)
 	}
 }
 
 func TestIdleDefaultsArmPerPowerSource(t *testing.T) {
 	p := DefaultsIdle().Policy()
-	ac, battery := p.Arms(idle.AC), p.Arms(idle.Battery)
+	ac, battery := p.Arms(idlepolicy.AC), p.Arms(idlepolicy.Battery)
 	if len(ac) != 3 || len(battery) != 4 {
 		t.Fatalf("defaults arm %v on AC and %v on battery", ac, battery)
 	}
-	if battery[3].Stage != idle.Suspend || battery[3].After != 15*time.Minute {
+	if battery[3].Stage != idlepolicy.Suspend || battery[3].After != 15*time.Minute {
 		t.Errorf("battery suspend = %+v", battery[3])
 	}
 	if !p.LockBeforeSleep || p.DimPercent.Percent() != 30 {

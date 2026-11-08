@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/service/brightness"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 )
 
 type fakeWatch struct {
@@ -38,7 +39,7 @@ func (w *fakeWatcher) live() []*fakeWatch {
 
 type fakeActions struct{ calls []string }
 
-func (a *fakeActions) Dim(share DimPercent) (func() error, error) {
+func (a *fakeActions) Dim(share idlepolicy.DimPercent) (func() error, error) {
 	a.calls = append(a.calls, "dim")
 	return func() error { a.calls = append(a.calls, "undim"); return nil }, nil
 }
@@ -52,26 +53,26 @@ func (a *fakeActions) ScreenOff() (func() error, error) {
 
 func (a *fakeActions) Suspend() error { a.calls = append(a.calls, "suspend"); return nil }
 
-func timeout(t *testing.T, d time.Duration) Timeout {
+func timeout(t *testing.T, d time.Duration) idlepolicy.Timeout {
 	t.Helper()
-	to, err := NewTimeout(d)
+	to, err := idlepolicy.NewTimeout(d)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return to
 }
 
-func testPolicy(t *testing.T) Policy {
+func testPolicy(t *testing.T) idlepolicy.Policy {
 	t.Helper()
-	share, err := NewDimPercent(30)
+	share, err := idlepolicy.NewDimPercent(30)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var p Policy
-	p.Timeouts[Dim] = Timeouts{AC: timeout(t, 4*time.Minute), Battery: timeout(t, 2*time.Minute)}
-	p.Timeouts[Lock] = Timeouts{AC: timeout(t, 5*time.Minute), Battery: timeout(t, 3*time.Minute)}
-	p.Timeouts[ScreenOff] = Timeouts{AC: timeout(t, 10*time.Minute), Battery: timeout(t, 5*time.Minute)}
-	p.Timeouts[Suspend] = Timeouts{AC: Never, Battery: timeout(t, 15*time.Minute)}
+	var p idlepolicy.Policy
+	p.Timeouts[idlepolicy.Dim] = idlepolicy.Timeouts{AC: timeout(t, 4*time.Minute), Battery: timeout(t, 2*time.Minute)}
+	p.Timeouts[idlepolicy.Lock] = idlepolicy.Timeouts{AC: timeout(t, 5*time.Minute), Battery: timeout(t, 3*time.Minute)}
+	p.Timeouts[idlepolicy.ScreenOff] = idlepolicy.Timeouts{AC: timeout(t, 10*time.Minute), Battery: timeout(t, 5*time.Minute)}
+	p.Timeouts[idlepolicy.Suspend] = idlepolicy.Timeouts{AC: idlepolicy.Never, Battery: timeout(t, 15*time.Minute)}
 	p.DimPercent = share
 	return p
 }
@@ -87,13 +88,13 @@ func afters(ws []*fakeWatch) []time.Duration {
 func TestEachPowerSourceArmsItsOwnTimeouts(t *testing.T) {
 	w, a := &fakeWatcher{}, &fakeActions{}
 	s := New(w, a)
-	if err := s.Configure(testPolicy(t), true, AC); err != nil {
+	if err := s.Configure(testPolicy(t), true, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := afters(w.live()), []time.Duration{4 * time.Minute, 5 * time.Minute, 10 * time.Minute}; !slices.Equal(got, want) {
 		t.Fatalf("on AC: watches %v, want %v (suspend is never on AC)", got, want)
 	}
-	if err := s.SetPowerSource(Battery); err != nil {
+	if err := s.SetPowerSource(idlepolicy.Battery); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := afters(w.live()), []time.Duration{2 * time.Minute, 3 * time.Minute, 5 * time.Minute, 15 * time.Minute}; !slices.Equal(got, want) {
@@ -110,7 +111,7 @@ func TestEachPowerSourceArmsItsOwnTimeouts(t *testing.T) {
 func TestStagesRunWhenIdleAndUndoOnResume(t *testing.T) {
 	w, a := &fakeWatcher{}, &fakeActions{}
 	s := New(w, a)
-	if err := s.Configure(testPolicy(t), true, Battery); err != nil {
+	if err := s.Configure(testPolicy(t), true, idlepolicy.Battery); err != nil {
 		t.Fatal(err)
 	}
 	live := w.live()
@@ -134,7 +135,7 @@ func TestStagesRunWhenIdleAndUndoOnResume(t *testing.T) {
 	if want := []string{"undim", "screen-on"}; !slices.Equal(a.calls, want) {
 		t.Fatalf("resume undid %v, want %v", a.calls, want)
 	}
-	if next, ok := s.Status().Next(); !ok || next.Stage != Dim {
+	if next, ok := s.Status().Next(); !ok || next.Stage != idlepolicy.Dim {
 		t.Errorf("after resume the next stage is %v %v, want dim", next, ok)
 	}
 }
@@ -142,12 +143,12 @@ func TestStagesRunWhenIdleAndUndoOnResume(t *testing.T) {
 func TestDisabledArmsNothingAndReconfiguringUndoes(t *testing.T) {
 	w, a := &fakeWatcher{}, &fakeActions{}
 	s := New(w, a)
-	if err := s.Configure(testPolicy(t), true, AC); err != nil {
+	if err := s.Configure(testPolicy(t), true, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	w.live()[0].idle()
 	stale := w.live()[0]
-	if err := s.Configure(testPolicy(t), false, AC); err != nil {
+	if err := s.Configure(testPolicy(t), false, idlepolicy.AC); err != nil {
 		t.Fatal(err)
 	}
 	if n := len(w.live()); n != 0 {
@@ -177,27 +178,8 @@ func (w *countingWatcher) Watch(after time.Duration, idle, resume func()) (func(
 func TestAWatchThatCannotBeMadeIsTheError(t *testing.T) {
 	refused := errors.New("refused")
 	s := New(&countingWatcher{err: refused}, &fakeActions{})
-	if err := s.Configure(testPolicy(t), true, AC); !errors.Is(err, refused) {
+	if err := s.Configure(testPolicy(t), true, idlepolicy.AC); !errors.Is(err, refused) {
 		t.Fatalf("Configure = %v, want the watcher's error", err)
-	}
-}
-
-func TestTimeoutAndDimPercentBounds(t *testing.T) {
-	for _, d := range []time.Duration{0, time.Millisecond * 999, MaxTimeout + time.Millisecond} {
-		if _, err := NewTimeout(d); !errors.Is(err, ErrTimeoutRange) {
-			t.Errorf("NewTimeout(%s) = %v, want ErrTimeoutRange", d, err)
-		}
-	}
-	if _, err := NewTimeout(MinTimeout); err != nil {
-		t.Errorf("NewTimeout(MinTimeout) = %v", err)
-	}
-	for _, p := range []int64{0, 101, -1} {
-		if _, err := NewDimPercent(p); !errors.Is(err, ErrDimPercentRange) {
-			t.Errorf("NewDimPercent(%d) = %v, want ErrDimPercentRange", p, err)
-		}
-	}
-	if _, ok := Never.After(); ok {
-		t.Error("Never has an idle time")
 	}
 }
 
@@ -230,7 +212,7 @@ func TestDimRestoresTheExactPreviousLevel(t *testing.T) {
 		"ddcci7":          {Name: "ddcci7", Brightness: 37, Max: 100},
 	}
 	b := &fakeBacklights{devices: maps.Clone(levels)}
-	share, err := NewDimPercent(30)
+	share, err := idlepolicy.NewDimPercent(30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +237,11 @@ func TestDimRestoresTheExactPreviousLevel(t *testing.T) {
 
 func TestStagesWithoutTheirSystemFailLoudly(t *testing.T) {
 	var s System
-	if restore, err := s.Dim(DimPercent{percent: 30}); err != nil || restore != nil {
+	share, err := idlepolicy.NewDimPercent(30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restore, err := s.Dim(share); err != nil || restore != nil {
 		t.Errorf("Dim without backlights = %v, %v; want nothing to do", restore != nil, err)
 	}
 	if err := s.Lock(); !errors.Is(err, ErrNoLogind) {
@@ -273,7 +259,7 @@ func TestWaitingBetweenStagesStartsNoGoroutineOrTimer(t *testing.T) {
 	w, a := &fakeWatcher{}, &fakeActions{}
 	s := New(w, a)
 	before := runtime.NumGoroutine()
-	if err := s.Configure(testPolicy(t), true, Battery); err != nil {
+	if err := s.Configure(testPolicy(t), true, idlepolicy.Battery); err != nil {
 		t.Fatal(err)
 	}
 	w.live()[0].idle()

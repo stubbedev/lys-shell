@@ -15,6 +15,8 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-lib/atomicfile"
+
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 )
 
 // Digest is the SHA-256 of an entry's bytes: the name its payload file
@@ -225,7 +227,7 @@ func parseRecord(line string) (Record, error) {
 		return Record{}, fmt.Errorf("bad digest %q", sum)
 	}
 	n, err := strconv.Atoi(size)
-	if err != nil || n <= 0 || n > MaxEntryBytes {
+	if err != nil || n <= 0 || n > historybudget.MaxEntryBytes {
 		return Record{}, fmt.Errorf("bad size %q", size)
 	}
 	r.Size = n

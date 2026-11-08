@@ -1,7 +1,6 @@
 package notifications
 
 import (
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +9,7 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 func critical() map[string]dbus.Variant {
@@ -28,7 +28,7 @@ func popped(s *Service, id uint32) bool {
 func TestCriticalPassesDoNotDisturbOnlyWhenAllowed(t *testing.T) {
 	for _, allow := range []bool{true, false} {
 		s := newTestService(t)
-		s.SetFocusRules(FocusRules{AllowCritical: allow})
+		s.SetFocusRules(notifypolicy.FocusRules{AllowCritical: allow})
 		s.SetDND(true)
 		alarm := s.NotifyHints("battery", 0, "", "Battery at 3%", "", nil, critical(), 0)
 		chat := s.Notify("chat", 0, "", "hi", "", nil, 0)
@@ -46,7 +46,7 @@ func TestCriticalPassesDoNotDisturbOnlyWhenAllowed(t *testing.T) {
 
 func TestAnAllowedAppPopsUpThroughDoNotDisturb(t *testing.T) {
 	s := newTestService(t)
-	s.SetFocusRules(FocusRules{AllowApps: []string{"org.gnome.Calendar", "*alarm*"}})
+	s.SetFocusRules(notifypolicy.FocusRules{AllowApps: []string{"org.gnome.Calendar", "*alarm*"}})
 	s.SetDND(true)
 	cal := s.Notify("org.gnome.Calendar", 0, "", "Standup", "", nil, 0)
 	clock := s.NotifyHints("Clocks", 0, "", "Wake up", "", nil, map[string]dbus.Variant{"desktop-entry": dbus.MakeVariant("org.gnome.alarm-clock")}, 0)
@@ -57,7 +57,7 @@ func TestAnAllowedAppPopsUpThroughDoNotDisturb(t *testing.T) {
 	if popped(s, other) {
 		t.Error("an app no glob matches popped up")
 	}
-	s.SetFocusRules(FocusRules{AllowApps: []string{"*nothing-matches*"}})
+	s.SetFocusRules(notifypolicy.FocusRules{AllowApps: []string{"*nothing-matches*"}})
 	if popped(s, s.Notify("chat", 0, "", "again", "", nil, 0)) || !s.DND() {
 		t.Error("a glob matching no app changed do-not-disturb")
 	}
@@ -93,7 +93,7 @@ func (c *countingClock) counts() (live, made int) {
 	return c.live, c.made
 }
 
-func scheduledService(t *testing.T, start time.Time, loc *time.Location, windows ...Window) (*Service, *countingClock) {
+func scheduledService(t *testing.T, start time.Time, loc *time.Location, windows ...notifypolicy.Window) (*Service, *countingClock) {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	fc := fakeclock.New()
@@ -102,29 +102,29 @@ func scheduledService(t *testing.T, start time.Time, loc *time.Location, windows
 	s := NewService()
 	s.UseClock(clock)
 	s.UseLocation(loc)
-	s.SetFocusRules(FocusRules{Schedule: windows})
+	s.SetFocusRules(notifypolicy.FocusRules{Schedule: windows})
 	return s, clock
 }
 
-func everyDay() DaySet {
-	var d DaySet
+func everyDay() notifypolicy.DaySet {
+	var d notifypolicy.DaySet
 	for day := time.Sunday; day <= time.Saturday; day++ {
 		d = d.With(day)
 	}
 	return d
 }
 
-func mustWindow(t *testing.T, days DaySet, from, to string) Window {
+func mustWindow(t *testing.T, days notifypolicy.DaySet, from, to string) notifypolicy.Window {
 	t.Helper()
-	f, err := ParseClockTime(from)
+	f, err := notifypolicy.ParseClockTime(from)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tt, err := ParseClockTime(to)
+	tt, err := notifypolicy.ParseClockTime(to)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := NewWindow(days, f, tt)
+	w, err := notifypolicy.NewWindow(days, f, tt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestAScheduleCrossesMidnightAndADaylightSavingChange(t *testing.T) {
 }
 
 func TestADayOffScheduleStaysOff(t *testing.T) {
-	var weekdays DaySet
+	var weekdays notifypolicy.DaySet
 	for _, d := range []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday} {
 		weekdays = weekdays.With(d)
 	}
@@ -197,7 +197,7 @@ func TestATimerIsArmedOnlyForTheNextBoundary(t *testing.T) {
 	if _, made := clock.counts(); made != before {
 		t.Errorf("%d timers armed between boundaries", made-before)
 	}
-	s.SetFocusRules(FocusRules{})
+	s.SetFocusRules(notifypolicy.FocusRules{})
 	if live, _ := clock.counts(); live != 0 {
 		t.Errorf("no schedule left %d timers armed", live)
 	}
@@ -206,7 +206,7 @@ func TestATimerIsArmedOnlyForTheNextBoundary(t *testing.T) {
 func TestSharingTurnsDoNotDisturbOnAndKeepsTheManualState(t *testing.T) {
 	for _, manual := range []bool{false, true} {
 		s := newTestService(t)
-		s.SetFocusRules(FocusRules{WhileSharing: true})
+		s.SetFocusRules(notifypolicy.FocusRules{WhileSharing: true})
 		s.SetDND(manual)
 		s.SetSharing(true)
 		if f := s.Focus(); !f.On || f.Reason != FocusSharing {
@@ -218,7 +218,7 @@ func TestSharingTurnsDoNotDisturbOnAndKeepsTheManualState(t *testing.T) {
 		}
 	}
 	s := newTestService(t)
-	s.SetFocusRules(FocusRules{})
+	s.SetFocusRules(notifypolicy.FocusRules{})
 	s.SetSharing(true)
 	if s.DND() {
 		t.Error("sharing turned do-not-disturb on without while-sharing")
@@ -246,7 +246,7 @@ func TestTheManualToggleOverridesARuleUntilItsNextBoundary(t *testing.T) {
 
 func TestDoNotDisturbUntilATime(t *testing.T) {
 	s := newTestService(t)
-	s.SetFocusRules(FocusRules{})
+	s.SetFocusRules(notifypolicy.FocusRules{})
 	until := testClock(s).Now().Add(time.Hour)
 	s.SetDNDUntil(until)
 	if f := s.Focus(); !f.On || f.Reason != FocusUntil || !f.Until.Equal(until) {
@@ -255,41 +255,5 @@ func TestDoNotDisturbUntilATime(t *testing.T) {
 	advance(s, time.Hour)
 	if s.DND() {
 		t.Fatal("still on after its time")
-	}
-}
-
-func TestScheduleWindowsAndTimesAreValidated(t *testing.T) {
-	for _, raw := range []string{"24:00", "7:00", "07:60", "0700", "ab:cd"} {
-		if _, err := ParseClockTime(raw); !errors.Is(err, ErrClockTime) {
-			t.Errorf("%q: %v", raw, err)
-		}
-	}
-	at, err := ParseClockTime("07:00")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NewWindow(everyDay(), at, at); !errors.Is(err, ErrEmptyWindow) {
-		t.Errorf("empty window: %v", err)
-	}
-}
-
-func TestParseUntilTakesATimeOfDayOrADuration(t *testing.T) {
-	now := time.Date(2026, 3, 2, 10, 30, 0, 0, time.UTC)
-	for raw, want := range map[string]time.Time{
-		"11:00": time.Date(2026, 3, 2, 11, 0, 0, 0, time.UTC),
-		"09:00": time.Date(2026, 3, 3, 9, 0, 0, 0, time.UTC),
-		"10:30": time.Date(2026, 3, 3, 10, 30, 0, 0, time.UTC),
-		"1h":    now.Add(time.Hour),
-		"45m":   now.Add(45 * time.Minute),
-	} {
-		got, err := ParseUntil(raw, now)
-		if err != nil || !got.Equal(want) {
-			t.Errorf("%q = %s, %v; want %s", raw, got, err, want)
-		}
-	}
-	for _, raw := range []string{"", "soon", "-1h", "0s", "25:00"} {
-		if _, err := ParseUntil(raw, now); !errors.Is(err, ErrUntil) {
-			t.Errorf("%q: %v, want ErrUntil", raw, err)
-		}
 	}
 }

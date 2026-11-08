@@ -1,3 +1,10 @@
+// Package idle is the shell's built-in idle policy: after the session has
+// been idle for a stage's timeout it dims the backlights, locks, turns the
+// outputs off and suspends, each undone (where it can be) when the user is
+// back, with timeouts per power source; and it locks before the system
+// sleeps. Idle is the compositor's ext-idle-notify-v1, so idle inhibitors
+// (a playing video, the caffeine toggle, a portal or ScreenSaver hold)
+// hold every stage, and waiting costs no timer.
 package idle
 
 import (
@@ -9,6 +16,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/internal/feed"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 )
 
 // Watcher tells when the session has been idle for a while: idle runs once
@@ -21,7 +29,7 @@ type Watcher interface {
 // Actions carry the stages out. Dim and ScreenOff return what undoes them
 // at resume.
 type Actions interface {
-	Dim(DimPercent) (restore func() error, err error)
+	Dim(idlepolicy.DimPercent) (restore func() error, err error)
 	Lock() error
 	ScreenOff() (restore func() error, err error)
 	Suspend() error
@@ -31,20 +39,20 @@ type Actions interface {
 // user was last active.
 type Status struct {
 	Enabled bool
-	Source  PowerSource
-	Arms    []Arm
-	Reached []Stage
+	Source  idlepolicy.PowerSource
+	Arms    []idlepolicy.Arm
+	Reached []idlepolicy.Stage
 }
 
 // Next is the first armed stage that has not run yet; false when every
 // armed one has, or none is.
-func (s Status) Next() (Arm, bool) {
+func (s Status) Next() (idlepolicy.Arm, bool) {
 	for _, a := range s.Arms {
 		if !slices.Contains(s.Reached, a.Stage) {
 			return a, true
 		}
 	}
-	return Arm{}, false
+	return idlepolicy.Arm{}, false
 }
 
 // Service arms one idle watch per stage of the policy on the current power
@@ -54,12 +62,12 @@ type Service struct {
 	actions Actions
 
 	mu       sync.Mutex
-	policy   Policy
+	policy   idlepolicy.Policy
 	enabled  bool
-	source   PowerSource
+	source   idlepolicy.PowerSource
 	stops    []func()
-	restores [stageCount]func() error
-	reached  []Stage
+	restores [len(idlepolicy.Stages)]func() error
+	reached  []idlepolicy.Stage
 	gen      uint64
 	changes  feed.Tick
 }
@@ -72,7 +80,7 @@ func New(w Watcher, a Actions) *Service {
 // Configure arms the policy's stages on source; disabled arms none. Every
 // stage that has run is undone first, so a new policy starts from an
 // active session.
-func (s *Service) Configure(p Policy, enabled bool, source PowerSource) error {
+func (s *Service) Configure(p idlepolicy.Policy, enabled bool, source idlepolicy.PowerSource) error {
 	s.mu.Lock()
 	s.policy, s.enabled, s.source = p, enabled, source
 	err := s.rearmLocked()
@@ -82,7 +90,7 @@ func (s *Service) Configure(p Policy, enabled bool, source PowerSource) error {
 }
 
 // SetPowerSource re-arms the stages with source's timeouts.
-func (s *Service) SetPowerSource(source PowerSource) error {
+func (s *Service) SetPowerSource(source idlepolicy.PowerSource) error {
 	s.mu.Lock()
 	if s.source == source {
 		s.mu.Unlock()
@@ -96,7 +104,7 @@ func (s *Service) SetPowerSource(source PowerSource) error {
 }
 
 // Policy is the policy the service runs.
-func (s *Service) Policy() Policy {
+func (s *Service) Policy() idlepolicy.Policy {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.policy
@@ -130,7 +138,7 @@ func (s *Service) disarmLocked() error {
 	}
 	s.stops = s.stops[:0]
 	var err error
-	for _, stage := range Stages {
+	for _, stage := range idlepolicy.Stages {
 		err = errors.Join(err, s.restoreLocked(stage))
 	}
 	s.reached = s.reached[:0]
@@ -155,7 +163,7 @@ func (s *Service) rearmLocked() error {
 	return err
 }
 
-func (s *Service) idled(gen uint64, stage Stage) {
+func (s *Service) idled(gen uint64, stage idlepolicy.Stage) {
 	s.mu.Lock()
 	if gen != s.gen || slices.Contains(s.reached, stage) {
 		s.mu.Unlock()
@@ -170,32 +178,32 @@ func (s *Service) idled(gen uint64, stage Stage) {
 	feed.Notify(&s.changes)
 }
 
-func (s *Service) runLocked(stage Stage) error {
+func (s *Service) runLocked(stage idlepolicy.Stage) error {
 	var (
 		restore func() error
 		err     error
 	)
 	switch stage {
-	case Dim:
+	case idlepolicy.Dim:
 		restore, err = s.actions.Dim(s.policy.DimPercent)
-	case Lock:
+	case idlepolicy.Lock:
 		err = s.actions.Lock()
-	case ScreenOff:
+	case idlepolicy.ScreenOff:
 		restore, err = s.actions.ScreenOff()
-	case Suspend:
+	case idlepolicy.Suspend:
 		err = s.actions.Suspend()
 	}
 	s.restores[stage] = restore
 	return err
 }
 
-func (s *Service) resumed(gen uint64, stage Stage) {
+func (s *Service) resumed(gen uint64, stage idlepolicy.Stage) {
 	s.mu.Lock()
 	if gen != s.gen {
 		s.mu.Unlock()
 		return
 	}
-	s.reached = slices.DeleteFunc(s.reached, func(r Stage) bool { return r == stage })
+	s.reached = slices.DeleteFunc(s.reached, func(r idlepolicy.Stage) bool { return r == stage })
 	err := s.restoreLocked(stage)
 	s.mu.Unlock()
 	if err != nil {
@@ -204,7 +212,7 @@ func (s *Service) resumed(gen uint64, stage Stage) {
 	feed.Notify(&s.changes)
 }
 
-func (s *Service) restoreLocked(stage Stage) error {
+func (s *Service) restoreLocked(stage idlepolicy.Stage) error {
 	restore := s.restores[stage]
 	s.restores[stage] = nil
 	if restore == nil {

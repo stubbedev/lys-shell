@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
 
 	"github.com/stubbedev/lys-shell/internal/version"
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 const geoclueDropIn = "resources/geoclue-lys-shell.conf"
@@ -148,7 +149,7 @@ func TestQueryLocationOverGeoClue(t *testing.T) {
 // A fix of 0, 0 is an agent with nothing to say, not a position.
 func TestQueryLocationRefusesANullFix(t *testing.T) {
 	_, conn := serveGeoClue(t, 0, 0)
-	if _, err := QueryLocation(context.Background(), conn); !errors.Is(err, ErrNullIsland) {
+	if _, err := QueryLocation(context.Background(), conn); !errors.Is(err, nightschedule.ErrNullIsland) {
 		t.Errorf("err = %v, want ErrNullIsland", err)
 	}
 }

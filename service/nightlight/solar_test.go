@@ -3,6 +3,8 @@ package nightlight
 import (
 	"testing"
 	"time"
+
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 func utc(y int, m time.Month, d, h, min int) time.Time {
@@ -103,7 +105,7 @@ func TestCivilTwilightAgainstKnownValues(t *testing.T) {
 func TestPhaseFlipsAtTheBoundaries(t *testing.T) {
 	day := utc(2024, 3, 20, 12, 0)
 	loc := mustLocation(t, 51.5074, -0.1278)
-	st := sunTimesFor(day, loc.latitude, loc.longitude, civilTwilightAltitude)
+	st := sunTimesFor(day, loc.Latitude(), loc.Longitude(), civilTwilightAltitude)
 	if got := PhaseAt(st.rise.Add(-time.Second), loc); got != PhaseNight {
 		t.Errorf("a second before dawn = %v, want night", got)
 	}
@@ -113,7 +115,7 @@ func TestPhaseFlipsAtTheBoundaries(t *testing.T) {
 	if got := PhaseAt(st.set, loc); got != PhaseNight {
 		t.Errorf("at dusk = %v, want night (exclusive)", got)
 	}
-	sunrise := sunTimesFor(day, loc.latitude, loc.longitude, sunriseAltitude).rise
+	sunrise := sunTimesFor(day, loc.Latitude(), loc.Longitude(), sunriseAltitude).rise
 	if got := PhaseAt(sunrise.Add(-time.Minute), loc); got != PhaseDay {
 		t.Errorf("a minute before sunrise = %v, want day: civil dawn has passed", got)
 	}
@@ -126,7 +128,7 @@ func TestPhaseFollowsTheSolarDayAcrossUTCMidnight(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		now  time.Time
-		loc  Location
+		loc  nightschedule.Location
 		want Phase
 	}{
 		{"sydney morning, late on the UTC date", utc(2024, 6, 21, 22, 0), mustLocation(t, -33.8688, 151.2093), PhaseDay},

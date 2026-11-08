@@ -15,7 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/pulse"
-	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
 	"github.com/stubbedev/lys-shell/service/upower"
 )
 
@@ -117,10 +117,10 @@ func TestDropdownBuildersReturnWhileEveryServiceHolds(t *testing.T) {
 	stuckServices(&ctx, h)
 	probing := make(chan struct{}, 1)
 	prev := recorderCameras
-	recorderCameras = func() []recorder.DeviceChoice {
+	recorderCameras = func() []devicechoice.DeviceChoice {
 		probing <- struct{}{}
 		<-h.release
-		return recorder.NoCameras()
+		return devicechoice.NoCameras()
 	}
 	t.Cleanup(func() { recorderCameras = prev })
 	for name, build := range map[string]func(ModuleContext) widget.Widget{
@@ -157,9 +157,9 @@ func TestRecorderCameraProbeFillsThePickerWhenItEnds(t *testing.T) {
 	t.Cleanup(widget.SetAnimationsInstant(true))
 	release := make(chan struct{})
 	prev := recorderCameras
-	recorderCameras = func() []recorder.DeviceChoice {
+	recorderCameras = func() []devicechoice.DeviceChoice {
 		<-release
-		return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Cam"}}
+		return []devicechoice.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Cam"}}
 	}
 	t.Cleanup(func() { recorderCameras = prev })
 	v := apptest.On(a, func() *recorderView { return recorderDropdown(ctx).(*recorderView) })

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 func TestAFullscreenWindowTurnsDoNotDisturbOnWhileItIs(t *testing.T) {
@@ -16,7 +17,7 @@ func TestAFullscreenWindowTurnsDoNotDisturbOnWhileItIs(t *testing.T) {
 	dbustest.Session(t)
 	a := apptest.Run(t)
 	svc := notifications.NewService()
-	svc.SetFocusRules(notifications.FocusRules{WhileFullscreen: true})
+	svc.SetFocusRules(notifypolicy.FocusRules{WhileFullscreen: true})
 	var (
 		stop   func()
 		window *app.Window
@@ -47,7 +48,7 @@ func TestAPortalShareTurnsDoNotDisturbOnAndItsEndRestoresIt(t *testing.T) {
 	a := apptest.Run(t)
 	f, shares := servePortalShares(t)
 	svc := notifications.NewService()
-	svc.SetFocusRules(notifications.FocusRules{WhileSharing: true})
+	svc.SetFocusRules(notifypolicy.FocusRules{WhileSharing: true})
 	var stop func()
 	apptest.On(a, func() bool { stop = followFocusInputs(a, svc, shares, nil); return true })
 	t.Cleanup(func() { apptest.On(a, func() bool { stop(); return true }) })

@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -199,7 +200,7 @@ type launcherClipboard struct{ history *clipboard.History }
 
 func newLauncherClipboard(t *testing.T, selections ...[2]string) *launcherClipboard {
 	t.Helper()
-	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes*4, clipboard.MaxEntryBytes*4)
+	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes*4, historybudget.MaxEntryBytes*4)
 	if err != nil {
 		t.Fatal(err)
 	}

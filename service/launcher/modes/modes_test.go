@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/lyswm"
 	"github.com/stubbedev/lys-shell/service/mango"
@@ -611,7 +612,7 @@ type fakeClipboard struct {
 // returns the ids they are stored under.
 func newFakeClipboard(t *testing.T, selections ...[2]string) (*fakeClipboard, []uint64) {
 	t.Helper()
-	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes, clipboard.MaxEntryBytes)
+	h, err := clipboard.NewHistory(clipboard.DefaultCapacity, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

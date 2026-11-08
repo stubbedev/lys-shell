@@ -9,6 +9,8 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 func waitChange(t *testing.T, ch <-chan struct{}) {
@@ -249,9 +251,9 @@ func TestDaemonHoldsFollowTheirCaller(t *testing.T) {
 	}
 }
 
-func minutes(t *testing.T, n int64) Duration {
+func minutes(t *testing.T, n int64) inhibitduration.Duration {
 	t.Helper()
-	d, err := NewDuration(n)
+	d, err := inhibitduration.NewDuration(n)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,10 +268,10 @@ func rangeMessage(minutes int64) string {
 // the uint32 the timer and the Remaining property hold.
 func TestLongestDurationCountsDownItsExactSeconds(t *testing.T) {
 	const wantSecs = 4294967280
-	if got := minutes(t, MaxMinutes).Seconds(); got != wantSecs {
+	if got := minutes(t, inhibitduration.MaxMinutes).Seconds(); got != wantSecs {
 		t.Fatalf("Seconds() = %d, want %d, the last whole minute below 2^32", got, wantSecs)
 	}
-	s := NewState(minutes(t, MaxMinutes))
+	s := NewState(minutes(t, inhibitduration.MaxMinutes))
 	s.Enable(false)
 	defer s.Disable()
 	if got := s.Remaining(); got != wantSecs {
@@ -289,21 +291,6 @@ func TestLongestDurationCountsDownItsExactSeconds(t *testing.T) {
 	}
 }
 
-// A duration past MaxMinutes, whose seconds would wrap a uint32, is
-// refused with ErrDurationRange, as is a negative one.
-func TestDurationPastTheLimitIsRefused(t *testing.T) {
-	for _, n := range []int64{MaxMinutes + 1, math.MaxUint32, math.MaxUint32 + 1, -1} {
-		d, err := NewDuration(n)
-		if !errors.Is(err, ErrDurationRange) || d != (Duration{}) {
-			t.Errorf("NewDuration(%d) = %+v, %v; want ErrDurationRange", n, d, err)
-			continue
-		}
-		if err.Error() != rangeMessage(n) {
-			t.Errorf("NewDuration(%d) error = %q, want %q", n, err, rangeMessage(n))
-		}
-	}
-}
-
 // AdjustDuration saturates at zero below, and refuses a shift past
 // MaxMinutes, keeping the run, instead of saturating or wrapping.
 func TestAdjustDurationRefusesPastTheLimit(t *testing.T) {
@@ -316,8 +303,8 @@ func TestAdjustDurationRefusesPastTheLimit(t *testing.T) {
 		{30, -10, 20},
 		{5, -10, 0},
 		{0, math.MinInt32, 0},
-		{MaxMinutes - 1, 1, MaxMinutes},
-		{MaxMinutes, -1, MaxMinutes - 1},
+		{inhibitduration.MaxMinutes - 1, 1, inhibitduration.MaxMinutes},
+		{inhibitduration.MaxMinutes, -1, inhibitduration.MaxMinutes - 1},
 	} {
 		s := NewState(minutes(t, c.start))
 		if err := s.AdjustDuration(c.delta); err != nil {
@@ -328,15 +315,15 @@ func TestAdjustDurationRefusesPastTheLimit(t *testing.T) {
 		}
 	}
 	for _, delta := range []int32{1, math.MaxInt32} {
-		s := NewState(minutes(t, MaxMinutes))
+		s := NewState(minutes(t, inhibitduration.MaxMinutes))
 		s.Enable(false)
 		err := s.AdjustDuration(delta)
-		want := rangeMessage(MaxMinutes + int64(delta))
-		if !errors.Is(err, ErrDurationRange) || err.Error() != want {
-			t.Errorf("%d%+d: err = %v, want %q", MaxMinutes, delta, err, want)
+		want := rangeMessage(inhibitduration.MaxMinutes + int64(delta))
+		if !errors.Is(err, inhibitduration.ErrDurationRange) || err.Error() != want {
+			t.Errorf("%d%+d: err = %v, want %q", inhibitduration.MaxMinutes, delta, err, want)
 		}
-		if got, left := s.Duration().Minutes(), s.Remaining(); got != MaxMinutes || left != MaxMinutes*60 {
-			t.Errorf("%d%+d: the refused shift changed the run to %d min, %d s", MaxMinutes, delta, got, left)
+		if got, left := s.Duration().Minutes(), s.Remaining(); got != inhibitduration.MaxMinutes || left != inhibitduration.MaxMinutes*60 {
+			t.Errorf("%d%+d: the refused shift changed the run to %d min, %d s", inhibitduration.MaxMinutes, delta, got, left)
 		}
 		s.Disable()
 	}
@@ -346,7 +333,7 @@ func TestAdjustDurationRefusesPastTheLimit(t *testing.T) {
 // one past it is refused with InvalidArgs, leaving the run.
 func TestDaemonRefusesDurationsPastTheLimit(t *testing.T) {
 	bus := dbustest.Start(t)
-	state := NewState(Duration{})
+	state := NewState(inhibitduration.Duration{})
 	release, err := NewDaemon(state).Export(bus.Conn(t))
 	if err != nil {
 		t.Fatal(err)
@@ -364,31 +351,31 @@ func TestDaemonRefusesDurationsPastTheLimit(t *testing.T) {
 		}
 		return v
 	}
-	if err := call("SetDuration", uint32(MaxMinutes)); err != nil {
+	if err := call("SetDuration", uint32(inhibitduration.MaxMinutes)); err != nil {
 		t.Fatalf("SetDuration(MaxMinutes) = %v", err)
 	}
 	if err := call("Enable", false); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(state.Disable)
-	if d, r := prop("Duration"), prop("Remaining"); d != MaxMinutes || r != MaxMinutes*60 {
-		t.Errorf("Duration %d, Remaining %d; want %d, %d", d, r, MaxMinutes, MaxMinutes*60)
+	if d, r := prop("Duration"), prop("Remaining"); d != inhibitduration.MaxMinutes || r != inhibitduration.MaxMinutes*60 {
+		t.Errorf("Duration %d, Remaining %d; want %d, %d", d, r, inhibitduration.MaxMinutes, inhibitduration.MaxMinutes*60)
 	}
 	for _, c := range []struct {
 		method string
 		arg    any
 		value  int64
 	}{
-		{"SetDuration", uint32(MaxMinutes + 1), MaxMinutes + 1},
+		{"SetDuration", uint32(inhibitduration.MaxMinutes + 1), inhibitduration.MaxMinutes + 1},
 		{"SetDuration", uint32(math.MaxUint32), math.MaxUint32},
-		{"AdjustDuration", int32(1), MaxMinutes + 1},
+		{"AdjustDuration", int32(1), inhibitduration.MaxMinutes + 1},
 	} {
 		err := call(c.method, c.arg)
 		var de dbus.Error
 		if !errors.As(err, &de) || de.Name != "org.freedesktop.DBus.Error.InvalidArgs" || len(de.Body) != 1 || de.Body[0] != rangeMessage(c.value) {
 			t.Errorf("%s(%v) = %v, want InvalidArgs %q", c.method, c.arg, err, rangeMessage(c.value))
 		}
-		if d, r := prop("Duration"), prop("Remaining"); d != MaxMinutes || r != MaxMinutes*60 {
+		if d, r := prop("Duration"), prop("Remaining"); d != inhibitduration.MaxMinutes || r != inhibitduration.MaxMinutes*60 {
 			t.Errorf("%s(%v) changed the run to Duration %d, Remaining %d", c.method, c.arg, d, r)
 		}
 	}

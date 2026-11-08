@@ -4,6 +4,8 @@ import (
 	"errors"
 	"slices"
 	"testing"
+
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 )
 
 // pinnedTexts are the history's texts, pinned ones marked with a star.
@@ -29,7 +31,7 @@ func mustPin(t *testing.T, h *History, id uint64) {
 }
 
 func TestPinnedEntriesComeFirstAndOutliveTheCapacity(t *testing.T) {
-	h := mustHistory(t, 2, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 2, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	a, _ := push(t, h, textMime, []byte("a"))
 	mustPin(t, h, a)
 	for _, s := range []string{"b", "c", "d"} {
@@ -85,7 +87,7 @@ func TestAPinPastThePinnedBudgetIsRefused(t *testing.T) {
 }
 
 func TestUnpinningReturnsTheEntryToTheBudget(t *testing.T) {
-	h := mustHistory(t, 1, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 1, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	a, _ := push(t, h, textMime, []byte("a"))
 	mustPin(t, h, a)
 	push(t, h, textMime, []byte("b"))
@@ -148,11 +150,11 @@ func TestAPinnedBudgetBelowAnEntryIsRefused(t *testing.T) {
 	if _, err := NewHistory(8, 16, 16, 15); err == nil {
 		t.Error("a pinned budget below the largest entry was accepted")
 	}
-	if _, err := DefaultHistory(DefaultBudget(), Budget{}); err == nil {
+	if _, err := DefaultHistory(historybudget.DefaultBudget(), historybudget.Budget{}); err == nil {
 		t.Error("a zero pinned budget built a history")
 	}
 	h := defaultHistory(t)
-	if err := h.SetPinnedBudget(MaxEntryBytes - 1); err == nil {
+	if err := h.SetPinnedBudget(historybudget.MaxEntryBytes - 1); err == nil {
 		t.Error("SetPinnedBudget accepted a budget below the largest entry")
 	}
 }

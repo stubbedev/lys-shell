@@ -3,7 +3,7 @@ package config
 import (
 	"reflect"
 
-	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 )
 
 // ClipboardConfig is the clipboard section: the session's clipboard
@@ -31,8 +31,8 @@ type ClipboardConfig struct {
 // DefaultsClipboard returns the schema defaults.
 func DefaultsClipboard() ClipboardConfig {
 	return ClipboardConfig{
-		HistoryMiB: ClipboardMiB{budget: clipboard.DefaultBudget()},
-		PinnedMiB:  ClipboardMiB{budget: clipboard.DefaultPinnedBudget()},
+		HistoryMiB: ClipboardMiB{budget: historybudget.DefaultBudget()},
+		PinnedMiB:  ClipboardMiB{budget: historybudget.DefaultPinnedBudget()},
 	}
 }
 
@@ -41,10 +41,10 @@ func DefaultsClipboard() ClipboardConfig {
 // it can count.
 //
 // Clipboard budget in MiB.
-type ClipboardMiB struct{ budget clipboard.Budget }
+type ClipboardMiB struct{ budget historybudget.Budget }
 
 // Budget is the validated budget.
-func (m ClipboardMiB) Budget() clipboard.Budget { return m.budget }
+func (m ClipboardMiB) Budget() historybudget.Budget { return m.budget }
 
 // UnmarshalConfig implements Unmarshaler.
 func (m *ClipboardMiB) UnmarshalConfig(v any) error {
@@ -52,7 +52,7 @@ func (m *ClipboardMiB) UnmarshalConfig(v any) error {
 	if err := decodeInto(reflect.ValueOf(&mib).Elem(), v); err != nil {
 		return err
 	}
-	budget, err := clipboard.NewBudget(mib)
+	budget, err := historybudget.NewBudget(mib)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (ClipboardMiB) configSchema(*schemaGen) Schema {
 		"description": typeDoc(typeOf[ClipboardMiB]()),
 		"type":        "integer",
 		"format":      "uint32",
-		"minimum":     int64(clipboard.MinBudgetMiB),
-		"maximum":     int64(clipboard.MaxBudgetMiB),
+		"minimum":     int64(historybudget.MinBudgetMiB),
+		"maximum":     int64(historybudget.MaxBudgetMiB),
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-shell/service/mpris"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/notifications"
@@ -371,7 +372,7 @@ func lookContext(t *testing.T) ModuleContext {
 	ctx := fixtureContext(t)
 	ctx.Notifications = notifications.NewService()
 	ctx.Notifications.SetDND(true)
-	ctx.IdleInhibit = idleinhibit.NewState(idleinhibit.Duration{})
+	ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true, CanGoPrevious: true})
 	ctx.Battery = newFakeBattery(upower.Device{Percentage: 64, IsPresent: true, State: upower.StateDischarging, TimeToEmpty: 3 * time.Hour})
 	ctx.Network = &fakeNetworkSource{snap: network.Snapshot{HasWifi: true, WifiEnabled: true, WifiSSID: "lan", Primary: network.ConnectionWifi}, ticks: make(chan struct{}, 2)}

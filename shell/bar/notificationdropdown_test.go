@@ -26,6 +26,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-shell/shell/notifyui"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -572,11 +573,11 @@ func TestNotificationLongBodyStaysInItsItem(t *testing.T) {
 // a change rereads as deep as it had read.
 func TestNotificationDropdownPagesTheHistory(t *testing.T) {
 	svc := newNotifTestService(t)
-	memory, err := notifications.NewMemoryLimit(notifications.MaxHistoryMemory)
+	memory, err := notifypolicy.NewMemoryLimit(notifypolicy.MaxHistoryMemory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.SetHistoryLimits(memory, notifications.DefaultStoredLimit())
+	svc.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	const sent = 2*notifPageSize + 20
 	for i := range sent {
 		svc.Notify("app"+strconv.Itoa(i%4), 0, "", "n", "", nil, 0)

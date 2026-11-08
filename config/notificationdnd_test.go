@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 func TestDndWindowsParseAndRoundTrip(t *testing.T) {
@@ -45,7 +45,7 @@ func TestDndWindowsRefuseWhatCannotBeScheduled(t *testing.T) {
 		}
 	}
 	var w DndWindow
-	if err := w.UnmarshalConfig(map[string]any{"from": "07:00", "to": "07:00"}); !errors.Is(err, notifications.ErrEmptyWindow) {
+	if err := w.UnmarshalConfig(map[string]any{"from": "07:00", "to": "07:00"}); !errors.Is(err, notifypolicy.ErrEmptyWindow) {
 		t.Errorf("empty window: %v", err)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 // collect waits for n events.
@@ -337,17 +338,17 @@ func TestDismissStopsOnlyItsPopupTimers(t *testing.T) {
 func TestDismissAllIsOneRemoval(t *testing.T) {
 	st, _ := openTestStore(t)
 	s := newStoredService(t, st)
-	memory, err := NewMemoryLimit(MinHistoryMemory)
+	memory, err := notifypolicy.NewMemoryLimit(notifypolicy.MinHistoryMemory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.SetHistoryLimits(memory, DefaultStoredLimit())
+	s.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	var ids []uint32
-	for range 2 * MinHistoryMemory {
+	for range 2 * notifypolicy.MinHistoryMemory {
 		advance(s, time.Millisecond)
 		ids = append(ids, s.Notify("app", 0, "", "n", "", nil, 0))
 	}
-	window := ids[MinHistoryMemory:]
+	window := ids[notifypolicy.MinHistoryMemory:]
 	feed, _ := s.Subscribe()
 	closed := closedSignals(s)
 
@@ -367,12 +368,12 @@ func TestDismissAllIsOneRemoval(t *testing.T) {
 		t.Errorf("clearing an empty history: %d events, closed %v", len(feed), *closed)
 	}
 
-	for range 2 * MinHistoryMemory {
+	for range 2 * notifypolicy.MinHistoryMemory {
 		advance(s, time.Millisecond)
 		s.Notify("app", 0, "", "n", "", nil, 0)
 	}
-	collect(t, feed, 2*MinHistoryMemory)
-	inWindow := history(t, s)[:MinHistoryMemory]
+	collect(t, feed, 2*notifypolicy.MinHistoryMemory)
+	inWindow := history(t, s)[:notifypolicy.MinHistoryMemory]
 	shown := make([]uint32, 0, len(inWindow))
 	for _, n := range inWindow {
 		shown = append(shown, n.ID)
@@ -456,7 +457,7 @@ func BenchmarkDismiss(b *testing.B) {
 	b.Setenv("XDG_STATE_HOME", b.TempDir())
 	for _, n := range []int{1000, 5000} {
 		b.Run(strconv.Itoa(n), func(b *testing.B) {
-			memory, err := NewMemoryLimit(MaxHistoryMemory)
+			memory, err := notifypolicy.NewMemoryLimit(notifypolicy.MaxHistoryMemory)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -467,7 +468,7 @@ func BenchmarkDismiss(b *testing.B) {
 					b.Fatal(err)
 				}
 				s := NewService()
-				s.SetHistoryLimits(memory, DefaultStoredLimit())
+				s.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 				if err := s.AttachStore(st); err != nil {
 					b.Fatal(err)
 				}

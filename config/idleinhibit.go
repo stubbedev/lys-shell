@@ -1,6 +1,8 @@
 package config
 
-import "github.com/stubbedev/lys-shell/service/idleinhibit"
+import (
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
+)
 
 // IdleInhibitConfig is ported from crates/wayle-config/src/schemas/modules/idle_inhibit/mod.rs.
 //
@@ -89,11 +91,11 @@ func (c IdleInhibitConfig) Clicks() ClickConfig {
 // seconds must fit the service's uint32 timer.
 //
 // Idle inhibit duration in whole minutes, 0 for indefinite.
-type IdleInhibitDuration struct{ duration idleinhibit.Duration }
+type IdleInhibitDuration struct{ duration inhibitduration.Duration }
 
 // parseIdleInhibitDuration validates minutes as a duration.
 func parseIdleInhibitDuration(minutes int64) (IdleInhibitDuration, error) {
-	d, err := idleinhibit.NewDuration(minutes)
+	d, err := inhibitduration.NewDuration(minutes)
 	if err != nil {
 		return IdleInhibitDuration{}, err
 	}
@@ -111,7 +113,7 @@ func mustIdleInhibitDuration(minutes int64) IdleInhibitDuration {
 }
 
 // Duration is the validated duration.
-func (d IdleInhibitDuration) Duration() idleinhibit.Duration { return d.duration }
+func (d IdleInhibitDuration) Duration() inhibitduration.Duration { return d.duration }
 
 // UnmarshalConfig implements Unmarshaler.
 func (d *IdleInhibitDuration) UnmarshalConfig(v any) error {
@@ -131,5 +133,5 @@ func (d *IdleInhibitDuration) UnmarshalConfig(v any) error {
 func (d IdleInhibitDuration) MarshalConfig() any { return int64(d.duration.Minutes()) }
 
 func (IdleInhibitDuration) configSchema(*schemaGen) Schema {
-	return uint32RangeSchema(typeOf[IdleInhibitDuration](), 0, idleinhibit.MaxMinutes)
+	return uint32RangeSchema(typeOf[IdleInhibitDuration](), 0, inhibitduration.MaxMinutes)
 }

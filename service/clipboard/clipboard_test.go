@@ -11,6 +11,8 @@ import (
 
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/transfer"
+
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 )
 
 // fakeDevice plays the data-control device: the test announces
@@ -191,7 +193,7 @@ func TestAForeignCopyIsReadUnderItsBestMimeAndRemembered(t *testing.T) {
 	if !slices.Equal(offer.asked, []string{URIListMime}) {
 		t.Fatalf("read under %v", offer.asked)
 	}
-	if offer.limit != MaxEntryBytes {
+	if offer.limit != historybudget.MaxEntryBytes {
 		t.Fatalf("read limit = %d, want the entry cap", offer.limit)
 	}
 	if got := mimesOf(c.history); !slices.Equal(got, []string{URIListMime + "=file:///tmp/a\n"}) {
@@ -463,7 +465,7 @@ func (p *blockingPipe) Write(b []byte) (int, error) {
 }
 
 func TestARestoredEntryStillPastesAfterTheHistoryDropsIt(t *testing.T) {
-	h := mustHistory(t, 1, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 1, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	c, dev := newTestClipboard(t, h)
 	remember(dev, "image/png", "\x89PNG one")
 	c.Copy(ids(c)[0])
@@ -488,7 +490,7 @@ func TestARestoredEntryStillPastesAfterTheHistoryDropsIt(t *testing.T) {
 }
 
 func TestAPasteInFlightOutlivesItsClaimAndEntry(t *testing.T) {
-	h := mustHistory(t, 1, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 1, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	c, dev := newTestClipboard(t, h)
 	remember(dev, textMime, "in flight")
 	c.Copy(ids(c)[0])
@@ -513,7 +515,7 @@ func TestAPasteInFlightOutlivesItsClaimAndEntry(t *testing.T) {
 }
 
 func TestARestoreReplacedByAnotherFreesTheFirst(t *testing.T) {
-	h := mustHistory(t, 2, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 2, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	c, dev := newTestClipboard(t, h)
 	remember(dev, textMime, "one")
 	remember(dev, textMime, "two")
@@ -532,7 +534,7 @@ func TestARestoreReplacedByAnotherFreesTheFirst(t *testing.T) {
 }
 
 func TestAFailedClaimLetsGoOfTheEntry(t *testing.T) {
-	h := mustHistory(t, 2, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 2, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	c, dev := newTestClipboard(t, h)
 	remember(dev, textMime, "x")
 	dev.claimErr = errors.New("finished")
@@ -546,7 +548,7 @@ func TestAFailedClaimLetsGoOfTheEntry(t *testing.T) {
 }
 
 func TestCloseFreesTheHistoryAndTheRestoredEntry(t *testing.T) {
-	h := mustHistory(t, 4, MaxEntryBytes, MaxEntryBytes)
+	h := mustHistory(t, 4, historybudget.MaxEntryBytes, historybudget.MaxEntryBytes)
 	c, dev := newTestClipboard(t, h)
 	remember(dev, textMime, "one")
 	remember(dev, "image/png", "\x89PNG")
@@ -576,7 +578,7 @@ func TestSetBudgetEvictsOldestFirst(t *testing.T) {
 	for _, s := range []string{"aaaa", "bbbb", "cccc"} {
 		remember(dev, textMime, s)
 	}
-	b, err := NewBudget(MinBudgetMiB)
+	b, err := historybudget.NewBudget(historybudget.MinBudgetMiB)
 	if err != nil {
 		t.Fatal(err)
 	}

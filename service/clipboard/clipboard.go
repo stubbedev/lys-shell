@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-ui/transfer"
 
 	"github.com/stubbedev/lys-shell/offheap"
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 )
 
 // Clipboard is the session's clipboard history, kept current: it
@@ -184,7 +185,7 @@ func (c *Clipboard) ClearUnpinned() {
 
 // SetBudget bounds the unpinned entries to budget from now on, dropping
 // the oldest past it.
-func (c *Clipboard) SetBudget(budget Budget) error {
+func (c *Clipboard) SetBudget(budget historybudget.Budget) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	defer c.changedLocked()
@@ -192,7 +193,7 @@ func (c *Clipboard) SetBudget(budget Budget) error {
 }
 
 // SetPinnedBudget bounds what pins may hold from now on.
-func (c *Clipboard) SetPinnedBudget(budget Budget) error {
+func (c *Clipboard) SetPinnedBudget(budget historybudget.Budget) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.history.SetPinnedBudget(budget.Bytes())

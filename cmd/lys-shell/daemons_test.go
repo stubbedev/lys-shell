@@ -10,7 +10,9 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-shell/service/recorder"
 	"github.com/stubbedev/lys-shell/service/recorder/recordertest"
 )
@@ -39,7 +41,7 @@ func runSteps(t *testing.T, steps []step) {
 func TestIdleCommands(t *testing.T) {
 	dbustest.Session(t)
 	runSteps(t, []step{{[]string{"idle", "status"}, "Error: IdleInhibit service not running. Start lys-shell shell first.\n"}})
-	duration, err := idleinhibit.NewDuration(30)
+	duration, err := inhibitduration.NewDuration(30)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +81,7 @@ func TestIdleCommands(t *testing.T) {
 // leaves the run as it was.
 func TestIdleDurationLimit(t *testing.T) {
 	dbustest.Session(t)
-	release, err := idleinhibit.NewDaemon(idleinhibit.NewState(idleinhibit.Duration{})).Export(dbustest.SessionConn(t))
+	release, err := idleinhibit.NewDaemon(idleinhibit.NewState(inhibitduration.Duration{})).Export(dbustest.SessionConn(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,11 +129,11 @@ func TestNotifyListPagesTheWholeHistory(t *testing.T) {
 	dbustest.Session(t)
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	svc := notifications.NewService()
-	memory, err := notifications.NewMemoryLimit(notifications.MaxHistoryMemory)
+	memory, err := notifypolicy.NewMemoryLimit(notifypolicy.MaxHistoryMemory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc.SetHistoryLimits(memory, notifications.DefaultStoredLimit())
+	svc.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	server, err := notifications.Serve(dbustest.SessionConn(t), svc)
 	if err != nil {
 		t.Fatal(err)

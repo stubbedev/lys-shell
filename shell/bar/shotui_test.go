@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 )
 
@@ -21,7 +22,7 @@ func TestEditorSaveWritesAndCopiesWithoutStallingTheLoop(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := styledContext(t, cfg)
 	a := apptest.Run(t)
-	history, err := clipboard.DefaultHistory(clipboard.DefaultBudget(), clipboard.DefaultPinnedBudget())
+	history, err := clipboard.DefaultHistory(historybudget.DefaultBudget(), historybudget.DefaultPinnedBudget())
 	if err != nil {
 		t.Fatal(err)
 	}

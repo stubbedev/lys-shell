@@ -12,6 +12,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
 
@@ -213,13 +214,13 @@ type recorderView struct {
 	// list changes.
 	micSlot    *widget.Box
 	micPicker  *widget.Dropdown
-	mics, cams []recorder.DeviceChoice
+	mics, cams []devicechoice.DeviceChoice
 	webcam     *widget.Box
 	preview    *webcamPreview
 
 	*openFollow
-	micReads     *refresher[[]recorder.DeviceChoice]
-	camReads     *refresher[[]recorder.DeviceChoice]
+	micReads     *refresher[[]devicechoice.DeviceChoice]
+	camReads     *refresher[[]devicechoice.DeviceChoice]
 	camSlot      *widget.Box
 	replayMemory *widget.Label
 	replaySave   *widget.Button
@@ -229,7 +230,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &recorderView{ctx: ctx, font: font, px: px}
 	v.openFollow = newOpenFollow(v.follow)
-	v.camReads = newRefresher(ctx, v.life, func(context.Context) []recorder.DeviceChoice { return recorderCameras() }, v.syncCams)
+	v.camReads = newRefresher(ctx, v.life, func(context.Context) []devicechoice.DeviceChoice { return recorderCameras() }, v.syncCams)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "recorder-dropdown")
 	cfg := ctx.Config.Recorder
@@ -257,7 +258,7 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	audio.Append(v.switchRow(i18n.T("dropdown-recorder-microphone"), cfg.Microphone, recorderPathMic))
 	v.mics = microphoneSources(nil)
 	micRow := v.row(i18n.T("dropdown-recorder-microphone-device"))
-	v.micPicker = v.picker(v.mics, cfg.MicrophoneDevice, recorderPathMicDevice, func() []recorder.DeviceChoice { return v.mics })
+	v.micPicker = v.picker(v.mics, cfg.MicrophoneDevice, recorderPathMicDevice, func() []devicechoice.DeviceChoice { return v.mics })
 	v.micSlot = widget.NewBox(widget.Row, 0, 0)
 	v.micSlot.Append(v.micPicker, false)
 	micRow.AddAction(v.micSlot)
@@ -265,13 +266,13 @@ func recorderDropdown(ctx ModuleContext) widget.Widget {
 	audio.Append(v.switchRow(i18n.T("dropdown-recorder-system-audio"), cfg.SystemAudio, recorderPathSystem))
 	content.Append(dropdownGroup(v.sectionHeader("ld-mic-symbolic", i18n.T("dropdown-recorder-section-audio")), audioCard), false)
 
-	v.cams = recorder.NoCameras()
+	v.cams = devicechoice.NoCameras()
 	webcamCard, webcam := itemCard()
 	webcamCard.AddClass("recorder-card")
 	webcam.Append(v.switchRow(i18n.T("dropdown-recorder-webcam"), cfg.WebcamEnabled, recorderPathWebcam))
 	camRow := v.row(i18n.T("dropdown-recorder-webcam-device"))
 	v.camSlot = widget.NewBox(widget.Row, 0, 0)
-	v.camSlot.Append(v.picker(v.cams, cfg.WebcamDevice, recorderPathCamDevice, func() []recorder.DeviceChoice { return v.cams }), false)
+	v.camSlot.Append(v.picker(v.cams, cfg.WebcamDevice, recorderPathCamDevice, func() []devicechoice.DeviceChoice { return v.cams }), false)
 	camRow.AddAction(v.camSlot)
 	webcam.Append(camRow)
 	position := v.row(i18n.T("dropdown-recorder-position"))
@@ -373,8 +374,8 @@ func (v *recorderView) switchRow(title string, on bool, path string) *widget.Ite
 
 // picker is a device selector writing the chosen id; choices reads the
 // list current at selection time.
-func (v *recorderView) picker(list []recorder.DeviceChoice, saved, path string, choices func() []recorder.DeviceChoice) *widget.Dropdown {
-	d := widget.NewDropdown(v.font, v.px, recorder.ChoiceLabels(list), recorder.ChoiceIndex(list, saved))
+func (v *recorderView) picker(list []devicechoice.DeviceChoice, saved, path string, choices func() []devicechoice.DeviceChoice) *widget.Dropdown {
+	d := widget.NewDropdown(v.font, v.px, devicechoice.ChoiceLabels(list), devicechoice.ChoiceIndex(list, saved))
 	d.OnSelect = func(i int) {
 		if c := choices(); i >= 0 && i < len(c) {
 			v.ctx.setConfig(path, c[i].ID)
@@ -436,25 +437,25 @@ func (v *recorderView) applyState(c recorder.Change) {
 
 // syncMics is MicrophonesUpdated: a changed source list rebuilds the
 // picker, keeping the saved selection when it is still there.
-func (v *recorderView) syncMics(mics []recorder.DeviceChoice) {
+func (v *recorderView) syncMics(mics []devicechoice.DeviceChoice) {
 	if slices.Equal(mics, v.mics) {
 		return
 	}
 	v.mics = mics
 	saved := v.ctx.Config.Recorder.MicrophoneDevice
-	next := v.picker(mics, saved, recorderPathMicDevice, func() []recorder.DeviceChoice { return v.mics })
+	next := v.picker(mics, saved, recorderPathMicDevice, func() []devicechoice.DeviceChoice { return v.mics })
 	v.micSlot.Clear()
 	v.micSlot.Append(next, false)
 	v.micPicker = next
 }
 
-func (v *recorderView) syncCams(cams []recorder.DeviceChoice) {
+func (v *recorderView) syncCams(cams []devicechoice.DeviceChoice) {
 	if slices.Equal(cams, v.cams) {
 		return
 	}
 	v.cams = cams
 	v.camSlot.Clear()
-	v.camSlot.Append(v.picker(cams, v.ctx.Config.Recorder.WebcamDevice, recorderPathCamDevice, func() []recorder.DeviceChoice { return v.cams }), false)
+	v.camSlot.Append(v.picker(cams, v.ctx.Config.Recorder.WebcamDevice, recorderPathCamDevice, func() []devicechoice.DeviceChoice { return v.cams }), false)
 	v.webcam.SetVisible(len(cams) > 1)
 }
 
@@ -480,7 +481,7 @@ func (v *recorderView) follow(life context.Context) {
 	}
 	if src := v.ctx.Pulse; src != nil {
 		if v.micReads == nil {
-			v.micReads = newRefresher(v.ctx, v.life, func(context.Context) []recorder.DeviceChoice { return microphoneSources(src) }, v.syncMics)
+			v.micReads = newRefresher(v.ctx, v.life, func(context.Context) []devicechoice.DeviceChoice { return microphoneSources(src) }, v.syncMics)
 		}
 		followInto(life, "recorder microphones", src.Subscribe, v.micReads)
 	}

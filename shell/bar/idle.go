@@ -10,6 +10,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/idle"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 	"github.com/stubbedev/lys-shell/service/logind"
 	"github.com/stubbedev/lys-shell/service/upower"
 )
@@ -22,7 +23,7 @@ type idlePolicy struct {
 
 	mu        sync.Mutex
 	cfg       config.IdleConfig
-	source    idle.PowerSource
+	source    idlepolicy.PowerSource
 	stopSleep func()
 }
 
@@ -123,7 +124,7 @@ func (p *idlePolicy) followPowerSource(ctx context.Context) <-chan struct{} {
 	return done
 }
 
-func readPowerSource(ctx context.Context, battery *upower.System) idle.PowerSource {
+func readPowerSource(ctx context.Context, battery *upower.System) idlepolicy.PowerSource {
 	reading, cancel := context.WithTimeout(ctx, logind.CallTimeout)
 	defer cancel()
 	on, err := battery.OnBattery(reading)
@@ -131,10 +132,10 @@ func readPowerSource(ctx context.Context, battery *upower.System) idle.PowerSour
 		if !errors.Is(err, context.Canceled) {
 			log.Printf("idle: power source: %v; the AC timeouts apply", err)
 		}
-		return idle.AC
+		return idlepolicy.AC
 	}
 	if on {
-		return idle.Battery
+		return idlepolicy.Battery
 	}
-	return idle.AC
+	return idlepolicy.AC
 }

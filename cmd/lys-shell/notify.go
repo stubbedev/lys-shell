@@ -6,6 +6,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 // notifyCommand is lys-shell/src/cli/notify/commands.rs.
@@ -91,7 +92,7 @@ func notifyDismissAll(m *cli.Matches, p *daemonProxy) error {
 
 func notifyDND(m *cli.Matches, p *daemonProxy) error {
 	if raw, ok := cli.Value[string](m, "until"); ok {
-		until, err := notifications.ParseUntil(raw, time.Now())
+		until, err := notifypolicy.ParseUntil(raw, time.Now())
 		if err != nil {
 			return err
 		}

@@ -2,7 +2,6 @@ package notifications
 
 import (
 	"database/sql"
-	"errors"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -16,6 +15,7 @@ import (
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/internal/fakeclock"
+	"github.com/stubbedev/lys-shell/service/notifications/notifypolicy"
 )
 
 func openTestStore(t *testing.T) (*Store, string) {
@@ -294,8 +294,8 @@ func checkNewestFirst(t *testing.T, got []*Notification, want int) {
 func TestMemoryIsBoundedAndOlderEntriesPageIn(t *testing.T) {
 	st, path := openTestStore(t)
 	svc := newStoredService(t, st)
-	memory, _ := NewMemoryLimit(MinHistoryMemory)
-	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	memory, _ := notifypolicy.NewMemoryLimit(notifypolicy.MinHistoryMemory)
+	svc.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	settle(svc)
 	const sent = 37
 	for i := range sent {
@@ -309,10 +309,10 @@ func TestMemoryIsBoundedAndOlderEntriesPageIn(t *testing.T) {
 	svc.mu.Lock()
 	inMemory := len(svc.recent)
 	svc.mu.Unlock()
-	if inMemory != MinHistoryMemory || svc.Count() != sent {
-		t.Fatalf("in memory %d of count %d, want %d of %d", inMemory, svc.Count(), MinHistoryMemory, sent)
+	if inMemory != notifypolicy.MinHistoryMemory || svc.Count() != sent {
+		t.Fatalf("in memory %d of count %d, want %d of %d", inMemory, svc.Count(), notifypolicy.MinHistoryMemory, sent)
 	}
-	for _, size := range []int{1, 4, MinHistoryMemory, 11, MaxPage} {
+	for _, size := range []int{1, 4, notifypolicy.MinHistoryMemory, 11, MaxPage} {
 		got := pageAll(t, svc, size)
 		checkNewestFirst(t, got, sent)
 		if got[0].ID != sent || got[sent-1].ID != 1 {
@@ -328,7 +328,7 @@ func TestMemoryIsBoundedAndOlderEntriesPageIn(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = st2.Close() })
 	svc2 := newTestService(t)
-	svc2.SetHistoryLimits(memory, DefaultStoredLimit())
+	svc2.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	settle(svc2)
 	if err := svc2.AttachStore(st2); err != nil {
 		t.Fatal(err)
@@ -336,7 +336,7 @@ func TestMemoryIsBoundedAndOlderEntriesPageIn(t *testing.T) {
 	svc2.mu.Lock()
 	inMemory = len(svc2.recent)
 	svc2.mu.Unlock()
-	if inMemory != MinHistoryMemory || svc2.Count() != sent {
+	if inMemory != notifypolicy.MinHistoryMemory || svc2.Count() != sent {
 		t.Fatalf("restored %d in memory of count %d", inMemory, svc2.Count())
 	}
 	checkNewestFirst(t, pageAll(t, svc2, 4), sent)
@@ -344,19 +344,19 @@ func TestMemoryIsBoundedAndOlderEntriesPageIn(t *testing.T) {
 
 func TestMemoryOnlyHistoryIsBounded(t *testing.T) {
 	svc := newTestService(t)
-	memory, _ := NewMemoryLimit(MinHistoryMemory)
-	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	memory, _ := notifypolicy.NewMemoryLimit(notifypolicy.MinHistoryMemory)
+	svc.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	settle(svc)
-	for i := range 3 * MinHistoryMemory {
+	for i := range 3 * notifypolicy.MinHistoryMemory {
 		svc.Notify("app", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
 		settle(svc)
 	}
-	if svc.Count() != MinHistoryMemory {
-		t.Errorf("count = %d, want the memory limit %d", svc.Count(), MinHistoryMemory)
+	if svc.Count() != notifypolicy.MinHistoryMemory {
+		t.Errorf("count = %d, want the memory limit %d", svc.Count(), notifypolicy.MinHistoryMemory)
 	}
 	got := pageAll(t, svc, 3)
-	checkNewestFirst(t, got, MinHistoryMemory)
-	if got[0].ID != 3*MinHistoryMemory {
+	checkNewestFirst(t, got, notifypolicy.MinHistoryMemory)
+	if got[0].ID != 3*notifypolicy.MinHistoryMemory {
 		t.Errorf("newest = %d, want the last sent", got[0].ID)
 	}
 }
@@ -383,31 +383,6 @@ func TestPageRefusesABadSize(t *testing.T) {
 	}
 	if _, err := svc.Page(nil, MaxPage); err != nil {
 		t.Errorf("a full page was refused: %v", err)
-	}
-}
-
-// TestHistoryLimitsAreValidated pins the ranges the config refuses
-// outside of.
-func TestHistoryLimitsAreValidated(t *testing.T) {
-	for _, n := range []int64{MinHistoryMemory, DefaultHistoryMemory, MaxHistoryMemory} {
-		if l, err := NewMemoryLimit(n); err != nil || int64(l.Count()) != n {
-			t.Errorf("memory %d: %v", n, err)
-		}
-	}
-	for _, n := range []int64{MinHistoryMemory - 1, 0, MaxHistoryMemory + 1} {
-		if _, err := NewMemoryLimit(n); !errors.Is(err, ErrHistoryLimit) {
-			t.Errorf("memory %d: err = %v", n, err)
-		}
-	}
-	for _, n := range []int64{MinHistoryStored, MaxHistoryStored} {
-		if l, err := NewStoredLimit(n); err != nil || int64(l.Count()) != n {
-			t.Errorf("stored %d: %v", n, err)
-		}
-	}
-	for _, n := range []int64{MinHistoryStored - 1, MaxHistoryStored + 1} {
-		if _, err := NewStoredLimit(n); !errors.Is(err, ErrHistoryLimit) {
-			t.Errorf("stored %d: err = %v", n, err)
-		}
 	}
 }
 
@@ -570,25 +545,25 @@ func (r fakeResult) RowsAffected() (int64, error) { return int64(r), nil }
 
 func TestRetentionDropsTheOldest(t *testing.T) {
 	st, _ := openTestStore(t)
-	const rows = MinHistoryStored + 1234
+	const rows = notifypolicy.MinHistoryStored + 1234
 	seedRows(t, st.db, rows, 2, fakeclock.New().Now().Add(-time.Hour))
 	svc := newStoredService(t, st)
-	if svc.Count() != DefaultHistoryStored && svc.Count() != rows {
+	if svc.Count() != notifypolicy.DefaultHistoryStored && svc.Count() != rows {
 		t.Fatalf("count = %d", svc.Count())
 	}
-	least, _ := NewStoredLimit(MinHistoryStored)
-	svc.SetHistoryLimits(DefaultMemoryLimit(), least)
+	least, _ := notifypolicy.NewStoredLimit(notifypolicy.MinHistoryStored)
+	svc.SetHistoryLimits(notifypolicy.DefaultMemoryLimit(), least)
 	settle(svc)
 	got := stored(t, st)
-	checkNewestFirst(t, got, MinHistoryStored)
-	if got[len(got)-1].ID != 1235 || svc.Count() != MinHistoryStored {
-		t.Errorf("oldest kept %d, count %d; want 1235 and %d", got[len(got)-1].ID, svc.Count(), MinHistoryStored)
+	checkNewestFirst(t, got, notifypolicy.MinHistoryStored)
+	if got[len(got)-1].ID != 1235 || svc.Count() != notifypolicy.MinHistoryStored {
+		t.Errorf("oldest kept %d, count %d; want 1235 and %d", got[len(got)-1].ID, svc.Count(), notifypolicy.MinHistoryStored)
 	}
 	// Each arrival past the limit drops the oldest in its own write.
 	id := svc.Notify("app", 0, "", "new", "", nil, 0)
 	settle(svc)
 	got = stored(t, st)
-	if len(got) != MinHistoryStored || got[0].ID != id || got[len(got)-1].ID != 1236 || svc.Count() != MinHistoryStored {
+	if len(got) != notifypolicy.MinHistoryStored || got[0].ID != id || got[len(got)-1].ID != 1236 || svc.Count() != notifypolicy.MinHistoryStored {
 		t.Errorf("after an arrival: %d rows, newest %d oldest %d, count %d", len(got), got[0].ID, got[len(got)-1].ID, svc.Count())
 	}
 }
@@ -596,8 +571,8 @@ func TestRetentionDropsTheOldest(t *testing.T) {
 func TestStoredOnlyEntriesCloseReplaceAndInvoke(t *testing.T) {
 	st, _ := openTestStore(t)
 	svc := newStoredService(t, st)
-	memory, _ := NewMemoryLimit(MinHistoryMemory)
-	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	memory, _ := notifypolicy.NewMemoryLimit(notifypolicy.MinHistoryMemory)
+	svc.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	settle(svc)
 	var closed []uint32
 	var invoked []uint32
@@ -613,7 +588,7 @@ func TestStoredOnlyEntriesCloseReplaceAndInvoke(t *testing.T) {
 	settle(svc)
 	gone := svc.Notify("mail", 0, "", "to close", "", nil, 0)
 	settle(svc)
-	for i := range MinHistoryMemory {
+	for i := range notifypolicy.MinHistoryMemory {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
 		settle(svc)
@@ -644,7 +619,7 @@ func TestStoredOnlyEntriesCloseReplaceAndInvoke(t *testing.T) {
 		t.Errorf("a second close: count %d, closed %v", svc.Count(), closed)
 	}
 
-	for i := range MinHistoryMemory {
+	for i := range notifypolicy.MinHistoryMemory {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "m"+strconv.Itoa(i), "", nil, 0)
 		settle(svc)
@@ -759,12 +734,12 @@ func popupIDs(svc *Service) map[uint32]bool {
 func TestDismissClosesTheGivenNotifications(t *testing.T) {
 	st, _ := openTestStore(t)
 	svc := newStoredService(t, st)
-	memory, _ := NewMemoryLimit(MinHistoryMemory)
-	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	memory, _ := notifypolicy.NewMemoryLimit(notifypolicy.MinHistoryMemory)
+	svc.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	settle(svc)
 	old := svc.Notify("mail", 0, "", "old", "", nil, 0)
 	settle(svc)
-	for i := range MinHistoryMemory {
+	for i := range notifypolicy.MinHistoryMemory {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
 		settle(svc)
@@ -803,15 +778,15 @@ func TestDismissClosesTheGivenNotifications(t *testing.T) {
 func TestDismissAllEmptiesThePopupsPastTheWindow(t *testing.T) {
 	st, _ := openTestStore(t)
 	svc := newStoredService(t, st)
-	memory, _ := NewMemoryLimit(MinHistoryMemory)
-	svc.SetHistoryLimits(memory, DefaultStoredLimit())
+	memory, _ := notifypolicy.NewMemoryLimit(notifypolicy.MinHistoryMemory)
+	svc.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 	settle(svc)
-	for i := range MinHistoryMemory + 2 {
+	for i := range notifypolicy.MinHistoryMemory + 2 {
 		advance(svc, time.Millisecond)
 		svc.Notify("chat", 0, "", "n"+strconv.Itoa(i), "", nil, 0)
 		settle(svc)
 	}
-	if got := len(svc.Popups()); got != MinHistoryMemory+2 {
+	if got := len(svc.Popups()); got != notifypolicy.MinHistoryMemory+2 {
 		t.Fatalf("popups = %d, want every sticky one up", got)
 	}
 

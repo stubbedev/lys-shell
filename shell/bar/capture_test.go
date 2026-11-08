@@ -25,6 +25,7 @@ import (
 
 	"github.com/stubbedev/lys-shell/config"
 	"github.com/stubbedev/lys-shell/service/clipboard"
+	"github.com/stubbedev/lys-shell/service/clipboard/historybudget"
 	"github.com/stubbedev/lys-shell/service/hyprland"
 	"github.com/stubbedev/lys-shell/shell/screenshot"
 	"github.com/stubbedev/lys-shell/swaytest"
@@ -89,7 +90,7 @@ func TestHeadlessScreenshotOverDBusLandsOnTheClipboardWithoutInput(t *testing.T)
 	t.Cleanup(sess.Close)
 	application := app.NewApplication(sess)
 	application.SetClipboard(app.NewClipboard(sess))
-	history, err := clipboard.DefaultHistory(clipboard.DefaultBudget(), clipboard.DefaultPinnedBudget())
+	history, err := clipboard.DefaultHistory(historybudget.DefaultBudget(), historybudget.DefaultPinnedBudget())
 	if err != nil {
 		t.Fatal(err)
 	}

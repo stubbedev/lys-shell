@@ -1,11 +1,4 @@
-// Package idle is the shell's built-in idle policy: after the session has
-// been idle for a stage's timeout it dims the backlights, locks, turns the
-// outputs off and suspends, each undone (where it can be) when the user is
-// back, with timeouts per power source; and it locks before the system
-// sleeps. Idle is the compositor's ext-idle-notify-v1, so idle inhibitors
-// (a playing video, the caffeine toggle, a portal or ScreenSaver hold)
-// hold every stage, and waiting costs no timer.
-package idle
+package idlepolicy
 
 import (
 	"errors"

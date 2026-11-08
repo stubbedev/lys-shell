@@ -1,32 +1,10 @@
 package nightlight
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
-
-// MaxTransitionMinutes bounds an ease: past two hours it stops reading
-// as a transition at a solar event.
-const MaxTransitionMinutes = 120
-
-// Transition is how long an ease between day and night lasts, in whole
-// minutes, 0 for an instant switch. NewTransition is the only way to a
-// non-zero one, so it never exceeds MaxTransitionMinutes.
-type Transition struct{ minutes uint32 }
-
-// NewTransition validates minutes against 0..MaxTransitionMinutes.
-func NewTransition(minutes int64) (Transition, error) {
-	if minutes < 0 || minutes > MaxTransitionMinutes {
-		return Transition{}, fmt.Errorf("nightlight: transition of %d minutes is outside 0-%d", minutes, MaxTransitionMinutes)
-	}
-	return Transition{minutes: uint32(minutes)}, nil
-}
-
-// Minutes is the length in minutes.
-func (t Transition) Minutes() uint32 { return t.minutes }
-
-// Duration is the length as a duration.
-func (t Transition) Duration() time.Duration { return time.Duration(t.minutes) * time.Minute }
 
 // Target is what the schedule wants at a moment.
 type Target struct {
@@ -44,7 +22,7 @@ type Target struct {
 // TargetAt is the schedule at now for a place, a transition length and
 // the full night strength. Each transition is centred on civil dawn or
 // dusk; a polar solar day has neither, so it has no transition.
-func TargetAt(now time.Time, loc Location, transition Transition, night Setting) Target {
+func TargetAt(now time.Time, loc nightschedule.Location, transition nightschedule.Transition, night Setting) Target {
 	length := transition.Duration()
 	target := Target{Phase: PhaseAt(now.Add(length/2), loc)}
 	st := solarDayAt(now, loc)
@@ -64,7 +42,7 @@ func TargetAt(now time.Time, loc Location, transition Transition, night Setting)
 // NextEase is the moment the next transition after now starts, or, with
 // no transition length, the next civil dawn or dusk; false when polar
 // days leave none in reach.
-func NextEase(now time.Time, loc Location, transition Transition) (time.Time, bool) {
+func NextEase(now time.Time, loc nightschedule.Location, transition nightschedule.Transition) (time.Time, bool) {
 	length := transition.Duration()
 	var next time.Time
 	found := false
@@ -75,7 +53,7 @@ func NextEase(now time.Time, loc Location, transition Transition) (time.Time, bo
 		}
 	}
 	for _, days := range []time.Duration{-24, 0, 24, 48} {
-		st := sunTimesFor(now.Add(days*time.Hour), loc.latitude, loc.longitude, civilTwilightAltitude)
+		st := sunTimesFor(now.Add(days*time.Hour), loc.Latitude(), loc.Longitude(), civilTwilightAltitude)
 		if st.polarDay || st.polarNight {
 			continue
 		}

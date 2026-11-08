@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-shell/service/pulse/native"
 	"github.com/stubbedev/lys-shell/service/pulse/pulsetest"
 	"github.com/stubbedev/lys-shell/service/recorder"
+	"github.com/stubbedev/lys-shell/service/recorder/devicechoice"
 	"github.com/stubbedev/lys-shell/service/recorder/recordertest"
 	"github.com/stubbedev/lys-shell/shell/treetest"
 )
@@ -103,10 +104,10 @@ func (c *configLog) get(path string) any {
 	return c.writes[path]
 }
 
-func recorderTestCtx(t *testing.T, cams []recorder.DeviceChoice) (ModuleContext, *configLog, *recordertest.Engine) {
+func recorderTestCtx(t *testing.T, cams []devicechoice.DeviceChoice) (ModuleContext, *configLog, *recordertest.Engine) {
 	t.Helper()
 	prev := recorderCameras
-	recorderCameras = func() []recorder.DeviceChoice { return cams }
+	recorderCameras = func() []devicechoice.DeviceChoice { return cams }
 	t.Cleanup(func() { recorderCameras = prev })
 	cfg := config.Defaults()
 	cfg.Recorder.OutputDirectory, cfg.Recorder.StartDelayMs = t.TempDir(), 0
@@ -119,7 +120,7 @@ func recorderTestCtx(t *testing.T, cams []recorder.DeviceChoice) (ModuleContext,
 }
 
 func TestRecorderDropdownStateAndControls(t *testing.T) {
-	ctx, _, engine := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
+	ctx, _, engine := recorderTestCtx(t, []devicechoice.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
 	if v.status.Visible() || v.pause.Enabled() || !v.record.HasClass(css.SuggestedAction) || recordText(v) != i18n.T("dropdown-recorder-record") {
@@ -147,7 +148,7 @@ func TestRecorderDropdownStateAndControls(t *testing.T) {
 }
 
 func TestRecorderDropdownWritesConfig(t *testing.T) {
-	ctx, log, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Cam"}})
+	ctx, log, _ := recorderTestCtx(t, []devicechoice.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: "Cam"}})
 	srv := pulsetest.New(t)
 	srv.PutSource(pulsetest.Source(10, "mic", "Microphone", native.InvalidIndex, ""))
 	svc, err := pulse.Connect(context.Background(), srv.Addr())
@@ -190,7 +191,7 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 	}
 	// An unchanged list keeps the picker.
 	same := v.micPicker
-	v.syncMics(append([]recorder.DeviceChoice(nil), v.mics...))
+	v.syncMics(append([]devicechoice.DeviceChoice(nil), v.mics...))
 	if v.micPicker != same {
 		t.Error("an unchanged list rebuilt the picker")
 	}
@@ -200,7 +201,7 @@ func TestRecorderDropdownWritesConfig(t *testing.T) {
 // a group under its icon-led label, and the record button is lys-ui's
 // icon-and-label content.
 func TestRecorderSettingsAreItemCards(t *testing.T) {
-	ctx, _, _ := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
+	ctx, _, _ := recorderTestCtx(t, []devicechoice.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
 	cards := treetest.WithClass(v, "recorder-card")
@@ -225,8 +226,8 @@ func TestRecorderSettingsAreItemCards(t *testing.T) {
 func styledWebcamDropdown(t *testing.T, w int, camera string) *recorderView {
 	t.Helper()
 	prev := recorderCameras
-	recorderCameras = func() []recorder.DeviceChoice {
-		return []recorder.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: camera}}
+	recorderCameras = func() []devicechoice.DeviceChoice {
+		return []devicechoice.DeviceChoice{{ID: "", Label: "Automatic"}, {ID: "/dev/video0", Label: camera}}
 	}
 	t.Cleanup(func() { recorderCameras = prev })
 	cfg := config.Defaults()
@@ -312,7 +313,7 @@ func TestRecorderLongCameraSelectNarrowsToItsRow(t *testing.T) {
 		t.Errorf("the select is %dpx, its label wants %dpx: it did not narrow", b.W, natural)
 	}
 
-	v.syncMics([]recorder.DeviceChoice{{ID: "", Label: "Default"}, {ID: "usb", Label: "Creative Live! Cam Sync 4K Analog Stereo"}})
+	v.syncMics([]devicechoice.DeviceChoice{{ID: "", Label: "Default"}, {ID: "usb", Label: "Creative Live! Cam Sync 4K Analog Stereo"}})
 	arrangeDropdown(t, v, 360, 1000)
 	audio := treetest.WithClass(v, "recorder-card")[0]
 	sw := boundsOf(treetest.First[*widget.Switch](t, audio))
@@ -344,7 +345,7 @@ func recordText(v *recorderView) string {
 // replay is off the memory reads a dash and Save is disabled; armed, the
 // memory follows the ring at each keyframe and Save writes a file.
 func TestRecorderDropdownInstantReplay(t *testing.T) {
-	ctx, log, engine := recorderTestCtx(t, []recorder.DeviceChoice{{ID: "", Label: "Automatic"}})
+	ctx, log, engine := recorderTestCtx(t, []devicechoice.DeviceChoice{{ID: "", Label: "Automatic"}})
 	v := recorderDropdown(ctx).(*recorderView)
 	defer v.dropdownClosed()
 	if v.replaySave.Enabled() || v.replayMemory.Text() != "-" {

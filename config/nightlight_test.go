@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/service/nightlight"
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 func TestNightlightTransitionDefaultsToAQuarterHour(t *testing.T) {
@@ -16,7 +16,7 @@ func TestNightlightTransitionDefaultsToAQuarterHour(t *testing.T) {
 }
 
 func TestNightlightTransitionHoldsItsRange(t *testing.T) {
-	for _, minutes := range []int64{0, 5, nightlight.MaxTransitionMinutes} {
+	for _, minutes := range []int64{0, 5, nightschedule.MaxTransitionMinutes} {
 		path := writeFile(t, t.TempDir(), "config.yaml", "modules:\n  nightlight:\n    transition-duration: "+strconv.FormatInt(minutes, 10)+"\n")
 		cfg, err := LoadFile(path)
 		if err != nil {
@@ -26,7 +26,7 @@ func TestNightlightTransitionHoldsItsRange(t *testing.T) {
 			t.Errorf("%d minutes loaded as %d", minutes, got)
 		}
 	}
-	for _, minutes := range []int64{nightlight.MaxTransitionMinutes + 1, -1} {
+	for _, minutes := range []int64{nightschedule.MaxTransitionMinutes + 1, -1} {
 		path := writeFile(t, t.TempDir(), "config.yaml", "modules:\n  nightlight:\n    transition-duration: "+strconv.FormatInt(minutes, 10)+"\n")
 		_, err := LoadFile(path)
 		if err == nil || !strings.Contains(err.Error(), "Field: modules.nightlight.transition-duration") {
@@ -37,8 +37,8 @@ func TestNightlightTransitionHoldsItsRange(t *testing.T) {
 
 func TestNightlightTransitionIsABoundedSpin(t *testing.T) {
 	m, ok := Field("modules.nightlight.transition-duration")
-	if !ok || m.Kind != FieldInt || m.Min != 0 || m.Max != nightlight.MaxTransitionMinutes {
-		t.Errorf("meta = %+v, want an int field in 0-%d", m, nightlight.MaxTransitionMinutes)
+	if !ok || m.Kind != FieldInt || m.Min != 0 || m.Max != nightschedule.MaxTransitionMinutes {
+		t.Errorf("meta = %+v, want an int field in 0-%d", m, nightschedule.MaxTransitionMinutes)
 	}
 }
 
@@ -84,7 +84,7 @@ func TestNightlightPinnedLocationRefusesAHalfOrBadPair(t *testing.T) {
 	}
 	cfg := DefaultsNightlight()
 	cfg.Latitude, cfg.Longitude = coordinate(0), coordinate(0)
-	if _, ok, err := cfg.PinnedLocation(); ok || !errors.Is(err, nightlight.ErrNullIsland) {
+	if _, ok, err := cfg.PinnedLocation(); ok || !errors.Is(err, nightschedule.ErrNullIsland) {
 		t.Errorf("0, 0 = %v, %v; want ErrNullIsland", ok, err)
 	}
 }

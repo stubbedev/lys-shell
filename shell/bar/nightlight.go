@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/internal/version"
 	"github.com/stubbedev/lys-shell/service/nightlight"
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 // The schedule's cadence. A jump of the clock, as a resume from suspend
@@ -74,7 +75,7 @@ type sunsetEnv struct {
 	now      func() time.Time
 	stateDir string
 	// locate resolves the schedule location.
-	locate func(ctx context.Context) (nightlight.Location, error)
+	locate func(ctx context.Context) (nightschedule.Location, error)
 	// clockJumps calls onJump on every jump of the wall clock until ctx
 	// ends, and returns why not if it cannot.
 	clockJumps func(ctx context.Context, onJump func()) error
@@ -98,9 +99,9 @@ func liveSunsetEnv(vars xdg.Env, system *dbus.Conn) (sunsetEnv, error) {
 		},
 		now:      time.Now,
 		stateDir: dir,
-		locate: func(ctx context.Context) (nightlight.Location, error) {
+		locate: func(ctx context.Context) (nightschedule.Location, error) {
 			if system == nil {
-				return nightlight.Location{}, errors.New("geoclue: the shell has no system bus connection")
+				return nightschedule.Location{}, errors.New("geoclue: the shell has no system bus connection")
 			}
 			return nightlight.QueryLocation(ctx, system)
 		},
@@ -145,7 +146,7 @@ type nightlightModule struct {
 
 	// location is what the schedule follows, nil with none; locationErr
 	// is why there is none, nil while the first lookup is out.
-	location    *nightlight.Location
+	location    *nightschedule.Location
 	locationErr error
 	// pinned is the config naming the location, so GeoClue stays out.
 	pinned bool
@@ -193,7 +194,7 @@ func newNightlightWith(ctx ModuleContext, env sunsetEnv) *nightlightModule {
 			return
 		}
 		m.filter = filter
-		var remembered *nightlight.Location
+		var remembered *nightschedule.Location
 		if cfg.AutoSchedule && !m.pinned {
 			remembered = m.readRememberedLocation()
 		}
@@ -281,7 +282,7 @@ func (w *serialWorker) drain() {
 func (m *nightlightModule) resolvePinnedLocation() {
 	pinned, ok, err := m.ctx.Config.Nightlight.PinnedLocation()
 	switch {
-	case errors.Is(err, nightlight.ErrNullIsland):
+	case errors.Is(err, nightschedule.ErrNullIsland):
 		log.Printf("nightlight: ignoring latitude and longitude: %v; using GeoClue", err)
 	case err != nil:
 		m.pinned, m.locationErr = true, err
@@ -294,7 +295,7 @@ func (m *nightlightModule) resolvePinnedLocation() {
 }
 
 // readRememberedLocation is the last fix on disk, nil with none.
-func (m *nightlightModule) readRememberedLocation() *nightlight.Location {
+func (m *nightlightModule) readRememberedLocation() *nightschedule.Location {
 	remembered, err := nightlight.LoadLocation(m.env.stateDir)
 	switch {
 	case err == nil:
@@ -472,7 +473,7 @@ func (m *nightlightModule) refreshRefusal(refused error) {
 // setLocation is LocationResolved: a new fix is remembered for the next
 // start and re-evaluates at once. Only GeoClue calls it, and never with
 // a pinned location.
-func (m *nightlightModule) setLocation(loc nightlight.Location) {
+func (m *nightlightModule) setLocation(loc nightschedule.Location) {
 	m.lookupErr, m.locationErr = "", nil
 	if m.location != nil && *m.location == loc {
 		return

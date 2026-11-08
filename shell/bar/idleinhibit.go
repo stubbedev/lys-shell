@@ -14,17 +14,19 @@ import (
 	"github.com/stubbedev/lys-shell/i18n"
 	"github.com/stubbedev/lys-shell/internal/jinja"
 	"github.com/stubbedev/lys-shell/service/idle"
+	"github.com/stubbedev/lys-shell/service/idle/idlepolicy"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 // idleInhibitLabel is helpers.rs's build_label: On/Off state, the
 // remaining time (H:MM:SS or M:SS, "∞" when indefinite, "-" when
 // off), and the stored duration ("∞" when indefinite).
-func idleInhibitLabel(format string, active bool, duration idleinhibit.Duration, remainingSecs uint32) string {
+func idleInhibitLabel(format string, active bool, duration inhibitduration.Duration, remainingSecs uint32) string {
 	return jinja.RenderOr(format, idleInhibitVars(active, duration, remainingSecs))
 }
 
-func idleInhibitVars(active bool, duration idleinhibit.Duration, remainingSecs uint32) map[string]any {
+func idleInhibitVars(active bool, duration inhibitduration.Duration, remainingSecs uint32) map[string]any {
 	state := i18n.T("bar-idle-inhibit-off")
 	if active {
 		state = i18n.T("bar-idle-inhibit-on")
@@ -158,7 +160,7 @@ func idleTooltip(policy *idle.Service, state *idleinhibit.State) string {
 	if !ok {
 		return i18n.T("bar-idle-all-reached")
 	}
-	return i18n.T("bar-idle-next", i18n.Str("stage", i18n.T("bar-idle-stage-"+next.Stage.String())), i18n.Str("after", idle.FormatDuration(next.After)))
+	return i18n.T("bar-idle-next", i18n.Str("stage", i18n.T("bar-idle-stage-"+next.Stage.String())), i18n.Str("after", idlepolicy.FormatDuration(next.After)))
 }
 
 func idleHolders(state *idleinhibit.State) []string {

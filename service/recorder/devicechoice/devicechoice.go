@@ -1,9 +1,6 @@
-package recorder
+package devicechoice
 
 import (
-	"errors"
-	"fmt"
-	"image"
 	"os"
 	"path/filepath"
 	"slices"
@@ -102,24 +99,4 @@ func WithSaved(choices []DeviceChoice, id string) []DeviceChoice {
 		return choices
 	}
 	return append(slices.Clip(choices), DeviceChoice{id, id})
-}
-
-// webcamMaxFPS caps the overlay's updates: a webcam picture needs no
-// more, and each one is a conversion and an upload.
-const webcamMaxFPS = 30
-
-// openWebcam streams device, "" the first camera, letterboxed to frame.
-func openWebcam(device string, frame image.Point) (*v4l2.Camera, error) {
-	if device == "" {
-		choices := Cameras()
-		if len(choices) < 2 {
-			return nil, errors.New("recorder: the webcam overlay is on but no camera is connected")
-		}
-		device = choices[1].ID
-	}
-	cam, err := v4l2.Open(device, frame, webcamMaxFPS)
-	if err != nil {
-		return nil, fmt.Errorf("recorder: webcam: %w", err)
-	}
-	return cam, nil
 }

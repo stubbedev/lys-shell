@@ -1,6 +1,6 @@
 package config
 
-import "github.com/stubbedev/lys-secrets/vault"
+import "github.com/stubbedev/lys-secrets/vault/vaultserver"
 
 // BitwardenServer is where the account lives, resolved at load so a
 // mistyped URL is a diagnostic for its field: `bitwarden.com`,
@@ -8,12 +8,12 @@ import "github.com/stubbedev/lys-secrets/vault"
 // URL, e.g. `https://vault.example.com`.
 type BitwardenServer struct {
 	src    string
-	server vault.Server
+	server vaultserver.Server
 }
 
 // ParseBitwardenServer resolves one server setting.
 func ParseBitwardenServer(s string) (BitwardenServer, error) {
-	server, err := vault.ParseServer(s)
+	server, err := vaultserver.ParseServer(s)
 	if err != nil {
 		return BitwardenServer{}, err
 	}
@@ -34,7 +34,7 @@ func mustBitwardenServer(s string) BitwardenServer {
 func (b BitwardenServer) String() string { return b.src }
 
 // Server is the parsed server.
-func (b BitwardenServer) Server() vault.Server { return b.server }
+func (b BitwardenServer) Server() vaultserver.Server { return b.server }
 
 // UnmarshalConfig implements Unmarshaler.
 func (b *BitwardenServer) UnmarshalConfig(v any) error {
@@ -179,7 +179,7 @@ func DefaultsBitwarden() BitwardenConfig {
 	password, passphrase := DefaultsBitwardenPasswordPreset(), DefaultsBitwardenPassphrasePreset()
 	password.Name, passphrase.Name = "Password", "Passphrase"
 	return BitwardenConfig{
-		Server:               mustBitwardenServer(vault.CloudUS),
+		Server:               mustBitwardenServer(vaultserver.CloudUS),
 		Email:                "",
 		LockWithSession:      true,
 		UnlockWithSession:    false,

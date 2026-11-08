@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 
-	"github.com/stubbedev/lys-shell/service/nightlight"
+	"github.com/stubbedev/lys-shell/service/nightlight/nightschedule"
 )
 
 // NightlightConfig is the night light: a blue-light filter lys-shell
@@ -136,16 +136,16 @@ func (c NightlightConfig) Clicks() ClickConfig {
 // neither set, and an error with only one set, off the globe, or at 0, 0
 // (nightlight.ErrNullIsland), which older default configs still spell
 // out.
-func (c NightlightConfig) PinnedLocation() (nightlight.Location, bool, error) {
+func (c NightlightConfig) PinnedLocation() (nightschedule.Location, bool, error) {
 	if c.Latitude == nil && c.Longitude == nil {
-		return nightlight.Location{}, false, nil
+		return nightschedule.Location{}, false, nil
 	}
 	if c.Latitude == nil || c.Longitude == nil {
-		return nightlight.Location{}, false, errors.New("nightlight: set both latitude and longitude, or neither")
+		return nightschedule.Location{}, false, errors.New("nightlight: set both latitude and longitude, or neither")
 	}
-	loc, err := nightlight.NewLocation(*c.Latitude, *c.Longitude)
+	loc, err := nightschedule.NewLocation(*c.Latitude, *c.Longitude)
 	if err != nil {
-		return nightlight.Location{}, false, err
+		return nightschedule.Location{}, false, err
 	}
 	return loc, true, nil
 }
@@ -154,12 +154,12 @@ func (c NightlightConfig) PinnedLocation() (nightlight.Location, bool, error) {
 // its range rather than clamped.
 //
 // Night light transition length in whole minutes, 0 for an instant switch.
-type NightlightTransition struct{ transition nightlight.Transition }
+type NightlightTransition struct{ transition nightschedule.Transition }
 
 // mustNightlightTransition builds a schema-default length; a bad literal
 // panics at init.
 func mustNightlightTransition(minutes int64) NightlightTransition {
-	t, err := nightlight.NewTransition(minutes)
+	t, err := nightschedule.NewTransition(minutes)
 	if err != nil {
 		panic(err)
 	}
@@ -167,7 +167,7 @@ func mustNightlightTransition(minutes int64) NightlightTransition {
 }
 
 // Transition is the validated length.
-func (t NightlightTransition) Transition() nightlight.Transition { return t.transition }
+func (t NightlightTransition) Transition() nightschedule.Transition { return t.transition }
 
 // UnmarshalConfig implements Unmarshaler.
 func (t *NightlightTransition) UnmarshalConfig(v any) error {
@@ -175,7 +175,7 @@ func (t *NightlightTransition) UnmarshalConfig(v any) error {
 	if err != nil {
 		return err
 	}
-	parsed, err := nightlight.NewTransition(minutes)
+	parsed, err := nightschedule.NewTransition(minutes)
 	if err != nil {
 		return err
 	}
@@ -187,5 +187,5 @@ func (t *NightlightTransition) UnmarshalConfig(v any) error {
 func (t NightlightTransition) MarshalConfig() any { return int64(t.transition.Minutes()) }
 
 func (NightlightTransition) configSchema(*schemaGen) Schema {
-	return uint32RangeSchema(typeOf[NightlightTransition](), 0, nightlight.MaxTransitionMinutes)
+	return uint32RangeSchema(typeOf[NightlightTransition](), 0, nightschedule.MaxTransitionMinutes)
 }

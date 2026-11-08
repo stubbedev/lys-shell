@@ -5,22 +5,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stubbedev/lys-shell/service/idleinhibit"
+	"github.com/stubbedev/lys-shell/service/idleinhibit/inhibitduration"
 )
 
 func TestIdleInhibitStartupDurationTakesTheLongestTimer(t *testing.T) {
-	path := writeFile(t, t.TempDir(), "config.yaml", "modules:\n  idle-inhibit:\n    startup-duration: "+strconv.Itoa(idleinhibit.MaxMinutes)+"\n")
+	path := writeFile(t, t.TempDir(), "config.yaml", "modules:\n  idle-inhibit:\n    startup-duration: "+strconv.Itoa(inhibitduration.MaxMinutes)+"\n")
 	cfg, err := LoadFile(path)
 	if err != nil {
 		t.Fatalf("the longest duration was refused: %v", err)
 	}
-	if got := cfg.IdleInhibit.StartupDuration.Duration(); got.Minutes() != idleinhibit.MaxMinutes || got.Seconds() != idleinhibit.MaxMinutes*60 {
-		t.Errorf("duration = %d min, %d s; want %d min, %d s", got.Minutes(), got.Seconds(), idleinhibit.MaxMinutes, idleinhibit.MaxMinutes*60)
+	if got := cfg.IdleInhibit.StartupDuration.Duration(); got.Minutes() != inhibitduration.MaxMinutes || got.Seconds() != inhibitduration.MaxMinutes*60 {
+		t.Errorf("duration = %d min, %d s; want %d min, %d s", got.Minutes(), got.Seconds(), inhibitduration.MaxMinutes, inhibitduration.MaxMinutes*60)
 	}
 }
 
 func TestIdleInhibitStartupDurationRefusesWhatTheTimerCannotCount(t *testing.T) {
-	for _, minutes := range []int64{idleinhibit.MaxMinutes + 1, 1 << 32, -1} {
+	for _, minutes := range []int64{inhibitduration.MaxMinutes + 1, 1 << 32, -1} {
 		path := writeFile(t, t.TempDir(), "config.yaml", "modules:\n  idle-inhibit:\n    startup-duration: "+strconv.FormatInt(minutes, 10)+"\n")
 		cfg, err := LoadFile(path)
 		want := "Error: idle inhibit duration out of range: " + strconv.FormatInt(minutes, 10) + " minutes, valid 0-71582788"
@@ -35,7 +35,7 @@ func TestIdleInhibitStartupDurationRefusesWhatTheTimerCannotCount(t *testing.T) 
 
 func TestIdleInhibitStartupDurationIsABoundedSpin(t *testing.T) {
 	m, ok := Field("modules.idle-inhibit.startup-duration")
-	if !ok || m.Kind != FieldInt || m.Min != 0 || m.Max != idleinhibit.MaxMinutes {
-		t.Errorf("meta = %+v, want an int field in 0-%d", m, idleinhibit.MaxMinutes)
+	if !ok || m.Kind != FieldInt || m.Min != 0 || m.Max != inhibitduration.MaxMinutes {
+		t.Errorf("meta = %+v, want an int field in 0-%d", m, inhibitduration.MaxMinutes)
 	}
 }
