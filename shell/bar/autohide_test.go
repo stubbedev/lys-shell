@@ -203,7 +203,7 @@ func TestAnAutoHidingBarNeverReservesItsEdge(t *testing.T) {
 
 func TestAHiddenBarOwesNoFrameForItsModules(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
-	b := buildRoot(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
+	b := buildRootOnHeadlessLoop(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
 	clock := widget.NewLabel(ctx.Font, 14, "12:00", 0)
 	b.Start().Append(clock, false)
 	b.Arrange(render.Rect{W: 800, H: 30})

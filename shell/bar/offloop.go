@@ -39,6 +39,14 @@ func mountOffLoop(ctx ModuleContext, start func()) {
 	go start()
 }
 
+func returnToLoop(ctx ModuleContext, fn func()) {
+	if ctx.App == nil {
+		fn()
+		return
+	}
+	ctx.Invoke(fn)
+}
+
 type offLoopRead[T any] struct {
 	ctx    ModuleContext
 	module string

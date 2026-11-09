@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 )
@@ -16,6 +17,18 @@ func onHeadlessLoop[T any](read func() T) T {
 	headlessLoop.Lock()
 	defer headlessLoop.Unlock()
 	return read()
+}
+
+func createOnHeadlessLoop(name string, ctx ModuleContext) (Module, error) {
+	return onHeadlessLoop(func() moduleResult { return createResult(name, ctx) }).unpack()
+}
+
+func buildRootOnHeadlessLoop(ctx ModuleContext, layout config.BarLayout, connector string) *widget.Bar {
+	return onHeadlessLoop(func() *widget.Bar { return buildRoot(ctx, layout, connector) })
+}
+
+func newCwsModuleOnHeadlessLoop(ctx ModuleContext, kind string, flavor cwsFlavor, cfg config.CompositorWorkspacesConfig, backend cwsBackend) *cwsModule {
+	return onHeadlessLoop(func() *cwsModule { return newCwsModule(ctx, kind, flavor, cfg, backend) })
 }
 
 // waitHeadless polls cond on the headless loop until it holds or the

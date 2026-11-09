@@ -106,7 +106,7 @@ func TestTreemanModuleFollowsBuckets(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	src := &fakeTreeman{status: &treeman.Status{Total: 1, Stable: 1}}
 	ctx.Treeman = src
-	module, err := Create("treeman", ctx)
+	module, err := createOnHeadlessLoop("treeman", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

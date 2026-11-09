@@ -109,7 +109,8 @@ func (w *clockWatch) jump(t *testing.T) func() {
 
 func newTestNightlight(t *testing.T, cfg *config.Config, env sunsetEnv) *nightlightModule {
 	t.Helper()
-	return newNightlightWith(newTestContext(t, cfg), env)
+	ctx := newTestContext(t, cfg)
+	return onHeadlessLoop(func() *nightlightModule { return newNightlightWith(ctx, env) })
 }
 
 // Copenhagen, where 2024-06-21 01:00 UTC is night and 12:00 day.
@@ -1183,7 +1184,7 @@ func TestNightlightFailsWithoutAColourProtocol(t *testing.T) {
 	env := (&fakeSunset{clock: sunsetDay}).env(t)
 	env.open = func(func()) (colourFilter, error) { return nil, nightlight.ErrUnsupported }
 	logs := captureLog(t)
-	m := newNightlightWith(newTestContext(t, sunsetConfig(false)), env)
+	m := newTestNightlight(t, sunsetConfig(false), env)
 	if m.read {
 		t.Error("a compositor without a colour protocol revealed the module")
 	}
@@ -1199,7 +1200,8 @@ func TestRetiringTheBarLetsGoOfTheColoursBeforeTheNextMounts(t *testing.T) {
 	fake := &fakeSunset{clock: sunsetDay}
 	ctx := newTestContext(t, sunsetConfig(true))
 	ctx.gen = newMountGen()
-	m := newNightlightWith(ctx, fake.env(t))
+	env := fake.env(t)
+	m := onHeadlessLoop(func() *nightlightModule { return newNightlightWith(ctx, env) })
 	m.toggle()
 	if !fake.running {
 		t.Fatal("the toggle did not start the filter")

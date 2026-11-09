@@ -56,7 +56,7 @@ func TestNewMicrophoneRequiresSource(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Pulse = nil
-	if _, err := Create("microphone", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("microphone", ctx); err == nil {
 		t.Fatal("nil pulse source: want an error, got a module")
 	}
 }

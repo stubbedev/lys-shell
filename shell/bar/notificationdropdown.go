@@ -182,11 +182,7 @@ func (v *notificationView) readInto(kept []*notifications.Notification, n int) {
 			v.notifs, v.more = kept, more
 			v.regroup()
 		}
-		if v.ctx.App == nil {
-			show()
-			return
-		}
-		v.ctx.Invoke(show)
+		returnToLoop(v.ctx, show)
 	})
 }
 

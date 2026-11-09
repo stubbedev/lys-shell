@@ -155,7 +155,7 @@ func TestNewBrightnessRequiresSource(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Brightness = nil
-	if _, err := Create("brightness", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("brightness", ctx); err == nil {
 		t.Fatal("nil source: want an error, got a module")
 	}
 }
@@ -197,7 +197,7 @@ func TestBrightnessModuleIconFollowsTheLevel(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	source := &fakeBrightnessSource{devices: []brightness.Device{{Brightness: 9000, Max: 10000}}}
 	ctx.Brightness = source
-	module, err := Create("brightness", ctx)
+	module, err := createOnHeadlessLoop("brightness", ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

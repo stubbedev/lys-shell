@@ -169,12 +169,15 @@ func newTestCustom(t *testing.T, def config.CustomModuleDefinition) *customModul
 	ctx.CustomUpdates = newCustomUpdates()
 	ctx.gen = newMountGen()
 	t.Cleanup(ctx.gen.retire)
-	m := newCustomModule(ctx, def)
-	m.icon = widget.NewThemeIcon("x", 16)
-	m.btn = newBarButton(ctx, m.icon, "")
-	m.life, m.stop = context.WithCancel(ctx.Life())
+	m := onHeadlessLoop(func() *customModule {
+		m := newCustomModule(ctx, def)
+		m.icon = widget.NewThemeIcon("x", 16)
+		m.btn = newBarButton(ctx, m.icon, "")
+		m.life, m.stop = context.WithCancel(ctx.Life())
+		ctx.CustomUpdates.register(m)
+		return m
+	})
 	t.Cleanup(m.Stop)
-	ctx.CustomUpdates.register(m)
 	return m
 }
 

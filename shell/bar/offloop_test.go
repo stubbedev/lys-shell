@@ -333,6 +333,8 @@ func createResult(name string, ctx ModuleContext) moduleResult {
 	return moduleResult{m, err}
 }
 
+func (r moduleResult) unpack() (Module, error) { return r.module, r.err }
+
 func countRequests(f *lyswmtest.WM, request string) int {
 	n := 0
 	for _, line := range f.Requests() {

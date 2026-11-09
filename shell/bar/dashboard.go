@@ -136,7 +136,7 @@ func newDashboard(ctx ModuleContext) (Module, error) {
 	if cfg.IconOverride == "" {
 		mountOffLoop(ctx, func() {
 			name := dashboardIcon(cfg.IconOverride, detectDistro, widget.ThemeIconExists)
-			ctx.Invoke(func() { icon.SetThemeName(name) })
+			returnToLoop(ctx, func() { icon.SetThemeName(name) })
 		})
 	}
 	return &dashboardModule{icon: icon}, nil

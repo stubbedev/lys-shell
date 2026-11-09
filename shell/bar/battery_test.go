@@ -174,7 +174,7 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 	// App is required by the module; Invoke is what the subscription
 	// pumps through. Build with a nil App is refused, so run the module
 	// lifecycle by hand here: construct, read, restyle.
-	if _, err := Create("battery", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("battery", ctx); err == nil {
 		t.Fatal("nil App: want an error (no loop to subscribe on)")
 	}
 

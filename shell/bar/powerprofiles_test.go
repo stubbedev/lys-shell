@@ -104,7 +104,7 @@ func TestPowerProfilesModuleCycles(t *testing.T) {
 	}}
 	ctx.PowerProfiles = src
 
-	module, err := Create("power-profiles", ctx)
+	module, err := createOnHeadlessLoop("power-profiles", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestNewPowerProfilesRequiresSource(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.PowerProfiles = nil
-	if _, err := Create("power-profiles", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("power-profiles", ctx); err == nil {
 		t.Fatal("no daemon: want an error, got a module")
 	}
 }
@@ -142,7 +142,7 @@ func TestPowerProfilesColorsAndUnknown(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	src := &fakePPSource{snap: powerprofiles.Snapshot{Available: true, Active: powerprofiles.ProfilePerformance}}
 	ctx.PowerProfiles = src
-	module, err := Create("power-profiles", ctx)
+	module, err := createOnHeadlessLoop("power-profiles", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

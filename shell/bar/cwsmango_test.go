@@ -59,7 +59,7 @@ func newTestMango(t *testing.T, cfg *config.Config, connector string) *cwsModule
 	t.Helper()
 	ctx := newTestContext(t, cfg)
 	ctx.Connector = connector
-	module, err := Create("mango-workspaces", ctx)
+	module, err := createOnHeadlessLoop("mango-workspaces", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -73,7 +73,7 @@ func newTestMango(t *testing.T, cfg *config.Config, connector string) *cwsModule
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if err := readAndApply(m.read, m.apply); err != nil {
+	if err := onHeadlessLoop(func() error { return readAndApply(m.read, m.apply) }); err != nil {
 		t.Fatal(err)
 	}
 	return m

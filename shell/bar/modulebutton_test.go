@@ -418,7 +418,7 @@ func TestBarButtonAccessibleNameIsItsLabel(t *testing.T) {
 func TestBarButtonHoldsOpenWhileItsDropdownIs(t *testing.T) {
 	for _, freeze := range []bool{true, false} {
 		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
-		bar := buildRoot(styledContext(t, config.Defaults()), layout, "DP-1")
+		bar := buildRootOnHeadlessLoop(styledContext(t, config.Defaults()), layout, "DP-1")
 		b := clockButton(bar)
 		b.SetLabel("12:30")
 		settleBar(bar, widget.Size{W: 1000, H: 100})

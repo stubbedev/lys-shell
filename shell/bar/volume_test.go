@@ -230,7 +230,7 @@ func TestNewVolumeRequiresSource(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Pulse = nil
-	if _, err := Create("volume", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("volume", ctx); err == nil {
 		t.Fatal("nil pulse source: want an error, got a module")
 	}
 }

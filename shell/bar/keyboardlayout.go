@@ -224,7 +224,7 @@ func newKeyboardLayout(ctx ModuleContext) (Module, error) {
 			return
 		}
 		m.next.Store(&source.next)
-		ctx.Invoke(m.reveal)
+		returnToLoop(ctx, m.reveal)
 		reads := newOffLoopRead(ctx, "keyboard-input", func(context.Context) (string, error) { return readLayout(source) }, m.show)
 		ticks, stop, err := source.subscribe(ctx.Life())
 		if err != nil {

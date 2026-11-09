@@ -63,11 +63,11 @@ func TestRequireCompositorNamesBothSides(t *testing.T) {
 func TestSwayWorkspacesSkippedUnderHyprland(t *testing.T) {
 	fakeI3(t, "[]", `{"id":1,"type":"root","nodes":[],"floating_nodes":[]}`)
 	ctx := newTestContext(t, config.Defaults())
-	if _, err := Create("sway-workspaces", ctx); err != nil {
+	if _, err := createOnHeadlessLoop("sway-workspaces", ctx); err != nil {
 		t.Fatalf("sway-workspaces under sway: %v", err)
 	}
 	t.Setenv("HYPRLAND_INSTANCE_SIGNATURE", "/run/test-hyprland")
-	if _, err := Create("sway-workspaces", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("sway-workspaces", ctx); err == nil {
 		t.Error("sway-workspaces under Hyprland: want an error, got a module")
 	}
 }

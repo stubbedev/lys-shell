@@ -62,7 +62,7 @@ func TestDashboardModuleIsTheIcon(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Dashboard.IconOverride = "my-distro-symbolic"
 	ctx := newTestContext(t, cfg)
-	module, err := Create("dashboard", ctx)
+	module, err := createOnHeadlessLoop("dashboard", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

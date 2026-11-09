@@ -60,7 +60,7 @@ func newTestLysWM(t *testing.T, cfg *config.Config, connector string) *cwsModule
 	t.Helper()
 	ctx := newTestContext(t, cfg)
 	ctx.Connector = connector
-	module, err := Create("lys-wm-workspaces", ctx)
+	module, err := createOnHeadlessLoop("lys-wm-workspaces", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestLysWMWorkspacesClicksDispatch(t *testing.T) {
 
 func TestLysWMWorkspacesRequireLysWM(t *testing.T) {
 	advertise(t, "SWAYSOCK")
-	if _, err := Create("lys-wm-workspaces", newTestContext(t, config.Defaults())); err == nil {
+	if _, err := createOnHeadlessLoop("lys-wm-workspaces", newTestContext(t, config.Defaults())); err == nil {
 		t.Error("lys-wm-workspaces under sway: want an error, got a module")
 	}
 }
@@ -145,7 +145,7 @@ func TestWindowTitleFollowsLysWMFocus(t *testing.T) {
 	f.Result("activewindow", `{"id":4,"app_id":"foot","title":"~"}`)
 	cfg := config.Defaults()
 	cfg.WindowTitle.Format = "{{ app }}: {{ title }}"
-	module, err := Create("window-title", newTestContext(t, cfg))
+	module, err := createOnHeadlessLoop("window-title", newTestContext(t, cfg))
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestKeyboardLayoutLysWMWithoutALayoutAnswerFails(t *testing.T) {
 	if _, err := keyboardLayoutSource(ctx); err == nil || !strings.Contains(err.Error(), "seed the layout") {
 		t.Errorf("the source = %v, want the seed error", err)
 	}
-	m, err := Create("keyboard-input", ctx)
+	m, err := createOnHeadlessLoop("keyboard-input", ctx)
 	if err != nil {
 		t.Fatalf("Create decides nothing from the compositor's answer: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestKeyboardLayoutLysWMWithoutALayoutAnswerFails(t *testing.T) {
 func TestKeybindModeShowsLysWMsSubmapBeforeAnyEvent(t *testing.T) {
 	f := newFakeLysWM(t)
 	f.Result("submap", `"resize"`)
-	module, err := Create("keybind-mode", newTestContext(t, config.Defaults()))
+	module, err := createOnHeadlessLoop("keybind-mode", newTestContext(t, config.Defaults()))
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestKeybindModeShowsLysWMsSubmapBeforeAnyEvent(t *testing.T) {
 
 func TestKeybindModeFollowsLysWMSubmaps(t *testing.T) {
 	f := newFakeLysWM(t)
-	module, err := Create("keybind-mode", newTestContext(t, config.Defaults()))
+	module, err := createOnHeadlessLoop("keybind-mode", newTestContext(t, config.Defaults()))
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestKeybindModeFollowsLysWMSubmaps(t *testing.T) {
 // label follows lys-wm's event, not the click.
 func TestKeyboardLayoutClickCyclesThroughLysWM(t *testing.T) {
 	f := newFakeLysWM(t)
-	module, err := Create("keyboard-input", newTestContext(t, config.Defaults()))
+	module, err := createOnHeadlessLoop("keyboard-input", newTestContext(t, config.Defaults()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func TestKeyboardLayoutClickCyclesThroughLysWM(t *testing.T) {
 // Any other action on the module is not a layout switch.
 func TestKeyboardLayoutOtherActionsDoNotCycle(t *testing.T) {
 	f := newFakeLysWM(t)
-	module, err := Create("keyboard-input", newTestContext(t, config.Defaults()))
+	module, err := createOnHeadlessLoop("keyboard-input", newTestContext(t, config.Defaults()))
 	if err != nil {
 		t.Fatal(err)
 	}

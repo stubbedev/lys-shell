@@ -365,7 +365,7 @@ func newTestHypr(t *testing.T, mutate func(*config.Config)) (*fakeHypr, *hyprlan
 	ctx := newTestContext(t, cfg)
 	ctx.Hyprland = conn
 	ctx.Connector = "DP-1"
-	module, err := Create("hyprland-workspaces", ctx)
+	module, err := createOnHeadlessLoop("hyprland-workspaces", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -383,7 +383,7 @@ func modelIDs(models []cwsButtonModel) []int {
 func TestNewHyprlandWorkspacesRequiresHyprland(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Hyprland = nil
-	if _, err := Create("hyprland-workspaces", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("hyprland-workspaces", ctx); err == nil {
 		t.Fatal("no Hyprland connection: want an error, got a module")
 	}
 }

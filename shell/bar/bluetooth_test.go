@@ -141,7 +141,7 @@ func TestNewBluetoothRequiresSource(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Bluetooth = nil
-	if _, err := Create("bluetooth", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("bluetooth", ctx); err == nil {
 		t.Fatal("nil bluetooth source: want an error, got a module")
 	}
 }

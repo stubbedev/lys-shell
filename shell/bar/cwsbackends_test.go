@@ -80,7 +80,7 @@ func TestSwayBackendMapsTheSnapshot(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Connector = "DP-1"
-	module, err := Create("sway-workspaces", ctx)
+	module, err := createOnHeadlessLoop("sway-workspaces", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestNiriBackendMapsTheSnapshot(t *testing.T) {
 	cfg.NiriWorkspaces.AppIconsDedupe = false
 	ctx := newTestContext(t, cfg)
 	ctx.Connector = "DP-1"
-	module, err := Create("niri-workspaces", ctx)
+	module, err := createOnHeadlessLoop("niri-workspaces", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

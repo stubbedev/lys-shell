@@ -16,7 +16,7 @@ func separatorBar(t *testing.T, cfg *config.Config, loc config.Location, size wi
 	t.Helper()
 	cfg.Bar.Location = loc
 	layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}, {Module: "separator"}, {Module: "clock"}}}
-	bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+	bar := buildRootOnHeadlessLoop(styledContext(t, cfg), layout, "DP-1")
 	settleBar(bar, size)
 	item := bar.Start().Children()[1].(*widget.Box).Children()[0]
 	sep, ok := item.(*widget.BarSeparator)

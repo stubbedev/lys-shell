@@ -106,7 +106,10 @@ func followBackgroundApps(t *testing.T, serve bool) (*fakeMonitor, *argvRecorder
 
 func backgroundIndicator(t *testing.T, ctx ModuleContext) (*countIndicator, *widget.Box) {
 	t.Helper()
-	m, err := newBackgroundApps(ctx)
+	m, err := onHeadlessLoop(func() moduleResult {
+		m, err := newBackgroundApps(ctx)
+		return moduleResult{m, err}
+	}).unpack()
 	if err != nil {
 		t.Fatal(err)
 	}

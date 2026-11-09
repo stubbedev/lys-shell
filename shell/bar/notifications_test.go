@@ -63,7 +63,7 @@ func TestNotificationModuleFollowsService(t *testing.T) {
 	ctx.Notifications = notifications.NewService()
 	t.Cleanup(func() { ctx.Notifications.FlushWrites(5 * time.Second) })
 
-	module, err := Create("notifications", ctx)
+	module, err := createOnHeadlessLoop("notifications", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestNotificationModuleRequiresService(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Notifications = nil
-	if _, err := Create("notifications", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("notifications", ctx); err == nil {
 		t.Fatal("nil notification service: want an error, got a module")
 	}
 }

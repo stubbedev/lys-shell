@@ -274,7 +274,7 @@ func TestSystrayFollowsTheItemSignals(t *testing.T) {
 
 	ctx := newTestContext(t, config.Defaults())
 	ctx.SNI, ctx.Tray = store, NewTrayService(host)
-	module, err := Create("systray", ctx)
+	module, err := createOnHeadlessLoop("systray", ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

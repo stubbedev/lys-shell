@@ -141,7 +141,7 @@ func newTrayForTest(t *testing.T, cfg *config.Config, items ...*sni.Item) (*syst
 	tray := &fakeTray{}
 	ctx := newTestContext(t, cfg)
 	ctx.SNI, ctx.Tray = store, tray
-	module, err := Create("systray", ctx)
+	module, err := createOnHeadlessLoop("systray", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

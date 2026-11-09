@@ -55,7 +55,7 @@ func TestAppendItemsSkipsUnknownModule(t *testing.T) {
 // rest of the section builds.
 func TestUnimplementedSchemaModuleIsSkipped(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
-	if _, err := Create("updates", ctx); err == nil || !strings.Contains(err.Error(), "not implemented") {
+	if _, err := createOnHeadlessLoop("updates", ctx); err == nil || !strings.Contains(err.Error(), "not implemented") {
 		t.Fatalf("updates: %v, want a not-implemented error", err)
 	}
 	items := itemsZone([]config.BarItem{{Module: "updates"}, {Module: "clock"}}, ctx).Children()
@@ -70,7 +70,7 @@ func TestUnimplementedSchemaModuleIsSkipped(t *testing.T) {
 func TestModulesCarryTheirIcons(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	m, err := Create("clock", ctx)
+	m, err := createOnHeadlessLoop("clock", ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestModulesCarryTheirIcons(t *testing.T) {
 		t.Fatalf("clock root %T, want a bar button with %q and the time", m.Root(), cfg.Clock.IconName)
 	}
 	cfg.Clock.IconShow = false
-	if m, err = Create("clock", ctx); err != nil {
+	if m, err = createOnHeadlessLoop("clock", ctx); err != nil {
 		t.Fatal(err)
 	}
 	if btn := m.Root().(*barButton); shownIcon(btn) != nil {
@@ -95,7 +95,9 @@ func TestModulesCarryTheirIcons(t *testing.T) {
 
 // itemsZone is a bar zone holding items.
 func itemsZone(items []config.BarItem, ctx ModuleContext) *widget.Box {
-	zone := widget.NewBox(widget.Row, 0, 0)
-	appendItems(zone, items, ctx)
-	return zone
+	return onHeadlessLoop(func() *widget.Box {
+		zone := widget.NewBox(widget.Row, 0, 0)
+		appendItems(zone, items, ctx)
+		return zone
+	})
 }

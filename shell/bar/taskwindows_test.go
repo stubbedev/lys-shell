@@ -136,7 +136,10 @@ func minimizedModule(t *testing.T, cfg *config.Config, src *fakeToplevels) (*min
 	ctx.Connector = "DP-1"
 	ctx.Tasks = newTaskHub(src, func(fn func()) { fn() })
 	ctx.Tasks.apps.goOff = func(func()) {}
-	m, err := newMinimizedWindows(ctx)
+	m, err := onHeadlessLoop(func() moduleResult {
+		m, err := newMinimizedWindows(ctx)
+		return moduleResult{m, err}
+	}).unpack()
 	if err != nil {
 		t.Fatal(err)
 	}

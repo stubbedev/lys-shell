@@ -175,7 +175,7 @@ func TestMediaModuleRenders(t *testing.T) {
 	source := newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: strings.Repeat("t", 50), Artist: "Band", State: mpris.StatePlaying})
 	ctx := newTestContext(t, cfg)
 	ctx.Media = source
-	module, err := Create("media", ctx)
+	module, err := createOnHeadlessLoop("media", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestNewMediaRequiresSource(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Media = nil
-	if _, err := Create("media", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("media", ctx); err == nil {
 		t.Fatal("nil mpris source: want an error, got a module")
 	}
 }

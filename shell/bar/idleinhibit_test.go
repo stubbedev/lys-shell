@@ -75,7 +75,7 @@ func TestIdleInhibitModuleFollowsState(t *testing.T) {
 	state := idleinhibit.NewState(inhibitMinutes(t, 60))
 	ctx.IdleInhibit = state
 
-	module, err := Create("idle-inhibit", ctx)
+	module, err := createOnHeadlessLoop("idle-inhibit", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestIdleInhibitModuleFollowsState(t *testing.T) {
 	waitForText(t, label, i18n.T("bar-idle-inhibit-off"))
 
 	// A module built without the shared state still works standalone.
-	standalone, err := Create("idle-inhibit", newTestContext(t, cfg))
+	standalone, err := createOnHeadlessLoop("idle-inhibit", newTestContext(t, cfg))
 	if err != nil {
 		t.Fatalf("standalone Create: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestIdleInhibitKeepsTheStylesheetInk(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	state := idleinhibit.NewState(inhibitMinutes(t, 60))
 	ctx.IdleInhibit = state
-	module, err := Create("idle-inhibit", ctx)
+	module, err := createOnHeadlessLoop("idle-inhibit", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}

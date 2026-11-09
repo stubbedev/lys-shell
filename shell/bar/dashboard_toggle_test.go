@@ -102,13 +102,13 @@ func TestDashboardModuleRegistersItsButton(t *testing.T) {
 	ctx.Connector = "DP-1"
 	ctx.Dropdowns = newDropdownRegistry(nil, cfg, ctx.Font, &full, ctx)
 	row := widget.NewBox(widget.Row, 0, 0)
-	if err := appendModule(row, config.BarItem{Module: "clock"}, ctx); err != nil {
+	if err := mountInto(row, ctx, "clock"); err != nil {
 		t.Fatal(err)
 	}
 	if len(ctx.Dropdowns.dashboardAnchors) != 0 {
 		t.Error("the clock registered as the dashboard's anchor")
 	}
-	if err := appendModule(row, config.BarItem{Module: "dashboard"}, ctx); err != nil {
+	if err := mountInto(row, ctx, "dashboard"); err != nil {
 		t.Fatal(err)
 	}
 	anchor, ok := ctx.Dropdowns.dashboardAnchors["DP-1"].(*barButton)

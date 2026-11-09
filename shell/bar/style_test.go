@@ -83,7 +83,7 @@ func styledContext(t *testing.T, cfg *config.Config) ModuleContext {
 // returning the pixels and the measured height.
 func paintBar(t *testing.T, ctx ModuleContext, layout config.BarLayout, w int) ([]byte, int, widget.Widget) {
 	t.Helper()
-	return paintBarRoot(buildRoot(ctx, layout, "DP-1"), w)
+	return paintBarRoot(buildRootOnHeadlessLoop(ctx, layout, "DP-1"), w)
 }
 
 func paintBarRoot(root *widget.Bar, w int) ([]byte, int, widget.Widget) {
@@ -112,7 +112,7 @@ func TestBarCenterSectionIsCentered(t *testing.T) {
 		Left:    []config.BarItem{{Module: "clock"}, {Module: "clock"}, {Module: "clock"}},
 		Center:  []config.BarItem{{Module: "clock"}},
 	}
-	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	root := buildRootOnHeadlessLoop(newTestContext(t, cfg), layout, "DP-1")
 	widget.SizeWithin(root, widget.Size{W: 1600, H: 60})
 	root.Arrange(render.Rect{W: 1600, H: 60})
 	b := root.Center().Bounds()
@@ -126,7 +126,7 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	cfg.Bar = config.PlainBar()
 	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock", Class: "mine"}}}
 	ctx := newTestContext(t, cfg)
-	root := buildRoot(ctx, layout, "DP-1")
+	root := buildRootOnHeadlessLoop(ctx, layout, "DP-1")
 	for _, c := range []string{"top", "DP-1"} {
 		if !widget.HasClass(root, c) {
 			t.Errorf("root misses %q", c)
@@ -170,7 +170,7 @@ func TestBarRootCarriesTheRustTreeAndClasses(t *testing.T) {
 	}
 
 	cfg.Bar.InsetEdge = config.Size{Value: 4, Unit: config.SizePixels}
-	root = buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	root = buildRootOnHeadlessLoop(newTestContext(t, cfg), layout, "DP-1")
 	if !widget.HasClass(root, "floating") {
 		t.Error("an inset bar is not floating")
 	}
@@ -181,7 +181,7 @@ func TestGroupsAreBarItemsWithModules(t *testing.T) {
 	layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Group: &config.BarGroup{
 		Name: "g1", Modules: []config.BarItem{{Module: "clock"}, {Module: "clock"}},
 	}}}}
-	root := buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	root := buildRootOnHeadlessLoop(newTestContext(t, cfg), layout, "DP-1")
 	group := root.Start().Children()[0].(*widget.Box)
 	if !group.HasClass("bar-item") || !group.HasClass("bar-group") || group.ID() != "g1" {
 		t.Errorf("group box classes %v id %q", group.Classes(), group.ID())
@@ -262,7 +262,7 @@ func TestBarIsAsThickAsItsContent(t *testing.T) {
 		cfg := config.Defaults()
 		cfg.Bar.Location = loc
 		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
-		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		bar := buildRootOnHeadlessLoop(styledContext(t, cfg), layout, "DP-1")
 		if thick := barThickness(bar, out); thick == 0 || thick >= min(out.W, out.H) {
 			t.Errorf("%s: thickness %d, want the content's", loc, thick)
 		}
@@ -290,7 +290,7 @@ func TestBarPaddingInsetsTheZones(t *testing.T) {
 		cfg.Bar.Padding = config.Size{Value: float32(tc.padding), Unit: config.SizePixels}
 		cfg.Bar.PaddingEnds = config.Size{Value: float32(tc.ends), Unit: config.SizePixels}
 		layout := config.BarLayout{Monitor: "*", Left: []config.BarItem{{Module: "clock"}}}
-		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		bar := buildRootOnHeadlessLoop(styledContext(t, cfg), layout, "DP-1")
 		settleBar(bar, widget.Size{W: 1000, H: 1000})
 		start := bar.Start().Bounds()
 		wantX, wantY := tc.ends, tc.padding
@@ -327,7 +327,7 @@ func TestBarButtonGapSeparatesIconAndLabel(t *testing.T) {
 		cfg.Bar.ButtonIconPosition = tc.at
 		cfg.Bar.ButtonGap = config.Size{Value: tc.gap, Unit: config.SizePixels}
 		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
-		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		bar := buildRootOnHeadlessLoop(styledContext(t, cfg), layout, "DP-1")
 		settleBar(bar, widget.Size{W: 1000, H: 1000})
 		btn := clockButton(bar)
 		icon, label := shownIcon(btn).Bounds(), btn.Label().Bounds()
@@ -349,7 +349,7 @@ func TestBarButtonFollowsTheBarsOrientation(t *testing.T) {
 		cfg.Bar = config.PlainBar()
 		cfg.Bar.Location = loc
 		layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
-		bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+		bar := buildRootOnHeadlessLoop(styledContext(t, cfg), layout, "DP-1")
 		settleBar(bar, widget.Size{W: 1000, H: 1000})
 		btn := clockButton(bar)
 		if btn.HasClass("vertical") != loc.IsVertical() {
@@ -378,7 +378,7 @@ func paintedAt(bar *widget.Bar, w, h int, p widget.Point) render.Color {
 // configured background once the pointer leaves.
 func TestBarButtonShadesUnderThePointer(t *testing.T) {
 	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
-	bar := buildRoot(styledContext(t, config.Defaults()), layout, "DP-1")
+	bar := buildRootOnHeadlessLoop(styledContext(t, config.Defaults()), layout, "DP-1")
 	settleBar(bar, widget.Size{W: 1000, H: 100})
 	b := clockButton(bar)
 	lb := b.Label().Bounds()
@@ -403,7 +403,7 @@ func TestBlockPrefixIconFillsTheButtonHeight(t *testing.T) {
 	cfg.Bar.ButtonIconPadding = config.Scale(1)
 	cfg.Bar.ButtonLabelPadding = config.Scale(3)
 	layout := config.BarLayout{Monitor: "*", Center: []config.BarItem{{Module: "clock"}}}
-	bar := buildRoot(styledContext(t, cfg), layout, "DP-1")
+	bar := buildRootOnHeadlessLoop(styledContext(t, cfg), layout, "DP-1")
 	settleBar(bar, widget.Size{W: 1000, H: 1000})
 	btn := clockButton(bar)
 	icon, label := shownIcon(btn).Bounds(), btn.Label().Bounds()
@@ -418,7 +418,7 @@ func TestTheDefaultBarIsAFloatingPaneOfGlass(t *testing.T) {
 		t.Fatalf("background-opacity %d asks the compositor for no blur", cfg.Bar.BackgroundOpacity)
 	}
 	ctx := styledContext(t, cfg)
-	root := buildRoot(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
+	root := buildRootOnHeadlessLoop(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
 	if !widget.HasClass(root, "floating") {
 		t.Error("the default bar touches its edge")
 	}
@@ -434,7 +434,7 @@ func TestTheDefaultBarIsAFloatingPaneOfGlass(t *testing.T) {
 func TestABarWithoutBlurRestsOnItsOpaqueColor(t *testing.T) {
 	ctx := styledContext(t, config.Defaults())
 	palette := ctx.Theme.RenderPalette()
-	root := buildRoot(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
+	root := buildRootOnHeadlessLoop(ctx, config.BarLayout{Monitor: "*"}, "DP-1")
 	root.AddClass("blur-unavailable")
 	data, h, _ := paintBarRoot(root, 200)
 	if got := pixelAt(data, 200, 100, h/2); got != palette.Surface {

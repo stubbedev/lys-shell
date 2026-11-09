@@ -3,6 +3,7 @@ package bar
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/i18n"
@@ -80,7 +81,7 @@ func TestKeybindModeModuleRequiresHyprlandOrLysWM(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	ctx.Hyprland = nil
 	advertise(t, "SWAYSOCK")
-	if _, err := Create("keybind-mode", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("keybind-mode", ctx); err == nil {
 		t.Fatal("under sway: want an error, got a module")
 	}
 }
@@ -91,7 +92,7 @@ func TestKeybindModeModuleFollowsSubmaps(t *testing.T) {
 	eventLn := startFakeEventStream(t, []string{"submap>>resize\n"})
 	ctx.Hyprland = hyprland.ConnectTo(filepath.Join(sockdir.Dir(t), "unused.sock"), eventLn)
 
-	module, err := Create("keybind-mode", ctx)
+	module, err := createOnHeadlessLoop("keybind-mode", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -113,7 +114,7 @@ func TestKeybindModeHidesTheModuleRoot(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	f, conn := startFakeHypr(t, map[string]string{})
 	ctx.Hyprland = conn
-	module, err := Create("keybind-mode", ctx)
+	module, err := createOnHeadlessLoop("keybind-mode", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -133,6 +134,39 @@ func TestKeybindModeHidesTheModuleRoot(t *testing.T) {
 	if !visible() {
 		t.Error("auto-hide off hid the module")
 	}
+}
+
+func TestKeybindModeMountsWhileItsFirstSubmapArrives(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.KeybindMode.AutoHide = true
+	ctx := newTestContext(t, cfg)
+	ctx.Hyprland = hyprland.ConnectTo(filepath.Join(sockdir.Dir(t), "unused.sock"), startFakeEventStream(t, []string{"submap>>resize\n"}))
+	row := widget.NewBox(widget.Row, 0, 0)
+	shown := make(chan bool, 1)
+	go func() { shown <- shownInResize(row) }()
+	if err := mountInto(row, ctx, "keybind-mode"); err != nil {
+		t.Fatalf("mount: %v", err)
+	}
+	if !<-shown {
+		t.Fatal("under auto-hide the resize submap never showed the module")
+	}
+	if got := onHeadlessLoop(findLabel(row).Text); got != "resize" {
+		t.Errorf("the label reads %q, want the resize submap", got)
+	}
+}
+
+func shownInResize(row *widget.Box) bool {
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if onHeadlessLoop(func() bool {
+			kids := row.Children()
+			return len(kids) == 1 && widget.IsVisible(kids[0]) && findLabel(row).Text() == "resize"
+		}) {
+			return true
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return false
 }
 
 // findLabel walks a module root for its first label.

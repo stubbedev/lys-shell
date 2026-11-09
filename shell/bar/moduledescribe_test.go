@@ -46,7 +46,7 @@ func TestEveryBuiltModuleIsNamedByItsTitleAndState(t *testing.T) {
 			if got != title && !strings.HasPrefix(got, title+", ") {
 				t.Errorf("%s is named %q, want its title %q first", name, got, title)
 			}
-			if tip := b.TooltipText(); tip != got {
+			if tip := onHeadlessLoop(b.TooltipText); tip != got {
 				t.Errorf("%s shows the tooltip %q, want its name %q", name, tip, got)
 			}
 		}
@@ -68,7 +68,13 @@ func mountWithoutServices(t *testing.T, name string) (row *widget.Box, ok bool) 
 		}
 	}()
 	row = widget.NewBox(widget.Row, 0, 0)
-	return row, appendModule(row, config.BarItem{Module: config.BarModule(name)}, newTestContext(t, config.Defaults())) == nil
+	return row, mountInto(row, newTestContext(t, config.Defaults()), name) == nil
+}
+
+func mountInto(row *widget.Box, ctx ModuleContext, name string) error {
+	return onHeadlessLoop(func() error {
+		return appendModule(row, config.BarItem{Module: config.BarModule(name)}, ctx)
+	})
 }
 
 // A module is named by its title and its state, the name changes with

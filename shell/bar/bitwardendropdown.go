@@ -297,7 +297,7 @@ func (v *bitwardenView) follow(life context.Context) {
 	}
 	mountOffLoop(v.ctx, func() {
 		vt, err := v.host.vault()
-		v.ctx.Invoke(func() {
+		returnToLoop(v.ctx, func() {
 			if err != nil {
 				v.showError(err)
 				return

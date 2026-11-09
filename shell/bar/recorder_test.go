@@ -75,7 +75,7 @@ func TestRecorderPreparingClass(t *testing.T) {
 	t.Cleanup(func() { onHeadlessLoop(func() bool { ctx.gen.retire(); return true }) })
 	gate := make(chan struct{})
 	ctx.Recorder = recorder.NewState(&recordertest.Engine{Gate: gate}, func() config.RecorderConfig { return cfg.Recorder }, recorder.Hooks{})
-	module, err := Create("recorder", ctx)
+	module, err := createOnHeadlessLoop("recorder", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestRecorderFailedState(t *testing.T) {
 	noEncoder := fmt.Errorf("recorder: %w: llvmpipe encodes no H.264", recorder.ErrNoVideoEncoder)
 	engine := &recordertest.Engine{StartErr: noEncoder}
 	ctx.Recorder = recorder.NewState(engine, func() config.RecorderConfig { return cfg.Recorder }, recorder.Hooks{})
-	module, err := Create("recorder", ctx)
+	module, err := createOnHeadlessLoop("recorder", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestRecorderModuleFollowsState(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	ctx.Recorder = recorder.NewState(&recordertest.Engine{}, func() config.RecorderConfig { return cfg.Recorder }, recorder.Hooks{})
 
-	module, err := Create("recorder", ctx)
+	module, err := createOnHeadlessLoop("recorder", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestRecorderModuleFollowsState(t *testing.T) {
 }
 
 func TestRecorderModuleRequiresService(t *testing.T) {
-	if _, err := Create("recorder", newTestContext(t, config.Defaults())); err == nil {
+	if _, err := createOnHeadlessLoop("recorder", newTestContext(t, config.Defaults())); err == nil {
 		t.Error("no recorder service: want an error")
 	}
 }

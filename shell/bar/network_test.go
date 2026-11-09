@@ -185,7 +185,7 @@ func TestNewNetworkRequiresSource(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
 	ctx.Network = nil
-	if _, err := Create("network", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("network", ctx); err == nil {
 		t.Fatal("nil network source: want an error, got a module")
 	}
 }

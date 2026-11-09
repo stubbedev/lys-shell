@@ -121,7 +121,7 @@ func TestKeyboardLayoutModuleRenders(t *testing.T) {
 	ctx := newTestContext(t, cfg)
 	ctx.Hyprland = newFakeDevicesConn(t, devicesJSON)
 
-	module, err := Create("keyboard-input", ctx)
+	module, err := createOnHeadlessLoop("keyboard-input", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -163,18 +163,17 @@ func waitLabel(t *testing.T, label *widget.Label, want string) {
 
 func newTestKeyboardLayout(t *testing.T, cfg *config.Config) *widget.Label {
 	t.Helper()
-	module, err := Create("keyboard-input", newTestContext(t, cfg))
+	module, err := createOnHeadlessLoop("keyboard-input", newTestContext(t, cfg))
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	label := findLabel(module.Root())
-	return label
+	return findLabel(module.Root())
 }
 
 func TestNewKeyboardLayoutRefusesAnUnknownCompositor(t *testing.T) {
 	clearCompositorEnv(t)
 	ctx := newTestContext(t, config.Defaults())
-	if _, err := Create("keyboard-input", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("keyboard-input", ctx); err == nil {
 		t.Fatal("no supported compositor: want an error, got a module")
 	}
 }
@@ -268,7 +267,7 @@ func TestKeyboardLayoutStartsUnknownWithoutAKeyboard(t *testing.T) {
 func TestKeyboardLayoutSurvivesAFailedFirstRead(t *testing.T) {
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Hyprland = newFakeDevicesConn(t, `{"keyboards": not json`)
-	module, err := Create("keyboard-input", ctx)
+	module, err := createOnHeadlessLoop("keyboard-input", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -345,7 +344,7 @@ func TestKeyboardLayoutHidesWithLabelShowOff(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.KeyboardInput.LabelShow = false
 	row := widget.NewBox(widget.Row, 0, 0)
-	if err := appendModule(row, config.BarItem{Module: "keyboard-input"}, newTestContext(t, cfg)); err != nil {
+	if err := mountInto(row, newTestContext(t, cfg), "keyboard-input"); err != nil {
 		t.Fatal(err)
 	}
 	btn := treetest.WithClass(row, "bar-button")[0].(*barButton)

@@ -197,7 +197,7 @@ func TestNewCavaBuildsEveryStyleAndStereo(t *testing.T) {
 		cfg.Cava.Style = style
 		cfg.Cava.Stereo = true
 		cfg.Cava.Bars = 9
-		module, err := Create("cava", newTestContext(t, cfg))
+		module, err := createOnHeadlessLoop("cava", newTestContext(t, cfg))
 		if err != nil {
 			t.Fatalf("%s: %v", style, err)
 		}
@@ -220,7 +220,7 @@ func TestNewCavaRejectsAnUnsupportedInput(t *testing.T) {
 	} {
 		cfg := config.Defaults()
 		cfg.Cava.Input = input
-		_, err := Create("cava", newTestContext(t, cfg))
+		_, err := createOnHeadlessLoop("cava", newTestContext(t, cfg))
 		if (err == nil) != ok {
 			t.Errorf("input %q: err %v", input, err)
 		}

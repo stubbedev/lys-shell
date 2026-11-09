@@ -83,7 +83,7 @@ func TestWindowTitleModuleFollowsTheFocusedWindow(t *testing.T) {
 		"j/activewindow": `{"address":"0xaa","class":"foot","title":"neovim"}`,
 	})
 	ctx.Hyprland = conn
-	module, err := Create("window-title", ctx)
+	module, err := createOnHeadlessLoop("window-title", ctx)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestNewWindowTitleNeedsACompositor(t *testing.T) {
 	clearCompositorEnv(t)
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Hyprland = nil
-	if _, err := Create("window-title", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("window-title", ctx); err == nil {
 		t.Fatal("no compositor: want an error, got a module")
 	}
 }

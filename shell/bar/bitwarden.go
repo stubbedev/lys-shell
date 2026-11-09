@@ -325,7 +325,7 @@ func newBitwarden(ctx ModuleContext) (Module, error) {
 			return
 		}
 		ticks, stop := v.Subscribe()
-		ctx.Invoke(func() {
+		returnToLoop(ctx, func() {
 			m.vault = v
 			m.render()
 			m.reveal()

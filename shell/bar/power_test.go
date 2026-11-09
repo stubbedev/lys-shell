@@ -37,7 +37,7 @@ func TestNewPowerRequiresAnIcon(t *testing.T) {
 	cfg := config.Defaults()
 	cfg.Power.IconName = ""
 	ctx := newTestContext(t, cfg)
-	if _, err := Create("power", ctx); err == nil {
+	if _, err := createOnHeadlessLoop("power", ctx); err == nil {
 		t.Fatal("icon-show off: want an error, got a module")
 	}
 }
@@ -63,7 +63,7 @@ func TestPowerMenuVerbOpensTheMenu(t *testing.T) {
 		Run:  func(string) {},
 		Font: ctx.Font,
 	})
-	mod, err := Create("power", ctx)
+	mod, err := createOnHeadlessLoop("power", ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,6 +73,6 @@ func TestPowerMenuVerbOpensTheMenu(t *testing.T) {
 		t.Errorf(":menu opened %d menus", opened)
 	}
 	ctx.PowerMenu = nil
-	mod, _ = Create("power", ctx)
+	mod, _ = createOnHeadlessLoop("power", ctx)
 	mod.(interface{ RunAction(config.ClickAction) }).RunAction(menu) // no menu: nothing
 }

@@ -77,7 +77,7 @@ func TestZonesSpaceItemsByTheModuleGap(t *testing.T) {
 		{Module: "clock"},
 		{Group: &config.BarGroup{Name: "g", Modules: []config.BarItem{{Module: "clock"}, {Module: "clock"}}}},
 	}}
-	bar := buildRoot(newTestContext(t, cfg), layout, "DP-1")
+	bar := buildRootOnHeadlessLoop(newTestContext(t, cfg), layout, "DP-1")
 	settleBar(bar, widget.Size{W: 1600, H: 60})
 	items := bar.Start().Children()
 	if len(items) != 2 {

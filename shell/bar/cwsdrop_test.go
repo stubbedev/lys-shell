@@ -45,7 +45,7 @@ func threeWorkspaces(active int) []cwsWorkspace {
 func cwsDropModule(t *testing.T, ctx ModuleContext, wcfg config.CompositorWorkspacesConfig, workspaces []cwsWorkspace) (*cwsModule, *fakeCws, *widget.Bar, widget.Size) {
 	t.Helper()
 	f := newFakeCws(workspaces, nil)
-	m := newCwsModule(ctx, "niri", cwsWorkspaces, wcfg, f)
+	m := newCwsModuleOnHeadlessLoop(ctx, "niri", cwsWorkspaces, wcfg, f)
 	bar, size := cwsBar(t, ctx, m)
 	return m, f, bar, size
 }
@@ -514,11 +514,11 @@ func assertSharedLook(t *testing.T, name string, segs *widget.SegmentIndicator) 
 func TestEveryWorkspacesModuleSharesTheLook(t *testing.T) {
 	for _, kind := range []string{"sway", "niri", "lys-wm"} {
 		ctx := cwsDropContext(t, config.LocationTop, 1)
-		m := newCwsModule(ctx, kind, cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
+		m := newCwsModuleOnHeadlessLoop(ctx, kind, cwsWorkspaces, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
 		assertSharedLook(t, kind, m.segs)
 	}
 	ctx := cwsDropContext(t, config.LocationTop, 1)
-	tags := newCwsModule(ctx, "mango", cwsTags, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
+	tags := newCwsModuleOnHeadlessLoop(ctx, "mango", cwsTags, config.DefaultsNiriWorkspaces().View(), newFakeCws(threeWorkspaces(0), nil))
 	assertSharedLook(t, "mango", tags.segs)
 	_, hypr := newTestHypr(t, nil)
 	assertSharedLook(t, "hyprland", hypr.segs)
@@ -584,7 +584,7 @@ func TestHyprlandOtherMonitorFillsItsOwnCircle(t *testing.T) {
 	ctx := styledContext(t, cfg)
 	ctx.Hyprland = conn
 	ctx.Connector = "DP-1"
-	module, err := Create("hyprland-workspaces", ctx)
+	module, err := createOnHeadlessLoop("hyprland-workspaces", ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

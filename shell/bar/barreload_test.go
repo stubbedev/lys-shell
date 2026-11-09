@@ -52,7 +52,7 @@ func TestReloadQueueCoalescesABurst(t *testing.T) {
 func TestFillBarRefillsTheSameRoot(t *testing.T) {
 	cfg := config.Defaults()
 	out := widget.Size{W: 1600, H: 400}
-	bar := buildRoot(styledContext(t, cfg), clockLayout, "DP-1")
+	bar := buildRootOnHeadlessLoop(styledContext(t, cfg), clockLayout, "DP-1")
 	thick := barThickness(bar, out)
 	oldItem := bar.Start().Children()[0]
 
