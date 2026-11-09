@@ -178,6 +178,7 @@ func (t *popupTimer) remaining(now time.Time) time.Duration {
 type Service struct {
 	mu   sync.Mutex
 	next uint32
+	dnd  dndFile
 	// recent is the newest part of the history, oldest first by Key:
 	// at most memory notifications, the rest only in the store.
 	recent []*Notification
@@ -235,15 +236,17 @@ type expiryTimer struct{ stop func() bool }
 func NewService() *Service {
 	idle := make(chan struct{})
 	close(idle)
+	dnd := stateDNDFile()
 	return &Service{
 		storeTail:     idle,
+		dnd:           dnd,
 		next:          0,
 		memory:        notifypolicy.DefaultMemoryLimit(),
 		stored:        notifypolicy.DefaultStoredLimit(),
 		expiry:        make(map[uint32]*expiryTimer),
 		timers:        make(map[uint32]*popupTimer),
 		popupDuration: DefaultPopupDuration,
-		focus:         focusInputs{manual: loadDND()},
+		focus:         focusInputs{manual: dnd.load()},
 		focusLoc:      time.Local,
 		removeExpired: true,
 		owners:        make(map[uint32]string),
@@ -861,33 +864,41 @@ func globMatch(pattern, name string) bool {
 	return glob.Match(pattern, name)
 }
 
-// loadDND restores the sticky flag; anything but "on" reads off.
-func loadDND() bool {
+type dndFile string
+
+func stateDNDFile() dndFile {
 	dir, ok := xdg.OS.StateDir(identity.Name)
 	if !ok {
+		return ""
+	}
+	return dndFile(filepath.Join(dir, "dnd"))
+}
+
+// load restores the sticky flag; anything but "on" reads off.
+func (f dndFile) load() bool {
+	if f == "" {
 		return false
 	}
-	body, err := os.ReadFile(filepath.Join(dir, "dnd")) //nolint:gosec // the path is lys-shell's own state dir
+	body, err := os.ReadFile(string(f))
 	if err != nil {
 		return false
 	}
 	return strings.TrimSpace(string(body)) == "on"
 }
 
-// saveDND mirrors the flag into the state dir; failures are quiet.
-func saveDND(on bool) {
-	dir, ok := xdg.OS.StateDir(identity.Name)
-	if !ok {
+// save mirrors the flag into the state dir; failures are quiet.
+func (f dndFile) save(on bool) {
+	if f == "" {
 		return
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(string(f)), 0o700); err != nil {
 		return
 	}
 	body := "off\n"
 	if on {
 		body = "on\n"
 	}
-	_ = os.WriteFile(filepath.Join(dir, "dnd"), []byte(body), 0o600)
+	_ = os.WriteFile(string(f), []byte(body), 0o600)
 }
 
 // String renders the summary for logs and tests.

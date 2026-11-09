@@ -98,7 +98,7 @@ func scheduledService(t *testing.T, start time.Time, loc *time.Location, windows
 	fc := fakeclock.New()
 	fc.Advance(start.Sub(fc.Now()))
 	clock := &countingClock{Clock: fc}
-	s := NewService()
+	s := newService(t)
 	s.UseClock(clock)
 	s.UseLocation(loc)
 	s.SetFocusRules(notifypolicy.FocusRules{Schedule: windows})

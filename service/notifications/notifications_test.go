@@ -34,7 +34,7 @@ func collect(t *testing.T, feed <-chan Event, n int) []Event {
 func newTestService(t *testing.T) *Service {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	s := NewService()
+	s := newService(t)
 	s.UseClock(fakeclock.New())
 	return s
 }
@@ -242,21 +242,34 @@ func TestGlobMatch(t *testing.T) {
 
 func TestDNDPersistence(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	s := NewService()
+	s := newService(t)
 	if s.DND() {
 		t.Fatal("a fresh state dir starts with dnd off")
 	}
 	s.SetDND(true)
 	settle(s)
-	restored := NewService()
+	restored := newService(t)
 	if !restored.DND() {
 		t.Fatal("the dnd flag did not survive a restart")
 	}
 	s.SetDND(false)
 	settle(s)
-	restored = NewService()
+	restored = newService(t)
 	if restored.DND() {
 		t.Fatal("dnd off did not persist")
+	}
+}
+
+func TestDNDIsSavedWhereTheServiceReadIt(t *testing.T) {
+	read := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", read)
+	s := newService(t)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	s.SetDND(true)
+	settle(s)
+	t.Setenv("XDG_STATE_HOME", read)
+	if !newService(t).DND() {
+		t.Fatal("dnd turned on after the state dir moved did not reach the dir the service read")
 	}
 }
 
@@ -467,7 +480,7 @@ func BenchmarkDismiss(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				s := NewService()
+				s := newService(b)
 				s.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 				if err := s.AttachStore(st); err != nil {
 					b.Fatal(err)

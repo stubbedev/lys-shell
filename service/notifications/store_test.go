@@ -214,7 +214,7 @@ func TestStoreDropsWhatExpiredWhileDown(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		svc := NewService()
+		svc := newService(t)
 		svc.SetRemoveExpired(removeExpired)
 		if err := svc.AttachStore(st); err != nil {
 			t.Fatal(err)
@@ -833,7 +833,7 @@ func TestRestoredExpiryStillFires(t *testing.T) {
 	if err := st.Add(&Notification{ID: 7, AppName: "app", Summary: "soon", ExpireMS: 1500, Added: clock.Now().Add(-100 * time.Millisecond)}, 0); err != nil {
 		t.Fatal(err)
 	}
-	svc := NewService()
+	svc := newService(t)
 	svc.UseClock(clock)
 	if err := svc.AttachStore(st); err != nil {
 		t.Fatal(err)
@@ -919,7 +919,7 @@ func TestStoreRemoveReportsWhatWasStored(t *testing.T) {
 }
 
 func TestServiceCallsReturnWhileTheStoreHolds(t *testing.T) {
-	s := NewService()
+	s := newService(t)
 	st, err := OpenStore(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -957,3 +957,10 @@ func TestServiceCallsReturnWhileTheStoreHolds(t *testing.T) {
 // settle waits for the writes svc queued so far: a call returns before its
 // write reaches the disk.
 func settle(svc *Service) { svc.FlushWrites(10 * time.Second) }
+
+func newService(tb testing.TB) *Service {
+	tb.Helper()
+	s := NewService()
+	tb.Cleanup(func() { settle(s) })
+	return s
+}

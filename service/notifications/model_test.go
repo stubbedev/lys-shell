@@ -226,7 +226,7 @@ func TestServerNotifyDecodesHints(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	bus := dbustest.Start(t)
-	svc := NewService()
+	svc := newService(t)
 	server, err := Serve(bus.Conn(t), svc)
 	if err != nil {
 		t.Fatal(err)
