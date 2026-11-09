@@ -71,7 +71,7 @@ buildGo127Module {
   # first import of a package not vendored yet both change it, since only
   # imported packages are vendored; `just vendor-hash` recomputes it (a
   # stale one is reused, not reported, the derivation being fixed-output).
-  vendorHash = "sha256-nlGSYROD1yaZkQvcl1p8ksqU/AJG/DOrrtcVtpcAj9Q=";
+  vendorHash = "sha256-aA+nwE25GTmD98aVljcI6iD9y2GC0U+UG6OyNh0ftN0=";
 
   subPackages = [
     "cmd/lys-shell"
