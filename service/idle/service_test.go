@@ -1,11 +1,13 @@
 package idle
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"maps"
 	"runtime"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -256,19 +258,84 @@ func TestStagesWithoutTheirSystemFailLoudly(t *testing.T) {
 	}
 }
 
+// goroutineIDs are the ids of the goroutines alive now, read off their
+// stacks.
+func goroutineIDs(t *testing.T) map[uint64]bool {
+	t.Helper()
+	buf := make([]byte, 1<<16)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			buf = buf[:n]
+			break
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+	ids := map[uint64]bool{}
+	for stack := range bytes.SplitSeq(buf, []byte("\n\n")) {
+		header, ok := bytes.CutPrefix(stack, []byte("goroutine "))
+		if !ok {
+			t.Fatalf("a stack without a goroutine header: %q", stack)
+		}
+		digits, _, _ := bytes.Cut(header, []byte(" "))
+		id, err := strconv.ParseUint(string(digits), 10, 64)
+		if err != nil {
+			t.Fatalf("goroutine id %q: %v", digits, err)
+		}
+		ids[id] = true
+	}
+	return ids
+}
+
+// startedSince are the goroutines alive now that were not in before.
+func startedSince(t *testing.T, before map[uint64]bool) []uint64 {
+	t.Helper()
+	var started []uint64
+	for id := range goroutineIDs(t) {
+		if !before[id] {
+			started = append(started, id)
+		}
+	}
+	return started
+}
+
+// Arming the stages and running one leaves no goroutine of the service
+// behind, counted as the goroutines alive after that were not before:
+// one from an earlier test that ends meanwhile, as the test before's own
+// goroutine does on its way out, is not the service's. One left
+// running is seen.
 func TestWaitingBetweenStagesStartsNoGoroutineOrTimer(t *testing.T) {
 	w, a := &fakeWatcher{}, &fakeActions{}
 	s := New(w, a)
-	before := runtime.NumGoroutine()
+	ending := make(chan struct{})
+	ended := make(chan struct{})
+	go func() {
+		defer close(ended)
+		<-ending
+	}()
+	before := goroutineIDs(t)
 	if err := s.Configure(testPolicy(t), true, idlepolicy.Battery); err != nil {
 		t.Fatal(err)
 	}
 	w.live()[0].idle()
 	w.live()[0].resume()
-	if after := runtime.NumGoroutine(); after != before {
-		t.Errorf("arming and running a stage left %d goroutines, had %d", after, before)
+	close(ending)
+	<-ended
+	if started := startedSince(t, before); len(started) != 0 {
+		t.Errorf("arming and running a stage left goroutines %v running", started)
 	}
 	if n := len(w.watches); n != 4 {
 		t.Errorf("%d watches for 4 stages", n)
 	}
+	left := make(chan struct{})
+	running := make(chan struct{})
+	go func() {
+		close(running)
+		<-left
+	}()
+	<-running
+	if started := startedSince(t, before); len(started) != 1 {
+		t.Errorf("a goroutine left running shows as %v, want it alone", started)
+	}
+	close(left)
 }
