@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -226,8 +225,7 @@ const (
 func startProbeProcess(t *testing.T, appID, title string) <-chan struct{} {
 	t.Helper()
 	cmd := exec.Command(os.Args[0], "-test.run=^TestProbeWindow$")
-	socket := filepath.Join(os.Getenv("XDG_RUNTIME_DIR"), os.Getenv("WAYLAND_DISPLAY"))
-	cmd.Env = append(os.Environ(), probeEnv+"="+appID, probeTitleEnv+"="+title, "WAYLAND_DISPLAY="+socket)
+	cmd.Env = append(os.Environ(), probeEnv+"="+appID, probeTitleEnv+"="+title)
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)

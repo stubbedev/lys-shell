@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stubbedev/lys-desktop/testhome"
+	"github.com/stubbedev/lys-lib/testhome"
 )
 
 // TestMain points every per-user location at a scratch home so no
@@ -18,3 +18,5 @@ func TestMain(m *testing.M) {
 	}
 	testhome.Run(m)
 }
+
+func TestTheTestsReachNoHostSession(t *testing.T) { testhome.RequireNoHostSession(t) }

@@ -43,3 +43,19 @@ for the real xdg-desktop-portal frontend in front of the backend). The CLI's
 help, errors and completions are pinned byte for byte by the goldens under
 `cmd/lys-shell/testdata/clap`; a deliberate CLI change edits them in the same
 commit.
+
+A package whose tests dial a bus, connect to a compositor or a sound server,
+or build applications runs them away from the session of whoever runs them,
+with both halves of lys-lib's `testhome` (a `testhome_test.go`, or the
+package's `main_test.go`):
+
+```go
+func TestMain(m *testing.M) { testhome.Run(m) }
+
+func TestTheTestsReachNoHostSession(t *testing.T) { testhome.RequireNoHostSession(t) }
+```
+
+A test binary an isolated test starts again keeps the environment its parent
+gave it. A recipe that boots a session for the tests names it with
+`LYS_TEST_SESSION=<its runtime directory>`; none here does: every test starts
+the bus, compositor and sound server it needs.
