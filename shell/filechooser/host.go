@@ -13,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-desktop/fswatch"
+	"github.com/stubbedev/lys-desktop/mime"
 	"github.com/stubbedev/lys-desktop/shell/reveal"
 	"github.com/stubbedev/lys-desktop/shell/widgets"
 	"github.com/stubbedev/lys-desktop/styling"
@@ -26,7 +27,6 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 	"golang.org/x/sys/unix"
 
-	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/internal/statefile"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/shell/dialogqueue"

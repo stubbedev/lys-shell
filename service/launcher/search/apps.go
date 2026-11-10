@@ -115,7 +115,7 @@ func (a *Apps) Actions(e Entry) []Action {
 	if d.app == nil {
 		return []Action{
 			{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-				a.env.openURI(d.url)
+				a.env.Open(d.url)
 				return Close{}
 			}},
 			copyAction(i18n.T("launcher-action-copy-url"), d.url),

@@ -14,9 +14,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-desktop/fileuri"
+	"github.com/stubbedev/lys-desktop/mime"
 	"github.com/stubbedev/lys-lib/xdg"
-
-	"github.com/stubbedev/lys-shell/internal/mime"
 )
 
 // testDB is a shared-mime-info fixture with the types the filter tests

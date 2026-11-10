@@ -4,11 +4,11 @@ import (
 	"log"
 
 	"github.com/stubbedev/lys-desktop/config"
+	"github.com/stubbedev/lys-desktop/mime"
 	"github.com/stubbedev/lys-desktop/service/pulse"
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/gtksettings"
 
-	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/sounds"
 )

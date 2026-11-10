@@ -107,7 +107,7 @@ launcher:
       - keywords
     display-format: '{name} [<span weight=''light'' size=''small''><i>({generic})</i></span>]'
     show-actions: false
-    url-launcher: xdg-open
+    url-launcher: ""
   run:
     run-command: '{cmd}'
     shell-command: '{terminal} -e {cmd}'

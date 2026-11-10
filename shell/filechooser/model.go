@@ -20,9 +20,8 @@ import (
 
 	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-desktop/glob"
+	"github.com/stubbedev/lys-desktop/mime"
 	"github.com/stubbedev/lys-lib/xdg"
-
-	"github.com/stubbedev/lys-shell/internal/mime"
 )
 
 // Mode is what the chooser is doing.

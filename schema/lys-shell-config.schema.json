@@ -3993,7 +3993,7 @@
               "keywords"
             ],
             "show-actions": false,
-            "url-launcher": "xdg-open"
+            "url-launcher": ""
           },
           "description": "drun (application) mode."
         },
@@ -4282,8 +4282,8 @@
         },
         "url-launcher": {
           "$ref": "#/$defs/Program",
-          "default": "xdg-open",
-          "description": "Command opening `Type=Link` entries."
+          "default": "",
+          "description": "Command opening `Type=Link` entries (\"\" = the built-in opener)."
         }
       },
       "type": "object"
@@ -4365,7 +4365,7 @@
         "command": {
           "$ref": "#/$defs/Command",
           "default": "",
-          "description": "Command opening the picked file (\"\" = xdg-open)."
+          "description": "Command opening the picked file (\"\" = the built-in opener)."
         },
         "directories-first": {
           "$ref": "#/$defs/boolean",
@@ -12266,7 +12266,7 @@
             "keywords"
           ],
           "show-actions": false,
-          "url-launcher": "xdg-open"
+          "url-launcher": ""
         },
         "emoji": {
           "skin-tone": "none"

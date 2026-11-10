@@ -15,7 +15,6 @@ import (
 	"errors"
 	"log"
 	"net"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +22,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/stubbedev/lys-desktop/fileuri"
+
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // AnyConnect single sign-on through the system browser (sso.rs): the
@@ -378,16 +379,14 @@ func ssoWaitEnded(ctx context.Context) error {
 // can play the browser.
 var openBrowser = openInBrowser
 
-// openInBrowser runs xdg-open rather than a configured browser: the
-// sign-in has to land in the browser the user is already signed into
-// their IdP with.
+// openInBrowser opens the URL with the user's default browser, its
+// scheme's handler, rather than a configured one: the sign-in has to
+// land in the browser the user is already signed into their IdP with.
 func openInBrowser(url string) error {
-	cmd := exec.Command("xdg-open", url) //nolint:gosec // the URL is vetted by the caller
-	if err := cmd.Start(); err != nil {
+	if err := launcher.Open(url, "", ""); err != nil {
 		log.Printf("vpn: cannot open a browser for the VPN sign-in: %v", err)
 		return authError("cannot open a browser to sign in with")
 	}
-	go func() { _ = cmd.Wait() }()
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-desktop/desktopentry"
 	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-desktop/identity"
+	"github.com/stubbedev/lys-desktop/mime"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -19,7 +20,6 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/ipp"
-	"github.com/stubbedev/lys-shell/internal/mime"
 	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/shell/dialogsurface"

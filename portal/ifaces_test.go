@@ -36,9 +36,21 @@ func (r *rig) interactive(t *testing.T, method string, args ...any) (uint32, map
 // spawned records the programs the backend hands off to and the
 // environment they get; fail makes the named program fail to start.
 type spawned struct {
-	argv dbustest.Var[[][]string]
-	env  dbustest.Var[[][]string]
-	fail dbustest.Var[map[string]bool]
+	argv   dbustest.Var[[][]string]
+	env    dbustest.Var[[][]string]
+	opened dbustest.Var[[]string]
+	fail   dbustest.Var[map[string]bool]
+}
+
+// openFails is the name failOn takes to make every open fail.
+const openFails = "open"
+
+func (s *spawned) open(uri, token string) error {
+	s.opened.Update(func(all []string) []string { return append(all, uri+"|"+token) })
+	if s.fail.Load()[openFails] {
+		return os.ErrNotExist
+	}
+	return nil
 }
 
 func (s *spawned) spawn(argv, env []string) error {
@@ -66,7 +78,7 @@ func (s *spawned) failOn(names ...string) {
 func spawnRig(t *testing.T, fail ...string) (*rig, *spawned) {
 	s := &spawned{}
 	s.failOn(fail...)
-	return newRig(t, func(b *Backend) { b.spawn = s.spawn }), s
+	return newRig(t, func(b *Backend) { b.spawn, b.open = s.spawn, s.open }), s
 }
 
 const handle = dbus.ObjectPath("/org/freedesktop/portal/desktop/request/1_2/t")
@@ -177,9 +189,9 @@ func TestEmailOpensAMailtoURI(t *testing.T) {
 	if code, _ := r.interactive(t, emailIfaceName, handle, "org.app", "", opts); code != ResponseSuccess {
 		t.Errorf("code = %d", code)
 	}
-	want := []string{"xdg-open", "mailto:x@y.com,z@w.com,a@b.com?cc=c%40d.com&subject=Hi%20there&body=Line%20%26%20stuff~"}
-	if got := s.argv.Load(); len(got) != 1 || !slices.Equal(got[0], want) {
-		t.Errorf("spawned %q, want %q", got, want)
+	want := []string{"mailto:x@y.com,z@w.com,a@b.com?cc=c%40d.com&subject=Hi%20there&body=Line%20%26%20stuff~|"}
+	if got := s.opened.Load(); !slices.Equal(got, want) || len(s.argv.Load()) != 0 {
+		t.Errorf("opened %q, spawned %q, want only %q opened", got, s.argv.Load(), want)
 	}
 	if mailto(Vardict{}) != "mailto:" {
 		t.Errorf("empty mailto = %q", mailto(Vardict{}))
@@ -230,24 +242,31 @@ func TestEmailIgnoresAttachmentFds(t *testing.T) {
 		"attachment_fds": dbus.MakeVariant([]dbus.UnixFD{dbus.UnixFD(f.Fd())}),
 	}
 	r.interactive(t, emailIfaceName, handle, "org.app", "", opts)
-	if got := s.argv.Load(); len(got) != 1 || !slices.Equal(got[0], []string{"xdg-open", "mailto:a@b.com"}) {
-		t.Errorf("spawned %q, want the plain mailto", got)
+	if got := s.opened.Load(); !slices.Equal(got, []string{"mailto:a@b.com|"}) || len(s.argv.Load()) != 0 {
+		t.Errorf("opened %q, spawned %q, want the plain mailto", got, s.argv.Load())
 	}
 }
 
-// The activation token reaches the mail client as XDG_ACTIVATION_TOKEN,
-// so it can raise its window; without one nothing is added.
+// The activation token reaches the mail client, so it can raise its
+// window: handed to the opener, or as XDG_ACTIVATION_TOKEN to
+// xdg-email; without one nothing is added.
 func TestEmailPassesTheActivationToken(t *testing.T) {
 	r, s := spawnRig(t)
 	r.interactive(t, emailIfaceName, handle, "org.app", "", Vardict{"activation_token": dbus.MakeVariant("tok-1")})
 	r.interactive(t, emailIfaceName, handle, "org.app", "", Vardict{})
-	if got := s.env.Load(); len(got) != 2 || !slices.Equal(got[0], []string{"XDG_ACTIVATION_TOKEN=tok-1"}) || len(got[1]) != 0 {
+	if got := s.opened.Load(); !slices.Equal(got, []string{"mailto:|tok-1", "mailto:|"}) {
+		t.Errorf("opened %q", got)
+	}
+	attach := dbus.MakeVariant([]string{"/doc/a.txt"})
+	r.interactive(t, emailIfaceName, handle, "org.app", "", Vardict{"activation_token": dbus.MakeVariant("tok-2"), "attachments": attach})
+	r.interactive(t, emailIfaceName, handle, "org.app", "", Vardict{"attachments": attach})
+	if got := s.env.Load(); len(got) != 2 || !slices.Equal(got[0], []string{"XDG_ACTIVATION_TOKEN=tok-2"}) || len(got[1]) != 0 {
 		t.Errorf("env = %q", got)
 	}
 }
 
 func TestEmailFailsWithoutAHandler(t *testing.T) {
-	r, _ := spawnRig(t, "xdg-open")
+	r, _ := spawnRig(t, openFails)
 	if code, _ := r.interactive(t, emailIfaceName, handle, "org.app", "", Vardict{}); code != ResponseOther {
 		t.Errorf("code = %d, want other", code)
 	}

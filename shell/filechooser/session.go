@@ -7,8 +7,7 @@ import (
 	"strings"
 
 	"github.com/stubbedev/lys-desktop/fileuri"
-
-	"github.com/stubbedev/lys-shell/internal/mime"
+	"github.com/stubbedev/lys-desktop/mime"
 )
 
 // session is one open request's state, free of widgets: where it is,

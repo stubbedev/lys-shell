@@ -697,7 +697,7 @@ drun (application) mode settings.
 | `match-fields` | Desktop-entry fields fed to the matcher. |
 | `display-format` | Row template; `[..]` renders only when its placeholders are non-empty. |
 | `show-actions` | Expose desktop-file actions as extra rows. |
-| `url-launcher` | Command opening `Type=Link` entries. |
+| `url-launcher` | Command opening `Type=Link` entries ("" = the built-in opener). |
 
 ## LauncherDrunField {#launcher-drun-field}
 
@@ -741,7 +741,7 @@ file browser mode settings.
 | `sorting-method` | File ordering. |
 | `directories-first` | List directories before files. |
 | `show-hidden` | Show hidden files. |
-| `command` | Command opening the picked file ("" = xdg-open). |
+| `command` | Command opening the picked file ("" = the built-in opener). |
 
 ## LauncherHistoryConfig {#launcher-history-config}
 

@@ -65,6 +65,7 @@ func newPanelHarness(t *testing.T) *panelHarness {
 			Env: search.Env{
 				Spawn:      func(argv []string) { ph.record(strings.Join(argv, " ")) },
 				SpawnShell: func(line string) { ph.record(line) },
+				Open:       func(target string) { ph.record("open " + target) },
 			},
 			Windows: ph.windows,
 		}
@@ -186,7 +187,7 @@ func TestKeyboardFlowSelectsOverHeadingsAndWraps(t *testing.T) {
 	h.key("Return")
 	h.until("the session ended", func() bool { return h.s.panel == nil })
 	h.until("the open", func() bool { return len(h.spawned) == 1 })
-	if h.spawned[0] != "xdg-open https://alpha/issues" {
+	if h.spawned[0] != "open https://alpha/issues" {
 		t.Errorf("ran %v", h.spawned)
 	}
 	if f := h.frame(reply); f.Type != launcheripc.FrameResult {
@@ -281,7 +282,7 @@ func TestTabCompletesOrOpensActions(t *testing.T) {
 	h.until("the filled link", func() bool { return p.selectedTitle() == "Beta Search: rust lang" })
 	h.key("Return")
 	h.until("the open", func() bool { return len(h.spawned) == 1 })
-	if h.spawned[0] != "xdg-open https://beta/?q=rust+lang" {
+	if h.spawned[0] != "open https://beta/?q=rust+lang" {
 		t.Errorf("ran %v", h.spawned)
 	}
 
@@ -304,7 +305,7 @@ func TestNumberShortcutsPickTheNthRowDigitsTypeInTheField(t *testing.T) {
 	}
 	h.key("Control+2")
 	h.until("the open", func() bool { return len(h.spawned) == 1 })
-	if h.spawned[0] != "xdg-open https://alpha/issues" {
+	if h.spawned[0] != "open https://alpha/issues" {
 		t.Errorf("ran %v", h.spawned)
 	}
 }
@@ -320,7 +321,7 @@ func TestEnterBeforeTheRowsArriveTakesWhatTheTextFinds(t *testing.T) {
 		t.Fatal("Enter must be taken")
 	}
 	h.until("the open", func() bool { return len(h.spawned) == 1 })
-	if h.spawned[0] != "xdg-open https://alpha/issues" {
+	if h.spawned[0] != "open https://alpha/issues" {
 		t.Errorf("ran %v, want the row the last text finds", h.spawned)
 	}
 }

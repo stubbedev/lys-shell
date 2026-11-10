@@ -17,6 +17,7 @@ import (
 	"github.com/stubbedev/lys-desktop/resources"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // newIconManager is the handlers' IconManager::new (a variable so tests
@@ -27,15 +28,6 @@ var newIconManager = icons.NewManager
 type cliError string
 
 func (e cliError) Error() string { return string(e) }
-
-// spawnError renders a failed spawn like Rust's io::Error: a missing
-// binary is ENOENT.
-func spawnError(err error) string {
-	if errors.Is(err, exec.ErrNotFound) {
-		return "No such file or directory (os error 2)"
-	}
-	return icons.IOErrorString(err)
-}
 
 // iconsSetup is icons/setup.rs: copy the bundled icons into the icons
 // directory. The icons are embedded in the binary, where the Rust CLI
@@ -238,8 +230,8 @@ func runFzf(out io.Writer, names []string) error {
 	return nil
 }
 
-// iconsOpen is icons/open.rs: set the directory up, hand it to xdg-open
-// without waiting.
+// iconsOpen is icons/open.rs: set the directory up, open it with the
+// default app for directories without waiting.
 func iconsOpen(m *cli.Matches) error {
 	registry, err := icons.NewRegistry()
 	if err != nil {
@@ -249,11 +241,9 @@ func iconsOpen(m *cli.Matches) error {
 		return err
 	}
 	base := registry.BasePath()
-	cmd := exec.Command("xdg-open", base) //nolint:gosec // the icons directory
-	if err := cmd.Start(); err != nil {
-		return cliError("Failed to run xdg-open: " + spawnError(err))
+	if err := launcher.Open(base, "", ""); err != nil {
+		return cliError("Failed to open the icons directory: " + err.Error())
 	}
-	_ = cmd.Process.Release()
 	fmt.Fprintf(m.Stdout(), "Opened: %s\n", base)
 	return nil
 }

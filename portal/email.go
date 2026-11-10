@@ -6,23 +6,27 @@ import (
 	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
 // email is org.freedesktop.impl.portal.Email: the user's mail client
 // opens a pre-filled compose window, through `xdg-email --attach` when
-// there are attachments and a mailto: URI handed to xdg-open otherwise.
+// there are attachments and as the default app for a mailto: URI
+// otherwise.
 // The frontend turns the app's attachment_fds into the attachments
 // list of paths it passes here; a mail client that cannot take them is
 // a failure, never a compose window silently missing the files.
 type email struct {
 	conn  *dbus.Conn
 	spawn func(argv, env []string) error
+	open  func(uri, token string) error
 }
 
-func emailIface(conn *dbus.Conn, spawn func(argv, env []string) error) dbusx.Interface {
+func emailIface(conn *dbus.Conn, spawn func(argv, env []string) error, open func(uri, token string) error) dbusx.Interface {
 	return dbusx.Interface{
 		Name:    "org.freedesktop.impl.portal.Email",
-		Methods: email{conn, spawn},
+		Methods: email{conn, spawn, open},
 	}
 }
 
@@ -33,14 +37,20 @@ func (e email) ComposeEmail(handle dbus.ObjectPath, appID, parent string, option
 		return ResponseOther, Vardict{}, nil
 	}
 	defer c.end()
+	token, _ := optString(options, "activation_token")
+	attachments := attachmentPaths(options)
+	if len(attachments) == 0 {
+		if err := e.open(mailto(options), token); err != nil {
+			warnf("email: %v", err)
+			return ResponseOther, Vardict{}, nil
+		}
+		return ResponseSuccess, Vardict{}, nil
+	}
 	var env []string
-	if token, ok := optString(options, "activation_token"); ok && token != "" {
+	if token != "" {
 		env = []string{"XDG_ACTIVATION_TOKEN=" + token}
 	}
-	argv := []string{"xdg-open", mailto(options)}
-	if attachments := attachmentPaths(options); len(attachments) > 0 {
-		argv = xdgEmailArgv(options, attachments)
-	}
+	argv := xdgEmailArgv(options, attachments)
 	if err := e.spawn(argv, env); err != nil {
 		warnf("email: cannot launch %s: %v", argv[0], err)
 		return ResponseOther, Vardict{}, nil
@@ -117,3 +127,7 @@ func stringList(options Vardict, key string) []string {
 	list, _ := options[key].Value().([]string)
 	return list
 }
+
+// openURI opens uri with the user's default app for it, raised by
+// token ("" for none).
+func openURI(uri, token string) error { return launcher.Open(uri, "", token) }

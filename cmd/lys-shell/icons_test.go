@@ -8,8 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stubbedev/lys-desktop/fileuri"
 	"github.com/stubbedev/lys-desktop/icons"
 	"github.com/stubbedev/lys-desktop/icons/icontest"
+	"github.com/stubbedev/lys-desktop/opener/openertest"
 	"github.com/stubbedev/lys-desktop/resources"
 )
 
@@ -168,5 +170,24 @@ func TestIconsSetupInstallsTheBundledIcons(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", file)
 	if _, stderr, code := runCaptured(t, false, "icons", "setup"); code != 1 || !strings.HasPrefix(stderr, "Error: Failed to create icons directory: ") {
 		t.Errorf("setup under a file: code %d stderr %q", code, stderr)
+	}
+}
+
+// icons open hands the icons directory to the default app for
+// directories, and fails naming the directory's type when there is none.
+func TestIconsOpenOpensTheDirectoryWithItsDefaultApp(t *testing.T) {
+	desktop := openertest.New(t)
+	stdout, stderr, code := runCaptured(t, false, "icons", "open")
+	if code == 0 || !strings.Contains(stderr, "inode/directory") {
+		t.Errorf("no directory handler: code %d stdout %q stderr %q, want a failure naming inode/directory", code, stdout, stderr)
+	}
+	files := desktop.Handler(t, "files", "inode/directory")
+	stdout, stderr, code = runCaptured(t, false, "icons", "open")
+	base := filepath.Join(desktop.Root, "data", "lys-shell", "icons")
+	if code != 0 || stdout != "Opened: "+base+"\n" {
+		t.Fatalf("open: code %d stdout %q stderr %q", code, stdout, stderr)
+	}
+	if got := files.Ran(t); got != fileuri.FromPath(base)+"|" {
+		t.Errorf("the file manager ran with %q, want the icons directory", got)
 	}
 }

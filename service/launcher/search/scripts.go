@@ -180,7 +180,7 @@ func (s *Scripts) Actions(e Entry) []Action {
 			return s.next(ctx, sc, nil)
 		}},
 		{Title: i18n.T("launcher-action-reveal"), Icon: "ld-folder-open-symbolic", Run: func(context.Context) Outcome {
-			s.env.openURI(filepath.Dir(sc.Path))
+			s.env.Open(filepath.Dir(sc.Path))
 			return Close{}
 		}},
 		copyAction(i18n.T("launcher-action-copy-path"), sc.Path),

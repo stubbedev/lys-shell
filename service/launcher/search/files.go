@@ -243,11 +243,11 @@ func (f *Files) Actions(e Entry) []Action {
 	}
 	parent := filepath.Dir(d.path)
 	open := Action{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-		f.env.openURI(d.path)
+		f.env.Open(d.path)
 		return Close{}
 	}}
 	reveal := Action{Title: i18n.T("launcher-action-reveal"), Icon: "ld-folder-open-symbolic", Run: func(context.Context) Outcome {
-		f.env.openURI(parent)
+		f.env.Open(parent)
 		return Close{}
 	}}
 	terminalAt := parent

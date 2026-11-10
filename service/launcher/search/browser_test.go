@@ -316,16 +316,24 @@ func browserFixture(t *testing.T) *BrowserIndex {
 }
 
 type spawned struct {
-	mu   sync.Mutex
-	argv [][]string
+	mu     sync.Mutex
+	argv   [][]string
+	opened []string
 }
 
 func (s *spawned) env() Env {
-	return Env{Spawn: func(argv []string) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		s.argv = append(s.argv, argv)
-	}}
+	return Env{
+		Spawn: func(argv []string) {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.argv = append(s.argv, argv)
+		},
+		Open: func(target string) {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.opened = append(s.opened, target)
+		},
+	}
 }
 
 func rootOver(t *testing.T, env Env, index *BrowserIndex, providers ...config.LauncherSearchProvider) (*Engine, *sink) {
@@ -413,8 +421,8 @@ func TestActivatingABrowserRowOpensItsFullURL(t *testing.T) {
 	})
 	opened.mu.Lock()
 	defer opened.mu.Unlock()
-	if len(opened.argv) != 1 || !slices.Equal(opened.argv[0], []string{"xdg-open", target}) {
-		t.Errorf("spawned %q", opened.argv)
+	if len(opened.argv) != 0 || !slices.Equal(opened.opened, []string{target}) {
+		t.Errorf("spawned %q, opened %q, want only %s opened", opened.argv, opened.opened, target)
 	}
 }
 

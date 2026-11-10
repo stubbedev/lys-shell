@@ -110,7 +110,7 @@ func (l *Links) Actions(e Entry) []Action {
 func (l *Links) urlActions(target string) []Action {
 	return []Action{
 		{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-			l.env.openURI(target)
+			l.env.Open(target)
 			return Close{}
 		}},
 		copyAction(i18n.T("launcher-action-copy-url"), target),
@@ -126,7 +126,7 @@ func (l *Links) queryLevel(q config.LauncherQuicklink) *Level {
 			if !ok {
 				return Stay{}
 			}
-			l.env.openURI(target)
+			l.env.Open(target)
 			return Close{}
 		},
 	}

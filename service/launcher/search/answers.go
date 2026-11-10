@@ -216,7 +216,7 @@ func (w *Web) Actions(e Entry) []Action {
 	}
 	return []Action{
 		{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-			w.env.openURI(target)
+			w.env.Open(target)
 			return Close{}
 		}},
 		copyAction(i18n.T("launcher-action-copy-url"), target),

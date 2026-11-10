@@ -7,8 +7,6 @@ import (
 	"errors"
 	"log"
 	"net/url"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -19,13 +17,13 @@ import (
 	"github.com/stubbedev/lys-desktop/i18n"
 	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-desktop/shell/widgets"
-	"github.com/stubbedev/lys-desktop/spawn"
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/app"
 	"github.com/stubbedev/lys-ui/widget"
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/internal/appicons"
+	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -295,15 +293,9 @@ func OpenableLink(href string) bool {
 	return false
 }
 
-// OpenLink opens uri with the desktop's handler, in a scope of its own,
+// OpenLink opens uri with the user's default app for its scheme,
 // handing it token to raise its window ("" hands none).
-func OpenLink(uri, token string) error {
-	cmd := exec.Command("xdg-open", uri) //nolint:gosec // an http(s) or mailto link OpenableLink vetted
-	if token != "" {
-		cmd.Env = append(os.Environ(), "XDG_ACTIVATION_TOKEN="+token)
-	}
-	return spawn.Detached(cmd, "xdg-open")
-}
+func OpenLink(uri, token string) error { return launcher.Open(uri, "", token) }
 
 // PurposeClass is the style class a button purpose gives an action
 // button: accepting a call is the suggested action, declining or hanging

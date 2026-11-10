@@ -37,8 +37,10 @@ type FileBrowserConfig struct {
 	Sorting          FileSort
 	DirectoriesFirst bool
 	ShowHidden       bool
-	// Command opens a picked file; empty is xdg-open.
+	// Command opens a picked file; empty is the built-in opener.
 	Command string
+	// Terminal runs a Terminal=true opener; empty autodetects.
+	Terminal string
 	// Recursive lists every file below (recursivebrowser).
 	Recursive bool
 }
@@ -116,11 +118,13 @@ func (f *FileBrowser) state() launcher.ModeState {
 }
 
 func (f *FileBrowser) open(path string) {
-	opener := strings.TrimSpace(f.cfg.Command)
-	if opener == "" {
-		opener = "xdg-open"
+	if strings.TrimSpace(f.cfg.Command) != "" {
+		launcher.RunShell(f.cfg.Command + " " + shlex.MustQuote(path))
+		return
 	}
-	launcher.RunShell(opener + " " + shlex.MustQuote(path))
+	if err := launcher.Open(path, f.cfg.Terminal, ""); err != nil {
+		log.Printf("launcher: open %s: %v", path, err)
+	}
 }
 
 // Load lists the current directory.

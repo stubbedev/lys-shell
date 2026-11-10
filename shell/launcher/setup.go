@@ -325,6 +325,7 @@ func fileBrowserConfig(l config.LauncherConfig, recursive bool) modes.FileBrowse
 		DirectoriesFirst: l.Filebrowser.DirectoriesFirst,
 		ShowHidden:       l.Filebrowser.ShowHidden,
 		Command:          l.Filebrowser.Command,
+		Terminal:         l.Terminal,
 		Recursive:        recursive,
 	}
 }

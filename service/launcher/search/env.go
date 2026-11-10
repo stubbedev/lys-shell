@@ -1,6 +1,8 @@
 package search
 
 import (
+	"log"
+
 	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
@@ -11,17 +13,25 @@ type Env struct {
 	Spawn func(argv []string)
 	// SpawnShell runs a shell line detached.
 	SpawnShell func(line string)
+	// Open hands an absolute path or a URI to the user's default app.
+	Open func(target string)
 	// Terminal is the terminal emulator command ("" autodetects).
 	Terminal string
 }
 
-// RealEnv spawns for real.
+// RealEnv spawns and opens for real, a failed open logged.
 func RealEnv(terminal string) Env {
-	return Env{Spawn: launcher.RunArgv, SpawnShell: launcher.RunShell, Terminal: terminal}
+	return Env{
+		Spawn:      launcher.RunArgv,
+		SpawnShell: launcher.RunShell,
+		Open: func(target string) {
+			if err := launcher.Open(target, terminal, ""); err != nil {
+				log.Printf("launcher: %v", err)
+			}
+		},
+		Terminal: terminal,
+	}
 }
-
-// openURI hands a path or URL to the desktop's default handler.
-func (env Env) openURI(uri string) { env.Spawn([]string{"xdg-open", uri}) }
 
 // inTerminal runs argv inside the terminal.
 func (env Env) inTerminal(argv ...string) {

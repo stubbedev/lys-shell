@@ -44,7 +44,7 @@ type DrunConfig struct {
 	DisplayFormat string
 	// ShowActions adds desktop actions as rows.
 	ShowActions bool
-	// URLLauncher opens Type=Link entries.
+	// URLLauncher opens Type=Link entries; empty is the built-in opener.
 	URLLauncher string
 	// Terminal runs Terminal=true apps; empty autodetects.
 	Terminal   string
@@ -60,7 +60,6 @@ func DefaultDrunConfig() DrunConfig {
 	return DrunConfig{
 		MatchFields:   []DrunField{DrunFieldName, DrunFieldGeneric, DrunFieldExec, DrunFieldCategories, DrunFieldKeywords},
 		DisplayFormat: "{name} [<span weight='light' size='small'><i>({generic})</i></span>]",
-		URLLauncher:   "xdg-open",
 		MaxHistory:    25,
 	}
 }
@@ -109,7 +108,7 @@ func (d *Drun) record(id string) {
 
 func (d *Drun) launch(e drunEntry) {
 	if e.isLink {
-		launcher.RunShell(d.cfg.URLLauncher + " " + shlex.MustQuote(e.url))
+		d.openLink(e.url)
 		return
 	}
 	var err error
@@ -315,5 +314,15 @@ func drunVars(name, generic, exec, categories, comment string) map[string]string
 	return map[string]string{
 		"name": pango.Escape(name), "generic": pango.Escape(generic), "exec": pango.Escape(exec),
 		"categories": pango.Escape(categories), "comment": pango.Escape(comment),
+	}
+}
+
+func (d *Drun) openLink(url string) {
+	if strings.TrimSpace(d.cfg.URLLauncher) != "" {
+		launcher.RunShell(d.cfg.URLLauncher + " " + shlex.MustQuote(url))
+		return
+	}
+	if err := launcher.Open(url, d.cfg.Terminal, ""); err != nil {
+		log.Printf("launcher: open link %s: %v", url, err)
 	}
 }

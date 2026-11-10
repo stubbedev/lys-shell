@@ -41,7 +41,10 @@ type Backend struct {
 	sessions *sessions
 	// spawn starts a program the portal hands off to (detach; a
 	// recorder in tests).
-	spawn      func(argv, env []string) error
+	spawn func(argv, env []string) error
+	// open hands a URI to the user's default app for it, raised by
+	// an activation token (openURI; a recorder in tests).
+	open       func(uri, token string) error
 	logind     *logind
 	inhibitor  *inhibitor
 	notifier   *notifier
@@ -62,7 +65,7 @@ func New(conn *dbus.Conn, cfg *config.Service) *Backend {
 	b := &Backend{
 		conn: conn, cfg: cfg, sessions: newSessions(conn),
 		settings: newSettings(cfg, xdg.OS),
-		spawn:    detach, logind: &logind{}, notifier: newNotifier(conn),
+		spawn:    detach, open: openURI, logind: &logind{}, notifier: newNotifier(conn),
 	}
 	b.inhibitor = newInhibitor(conn, b.sessions, b.logind)
 	if dir, ok := xdg.OS.DataDir(identity.Name); ok {
@@ -90,7 +93,7 @@ func (b *Backend) interfaces() []dbusx.Interface {
 		lockdown{b.cfg}.iface(),
 		background{b.conn, b.notifier, b.windows}.iface(),
 		usbIface(b.conn),
-		emailIface(b.conn, b.spawn),
+		emailIface(b.conn, b.spawn, b.open),
 		secretIface(b.conn, b.cfg),
 		b.inhibitor.iface(),
 		screenshotIface(b.conn),

@@ -585,7 +585,7 @@ func (b browserRows) actions(e Entry) []Action {
 	}
 	return []Action{
 		{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-			b.env.openURI(p.url)
+			b.env.Open(p.url)
 			return Close{}
 		}},
 		copyAction(i18n.T("launcher-action-copy-url"), p.url),

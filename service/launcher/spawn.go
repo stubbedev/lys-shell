@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/stubbedev/lys-desktop/desktopentry"
+	"github.com/stubbedev/lys-desktop/opener"
 	"github.com/stubbedev/lys-desktop/spawn"
 )
 
@@ -64,4 +66,12 @@ func InPath(program string) bool {
 		}
 	}
 	return false
+}
+
+// Open opens target, an absolute path or a URI, with the user's default
+// app for its mimetype, a Terminal=true app inside terminal as
+// DetectTerminal resolves it, handing the app token to raise its window
+// ("" hands none).
+func Open(target, terminal, token string) error {
+	return opener.Open(target, desktopentry.LaunchContext{ActivationToken: token, Terminal: DetectTerminal(terminal)})
 }
