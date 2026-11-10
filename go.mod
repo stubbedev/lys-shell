@@ -5,10 +5,10 @@ go 1.27.3
 require (
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-desktop v0.0.4-0.20261110163137-a1cadb1d5284
-	github.com/stubbedev/lys-lib v0.3.16-0.20261110160804-16a3c7a7cca2
+	github.com/stubbedev/lys-desktop v0.0.4-0.20261110170502-259b255028dc
+	github.com/stubbedev/lys-lib v0.3.16-0.20261110165932-f89239bc8390
 	github.com/stubbedev/lys-secrets v0.3.17-0.20261110162858-74b8bf696079
-	github.com/stubbedev/lys-ui v0.2.19
+	github.com/stubbedev/lys-ui v0.2.20-0.20261110170052-479cd6fae469
 	github.com/stubbedev/memory-go v0.5.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.47.0
@@ -21,7 +21,6 @@ require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/jfreymuth/pulse v0.1.3 // indirect
 	github.com/kettek/apng v0.0.0-20250827064933-2bb5f5fcf253 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
