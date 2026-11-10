@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-lib/dbustest"
 
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/recorder"
@@ -100,7 +101,7 @@ func TestIdleDurationLimit(t *testing.T) {
 func TestNotifyCommands(t *testing.T) {
 	dbustest.Session(t)
 	runSteps(t, []step{{[]string{"notify", "list"}, "Error: Notification service not running. Start lys-shell shell first.\n"}})
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	server, err := notifications.Serve(dbustest.SessionConn(t), svc)
 	if err != nil {
 		t.Fatal(err)
@@ -127,8 +128,7 @@ func TestNotifyCommands(t *testing.T) {
 // daemon does not serve is an error rather than a silent clamp.
 func TestNotifyListPagesTheWholeHistory(t *testing.T) {
 	dbustest.Session(t)
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	memory, err := notifypolicy.NewMemoryLimit(notifypolicy.MaxHistoryMemory)
 	if err != nil {
 		t.Fatal(err)
@@ -192,9 +192,8 @@ func TestRecorderCommands(t *testing.T) {
 }
 
 func TestNotifyDndUntil(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	dbustest.Session(t)
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	server, err := notifications.Serve(dbustest.SessionConn(t), svc)
 	if err != nil {
 		t.Fatal(err)

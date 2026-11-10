@@ -341,16 +341,7 @@ func rootOver(t *testing.T, env Env, index *BrowserIndex, providers ...config.La
 	cfg := config.DefaultsLauncher().Search
 	cfg.Providers = providers
 	s := &sink{}
-	e := Start(NewRoot(cfg, config.DefaultsPower(), Deps{Env: env, Browser: index}, t.TempDir()), nil, s, func(fn func()) { fn() })
-	t.Cleanup(func() {
-		e.Stop()
-		select {
-		case <-e.Done():
-		case <-time.After(liveness):
-			t.Error("the engine did not stop")
-		}
-	})
-	return e, s
+	return startLevel(t, s, NewRoot(cfg, config.DefaultsPower(), Deps{Env: env, Browser: index}, t.TempDir()), nil), s
 }
 
 func TestBrowserRowsAtTheRoot(t *testing.T) {

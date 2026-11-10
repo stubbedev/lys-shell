@@ -18,9 +18,9 @@ import (
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/keytest"
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/network"
-	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 )
 
@@ -370,8 +370,7 @@ func (w *rectWidget) HitTest(widget.Point) widget.Widget    { return nil }
 func lookContext(t *testing.T) ModuleContext {
 	t.Helper()
 	ctx := fixtureContext(t)
-	ctx.Notifications = notifications.NewService()
-	t.Cleanup(func() { ctx.Notifications.FlushWrites(5 * time.Second) })
+	ctx.Notifications = notifytest.NewService(t)
 	ctx.Notifications.SetDND(true)
 	ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true, CanGoPrevious: true})

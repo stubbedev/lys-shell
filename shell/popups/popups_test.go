@@ -39,8 +39,7 @@ func newTestPopups(t *testing.T, ncfg config.NotificationConfig) (*Popups, *noti
 // advanced.
 func newClockedPopups(t *testing.T, ncfg config.NotificationConfig) (*Popups, *notifications.Service, *fakeclock.Clock) {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	clock := fakeclock.New()
 	svc.UseClock(clock)
 	cfg := config.Defaults()

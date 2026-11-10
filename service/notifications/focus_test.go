@@ -94,7 +94,6 @@ func (c *countingClock) counts() (live, made int) {
 
 func scheduledService(t *testing.T, start time.Time, loc *time.Location, windows ...notifypolicy.Window) (*Service, *countingClock) {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	fc := fakeclock.New()
 	fc.Advance(start.Sub(fc.Now()))
 	clock := &countingClock{Clock: fc}

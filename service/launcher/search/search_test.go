@@ -29,6 +29,7 @@ type fakeProvider struct {
 }
 
 func (p *fakeProvider) Spec() Spec { return p.spec }
+func (*fakeProvider) Whole()       {}
 func (p *fakeProvider) Load(ctx context.Context, publish func([]Entry)) {
 	if p.gate != nil {
 		select {
@@ -100,16 +101,24 @@ func start(t *testing.T, s *sink, freq *Frecency, providers ...Provider) *Engine
 	if freq != nil {
 		open = func() (*Frecency, error) { return freq, nil }
 	}
-	e := Start(&Level{Providers: providers}, open, s, func(fn func()) { fn() })
-	t.Cleanup(func() {
-		e.Stop()
-		select {
-		case <-e.Done():
-		case <-time.After(liveness):
-			t.Error("the engine did not stop")
-		}
-	})
+	return startLevel(t, s, &Level{Providers: providers}, open)
+}
+
+func startLevel(t *testing.T, s *sink, level *Level, open func() (*Frecency, error)) *Engine {
+	t.Helper()
+	e := Start(level, open, s, func(fn func()) { fn() })
+	t.Cleanup(func() { stopped(t, e) })
 	return e
+}
+
+func stopped(t *testing.T, e *Engine) {
+	t.Helper()
+	e.Stop()
+	select {
+	case <-e.Done():
+	case <-time.After(liveness):
+		t.Error("the engine did not stop")
+	}
 }
 
 func titles(f Frame) []string {

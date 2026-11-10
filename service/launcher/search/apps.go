@@ -46,6 +46,9 @@ type appData struct {
 	url string
 }
 
+// Whole implements Whole.
+func (*Apps) Whole() {}
+
 // Load implements Provider.
 func (a *Apps) Load(_ context.Context, publish func([]Entry)) {
 	apps := desktopentry.AllApps(a.dirs)

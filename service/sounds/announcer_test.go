@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-lib/pulse/pulsetest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -50,7 +51,6 @@ func (s *syncBuffer) String() string {
 
 func newRig(t *testing.T, policy soundpolicy.Policy) *rig {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("PATH", "")
 	chirp, err := os.ReadFile("testdata/chirp.oga")
 	if err != nil {
@@ -74,7 +74,7 @@ func newRig(t *testing.T, policy soundpolicy.Policy) *rig {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = audio.Close() })
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	svc.UseClock(fakeclock.New())
 	r := &rig{svc: svc, srv: srv, theme: theme, logs: &syncBuffer{}}
 	r.a = NewAnnouncer(svc, audio, NewTheme("", []string{data}), func() bool { return r.muted }, policy)

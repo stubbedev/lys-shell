@@ -5,7 +5,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
 )
@@ -66,16 +65,7 @@ func controlRoot(t *testing.T, d Deps, providers ...config.LauncherSearchProvide
 	cfg := config.DefaultsLauncher().Search
 	cfg.Providers = providers
 	s := &sink{}
-	e := Start(NewRoot(cfg, config.DefaultsPower(), d, t.TempDir()), nil, s, func(fn func()) { fn() })
-	t.Cleanup(func() {
-		e.Stop()
-		select {
-		case <-e.Done():
-		case <-time.After(liveness):
-			t.Error("the engine did not stop")
-		}
-	})
-	return e, s
+	return startLevel(t, s, NewRoot(cfg, config.DefaultsPower(), d, t.TempDir()), nil), s
 }
 
 func someControls(titles ...string) func(context.Context) []Control {

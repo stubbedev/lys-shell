@@ -28,12 +28,10 @@ func collect(t *testing.T, feed <-chan Event, n int) []Event {
 	return out
 }
 
-// newTestService isolates the DND state dir per test.
 // newTestService is a service on a fake clock (advance drives it), its
 // state in a temporary directory.
 func newTestService(t *testing.T) *Service {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	s := newService(t)
 	s.UseClock(fakeclock.New())
 	return s
@@ -241,20 +239,19 @@ func TestGlobMatch(t *testing.T) {
 }
 
 func TestDNDPersistence(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	s := newService(t)
 	if s.DND() {
 		t.Fatal("a fresh state dir starts with dnd off")
 	}
 	s.SetDND(true)
 	settle(s)
-	restored := newService(t)
+	restored := restartedService(t)
 	if !restored.DND() {
 		t.Fatal("the dnd flag did not survive a restart")
 	}
 	s.SetDND(false)
 	settle(s)
-	restored = newService(t)
+	restored = restartedService(t)
 	if restored.DND() {
 		t.Fatal("dnd off did not persist")
 	}
@@ -263,12 +260,12 @@ func TestDNDPersistence(t *testing.T) {
 func TestDNDIsSavedWhereTheServiceReadIt(t *testing.T) {
 	read := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", read)
-	s := newService(t)
+	s := restartedService(t)
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	s.SetDND(true)
 	settle(s)
 	t.Setenv("XDG_STATE_HOME", read)
-	if !newService(t).DND() {
+	if !restartedService(t).DND() {
 		t.Fatal("dnd turned on after the state dir moved did not reach the dir the service read")
 	}
 }
@@ -480,7 +477,7 @@ func BenchmarkDismiss(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				s := newService(b)
+				s := restartedService(b)
 				s.SetHistoryLimits(memory, notifypolicy.DefaultStoredLimit())
 				if err := s.AttachStore(st); err != nil {
 					b.Fatal(err)

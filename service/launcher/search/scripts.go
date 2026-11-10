@@ -120,6 +120,9 @@ func NewScripts(env Env, dir string) *Scripts { return &Scripts{env: env, dir: d
 // Spec implements Provider.
 func (*Scripts) Spec() Spec { return Spec{Section: SectionCommands, Weight: 8} }
 
+// Whole implements Whole.
+func (*Scripts) Whole() {}
+
 // Load implements Provider.
 func (s *Scripts) Load(_ context.Context, publish func([]Entry)) {
 	listing, err := os.ReadDir(s.dir)

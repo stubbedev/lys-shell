@@ -1,6 +1,6 @@
-// Package notifytest holds the notification history helpers the shell's
-// tests share: a store on a temporary file, and the history, the store
-// and the popup list read back as pages and id sets.
+// Package notifytest holds the notification helpers the shell's tests
+// share: a service and a store on temporary files, and the history, the
+// store and the popup list read back as pages and id sets.
 package notifytest
 
 import (
@@ -21,15 +21,30 @@ type Store struct {
 	st  *notifications.Store
 }
 
+// NewService is a service whose do-not-disturb state is a temporary
+// directory's: it starts off, and the writes the service queued have landed
+// before the directory goes.
+func NewService(tb testing.TB) *notifications.Service {
+	tb.Helper()
+	tb.Setenv("XDG_STATE_HOME", tb.TempDir())
+	svc := notifications.NewService()
+	tb.Cleanup(func() { svc.FlushWrites(settleTimeout) })
+	return svc
+}
+
 // AttachStore persists svc's history in a store on a temporary file,
-// closed when the test ends; call it before the first notification.
+// closed once the writes queued when the test ends have landed; call it
+// before the first notification.
 func AttachStore(t *testing.T, svc *notifications.Service) Store {
 	t.Helper()
 	st, err := notifications.OpenStore(filepath.Join(t.TempDir(), "notifications.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = st.Close() })
+	t.Cleanup(func() {
+		svc.FlushWrites(settleTimeout)
+		_ = st.Close()
+	})
 	if err := svc.AttachStore(st); err != nil {
 		t.Fatal(err)
 	}

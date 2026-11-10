@@ -22,8 +22,8 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/network"
-	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 	"github.com/stubbedev/lys-shell/service/sysinfo"
 )
@@ -125,7 +125,7 @@ func newDashboardRig(t *testing.T) *dashboardRig {
 		media:    &countedMedia{fakeMediaSource: newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})},
 	}
 	ctx.Network, ctx.PowerProfiles, ctx.Battery, ctx.Media = rig.network, rig.profiles, rig.battery, rig.media
-	ctx.Notifications = notifications.NewService()
+	ctx.Notifications = notifytest.NewService(t)
 	ctx.Notifications.SetDND(false)
 	ctx.Pulse = &fakePulseSource{dev: pulse.Device{Description: "Speakers", Volume: pct(40)}, ticks: make(chan struct{}, 2)}
 	full := computeStyle(cfg, styling.Default())

@@ -125,6 +125,9 @@ var notInstalled sync.Once
 // Spec implements Provider.
 func (*Settings) Spec() Spec { return Spec{Section: SectionSettings, MinQuery: 2} }
 
+// Whole implements Whole.
+func (*Settings) Whole() {}
+
 // Load implements Provider.
 func (s *Settings) Load(ctx context.Context, publish func([]Entry)) {
 	pages, err := s.pages(ctx)

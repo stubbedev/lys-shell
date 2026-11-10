@@ -74,13 +74,9 @@ func TestAStackTagReplacesTheSameAppsNotification(t *testing.T) {
 }
 
 func TestAStackTagSurvivesTheStore(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	st, _ := openTestStore(t)
 	s := newService(t)
 	s.UseClock(fakeclock.New())
-	st, err := OpenStore(t.TempDir() + "/n.db")
-	if err != nil {
-		t.Fatal(err)
-	}
 	if err := s.AttachStore(st); err != nil {
 		t.Fatal(err)
 	}

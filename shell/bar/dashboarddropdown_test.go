@@ -15,8 +15,8 @@ import (
 	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
-	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/powerprofiles"
 )
 
@@ -135,12 +135,9 @@ func TestDashboardPaintsFromTheStylesheet(t *testing.T) {
 }
 
 func TestDashboardQuickActionsDriveTheServices(t *testing.T) {
-	// DND persists to the state dir; keep it out of the real one.
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	ctx.Notifications = notifications.NewService()
-	t.Cleanup(func() { ctx.Notifications.FlushWrites(5 * time.Second) })
+	ctx.Notifications = notifytest.NewService(t)
 	ctx.Notifications.SetDND(false)
 	ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 	ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})

@@ -15,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-lib/pulse/native"
 	"github.com/stubbedev/lys-lib/sockdir"
 
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -151,8 +152,7 @@ func TestANotificationSoundPlaysOnAPrivatePipeWire(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(theme, "message-new-instant.oga"), chirp, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	a := NewAnnouncer(svc, audio, NewTheme("", []string{data}), func() bool { return false }, soundpolicy.Policy{Mode: soundpolicy.All, Default: "message-new-instant"})
 	a.Announce(&notifications.Notification{ID: 1, AppName: "chat", SoundName: "message-new-instant"})
 	a.Announce(&notifications.Notification{ID: 2, AppName: "chat", SoundName: "message-new-instant"})

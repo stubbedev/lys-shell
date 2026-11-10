@@ -223,7 +223,6 @@ func TestDefaultAction(t *testing.T) {
 
 // The D-Bus Notify call carries its hints into the stored notification.
 func TestServerNotifyDecodesHints(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 	bus := dbustest.Start(t)
 	svc := newService(t)

@@ -160,6 +160,9 @@ func (e *Emoji) Spec() Spec {
 	return Spec{Section: SectionEmoji, MinQuery: 2, Weight: -24}
 }
 
+// Whole implements Whole.
+func (*Emoji) Whole() {}
+
 // Load implements Provider.
 func (e *Emoji) Load(_ context.Context, publish func([]Entry)) {
 	table := e.load()

@@ -56,22 +56,8 @@ func (w *fakeWatch) changed() {
 // session runs one engine over level until t ends or the returned stop.
 func session(t *testing.T, s *sink, level *Level, open func() (*Frecency, error)) func() {
 	t.Helper()
-	e := Start(level, open, s, func(fn func()) { fn() })
-	stopped := false
-	stop := func() {
-		if stopped {
-			return
-		}
-		stopped = true
-		e.Stop()
-		select {
-		case <-e.Done():
-		case <-time.After(liveness):
-			t.Error("the engine did not stop")
-		}
-	}
-	t.Cleanup(stop)
-	return stop
+	e := startLevel(t, s, level, open)
+	return func() { stopped(t, e) }
 }
 
 func firstFrame(t *testing.T, s *sink) Frame {
@@ -107,6 +93,95 @@ func TestAKeptSourceLoadsOnceAndFillsTheNextSessionsFirstFrame(t *testing.T) {
 	}
 	if n := apps.loads.Load(); n != 1 {
 		t.Errorf("loads = %d, want 1: an unchanged source is not read again", n)
+	}
+}
+
+type heldProvider struct {
+	countingProvider
+	release chan struct{}
+}
+
+func (p *heldProvider) Load(ctx context.Context, publish func([]Entry)) {
+	p.countingProvider.Load(ctx, publish)
+	<-p.release
+}
+
+func TestASourceStillInItsLoadWhenTheSessionEndsIsKept(t *testing.T) {
+	src := NewSources((&fakeWatch{}).watch, time.Now)
+	apps := &heldProvider{spec: Spec{Section: SectionNone}, entries: []Entry{entry("Firefox")}, release: make(chan struct{})}
+	spec := keepSpec{paths: []string{"/apps"}}
+
+	first := &sink{}
+	e := startLevel(t, first, keptLevel(src, apps, spec), nil)
+	release := sync.OnceFunc(func() { close(apps.release) })
+	t.Cleanup(release)
+	until(t, first, "Firefox")
+	e.Stop()
+	release()
+	stopped(t, e)
+
+	second := &sink{}
+	stop := session(t, second, keptLevel(src, apps, spec), nil)
+	if got := titles(firstFrame(t, second)); !slices.Equal(got, []string{"Firefox"}) {
+		t.Errorf("the second session's first frame = %q, want the rows the first one showed", got)
+	}
+	stop()
+	if n := apps.loads.Load(); n != 1 {
+		t.Errorf("loads = %d, want 1: the rows were whole when the session ended", n)
+	}
+}
+
+type stagedProvider struct {
+	spec    Spec
+	entries []Entry
+	rest    chan struct{}
+	loads   atomic.Int32
+}
+
+func (p *stagedProvider) Spec() Spec { return p.spec }
+
+func (p *stagedProvider) Load(ctx context.Context, publish func([]Entry)) {
+	p.loads.Add(1)
+	publish(p.entries[:1])
+	select {
+	case <-p.rest:
+		publish(p.entries)
+	case <-ctx.Done():
+	}
+}
+
+func (*stagedProvider) Actions(Entry) []Action { return nil }
+
+func TestAStagedSourceIsKeptOnlyOnceItsLoadRanToItsEnd(t *testing.T) {
+	src := NewSources((&fakeWatch{}).watch, time.Now)
+	files := &stagedProvider{spec: Spec{Section: SectionNone}, entries: []Entry{entry("Firefox"), entry("Firewall")}, rest: make(chan struct{})}
+	spec := keepSpec{paths: []string{"/files"}}
+
+	first := &sink{}
+	stop := session(t, first, keptLevel(src, files, spec), nil)
+	until(t, first, "Firefox")
+	stop()
+
+	second := &sink{}
+	stop = session(t, second, keptLevel(src, files, spec), nil)
+	if got := titles(firstFrame(t, second)); len(got) != 0 {
+		t.Errorf("the second session's first frame = %q, want nothing kept of a load the session's end cut short", got)
+	}
+	close(files.rest)
+	until(t, second, "Firefox", "Firewall")
+	stop()
+	if n := files.loads.Load(); n != 2 {
+		t.Fatalf("loads = %d, want 2: the cut load is run again", n)
+	}
+
+	third := &sink{}
+	stop = session(t, third, keptLevel(src, files, spec), nil)
+	if got := titles(firstFrame(t, third)); !slices.Equal(got, []string{"Firefox", "Firewall"}) {
+		t.Errorf("the third session's first frame = %q, want the rows of the load that ran to its end", got)
+	}
+	stop()
+	if n := files.loads.Load(); n != 2 {
+		t.Errorf("loads = %d, want 2: a staged load that ran to its end is kept", n)
 	}
 }
 
@@ -195,11 +270,7 @@ func TestAnEmptyListSettlesInOneUpdateOnceTheSourcesAreKept(t *testing.T) {
 
 	s := &sink{}
 	windows := &fakeProvider{spec: Spec{Section: SectionWindows}, entries: []Entry{{ID: "w", Title: "a window"}}, published: make(chan struct{})}
-	e := Start(level(windows), open, s, func(fn func()) { fn() })
-	t.Cleanup(func() {
-		e.Stop()
-		<-e.Done()
-	})
+	e := startLevel(t, s, level(windows), open)
 	select {
 	case <-windows.published:
 	case <-time.After(liveness):

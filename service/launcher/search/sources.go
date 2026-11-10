@@ -135,8 +135,9 @@ func (s *Sources) retain(keys []string) {
 }
 
 // kept is a session's provider over rows kept between sessions: its Load
-// is the provider's, remembering the rows a load that ran to its end
-// published last.
+// is the provider's, remembering the rows it published last once they are
+// its whole list: at once for a Whole provider, for any other only when the
+// load ran to its end before the session did.
 type kept struct {
 	Provider
 	rows *keptRows
@@ -152,7 +153,10 @@ func (k *kept) Load(ctx context.Context, publish func([]Entry)) {
 		last, got = entries, true
 		publish(entries)
 	})
-	if got && ctx.Err() == nil {
+	if !got {
+		return
+	}
+	if _, whole := k.Provider.(Whole); whole || ctx.Err() == nil {
 		k.rows.store(gen, last, k.now())
 	}
 }

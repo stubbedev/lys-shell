@@ -45,9 +45,8 @@ func TestNotifTimeLabel(t *testing.T) {
 
 func newNotifTestService(t *testing.T) *notifications.Service {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	svc.SetDND(false)
 	return svc
 }

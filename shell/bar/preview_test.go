@@ -17,12 +17,12 @@ import (
 	"github.com/stubbedev/lys-secrets/vault"
 	"github.com/stubbedev/lys-ui/widget"
 
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 	"github.com/stubbedev/lys-shell/service/bluetooth"
 	"github.com/stubbedev/lys-shell/service/brightness"
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
 	"github.com/stubbedev/lys-shell/service/network"
 	"github.com/stubbedev/lys-shell/service/network/secrets"
-	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/weather"
 )
 
@@ -138,8 +138,8 @@ func dropdownFixtures() []dropdownFixture {
 			return brightnessDropdown(*ctx)
 		}},
 		{"calendar", "calendar", func(_ *testing.T, ctx *ModuleContext) widget.Widget { return calendarDropdown(*ctx) }},
-		{"dashboard", "dashboard", func(_ *testing.T, ctx *ModuleContext) widget.Widget {
-			ctx.Notifications = notifications.NewService()
+		{"dashboard", "dashboard", func(t *testing.T, ctx *ModuleContext) widget.Widget {
+			ctx.Notifications = notifytest.NewService(t)
 			ctx.IdleInhibit = idleinhibit.NewState(inhibitduration.Duration{})
 			ctx.Media = newFakeMedia(mpris.Player{BusName: "org.mpris.MediaPlayer2.x", Title: "Song", Artist: "Band", State: mpris.StatePlaying, CanGoNext: true})
 			return dashboardDropdown(*ctx)

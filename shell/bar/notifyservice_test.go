@@ -8,7 +8,6 @@ import (
 	"github.com/stubbedev/lys-desktop/config"
 
 	"github.com/stubbedev/lys-shell/internal/notifytest"
-	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 func TestNotificationServiceRunsOnlyWhenEnabled(t *testing.T) {
@@ -58,7 +57,7 @@ func TestNotificationHistorySurvivesARestart(t *testing.T) {
 		t.Fatalf("restarted history = %v, want the stored notification", notifytest.History(t, again))
 	}
 
-	svc := notifications.NewService()
+	svc := notifytest.NewService(t)
 	attachNotificationStore(svc, func() (string, error) { return "", errors.New("no home") })
 	svc.Notify("mail", 0, "", "Memory only", "", nil, 0)
 	if svc.Count() != 1 {

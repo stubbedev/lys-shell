@@ -3,11 +3,10 @@ package bar
 import (
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
 
-	"github.com/stubbedev/lys-shell/service/notifications"
+	"github.com/stubbedev/lys-shell/internal/notifytest"
 )
 
 func TestNotificationLabel(t *testing.T) {
@@ -59,9 +58,7 @@ func TestLoadFileAppliesNotification(t *testing.T) {
 func TestNotificationModuleFollowsService(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := newTestContext(t, cfg)
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	ctx.Notifications = notifications.NewService()
-	t.Cleanup(func() { ctx.Notifications.FlushWrites(5 * time.Second) })
+	ctx.Notifications = notifytest.NewService(t)
 
 	module, err := createOnHeadlessLoop("notifications", ctx)
 	if err != nil {

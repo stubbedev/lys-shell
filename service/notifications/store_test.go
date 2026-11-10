@@ -827,7 +827,6 @@ func TestClosingAPopupOutsideTheHistoryUpdatesThePopups(t *testing.T) {
 }
 
 func TestRestoredExpiryStillFires(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	st, _ := openTestStore(t)
 	clock := fakeclock.New()
 	if err := st.Add(&Notification{ID: 7, AppName: "app", Summary: "soon", ExpireMS: 1500, Added: clock.Now().Add(-100 * time.Millisecond)}, 0); err != nil {
@@ -959,6 +958,12 @@ func TestServiceCallsReturnWhileTheStoreHolds(t *testing.T) {
 func settle(svc *Service) { svc.FlushWrites(10 * time.Second) }
 
 func newService(tb testing.TB) *Service {
+	tb.Helper()
+	tb.Setenv("XDG_STATE_HOME", tb.TempDir())
+	return restartedService(tb)
+}
+
+func restartedService(tb testing.TB) *Service {
 	tb.Helper()
 	s := NewService()
 	tb.Cleanup(func() { settle(s) })

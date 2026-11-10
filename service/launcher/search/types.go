@@ -214,6 +214,11 @@ type Provider interface {
 // panel does not change height a moment later.
 type Immediate interface{ Immediate() }
 
+// Whole marks a provider whose Load publishes once, every row it has: what
+// it published is its whole list even when the session ended before Load
+// returned, so a Sources keeps it.
+type Whole interface{ Whole() }
+
 // Answerer is a provider whose rows answer the query rather than being
 // searched through (a calculation, a web search). Answer runs on every
 // query on the engine goroutine, so it must be quick.

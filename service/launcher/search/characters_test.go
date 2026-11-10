@@ -64,8 +64,7 @@ func TestCharactersInTheMainListFromThreeLetters(t *testing.T) {
 
 func TestTheCharacterLevelListsWithAnEmptyQuery(t *testing.T) {
 	s := &sink{}
-	e := Start(CharactersLevel(charnames.Shared), nil, s, func(fn func()) { fn() })
-	t.Cleanup(e.Stop)
+	e := startLevel(t, s, CharactersLevel(charnames.Shared), nil)
 	e.SetQuery("x", 1)
 	e.SetQuery("", 2)
 	waitFor(t, "every character", func() bool { return len(s.last().Rows) == flatRowCap && s.last().Query == "" })
