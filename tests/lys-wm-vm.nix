@@ -101,7 +101,10 @@ pkgs.testers.nixosTest {
           exec lys-wm --systemd > /tmp/lys/lys-wm.log 2>&1
         fi
       '';
-      environment.sessionVariables.LIBGL_ALWAYS_SOFTWARE = "1";
+      environment.sessionVariables = {
+        LIBGL_ALWAYS_SOFTWARE = "1";
+        LYS_WM_RENDERER = "gles";
+      };
       systemd.tmpfiles.rules = [
         "d /tmp/lys 0777 root root -"
         "d /home/${user}/.config 0755 ${user} users -"
@@ -155,10 +158,12 @@ pkgs.testers.nixosTest {
         # the stream's identifier finds both, the unit only the shell.
         return machine.execute("journalctl --no-pager -o cat SYSLOG_IDENTIFIER=lys-shell")[1]
 
+    bus = "XDG_RUNTIME_DIR=${runtimeDir} DBUS_SESSION_BUS_ADDRESS=unix:path=${runtimeDir}/bus"
+
     def logs():
         print(machine.execute("cat /tmp/lys/*.log | tail -n 80; tail -n 40 /tmp/lys/events.jsonl")[1])
         print(shell_log()[-8000:])
-        print(machine.execute(f"su - ${user} -c '{env} systemctl --user status --no-pager lys-shell.service lys-wm-session.target graphical-session.target'")[1])
+        print(machine.execute(f"su - ${user} -c '{bus} systemctl --user status --no-pager lys-shell.service lys-wm-session.target graphical-session.target'")[1])
 
     def wait(what, check, tries=60, pause=1.0):
         for _ in range(tries):
@@ -171,10 +176,7 @@ pkgs.testers.nixosTest {
     wait("lys-wm's socket", lambda: machine.execute("ls ${runtimeDir}/lys-wm/*.sock")[0] == 0, tries=120)
     sock = machine.succeed("ls ${runtimeDir}/lys-wm/*.sock").split()[0]
     display = os.path.basename(sock)[: -len(".sock")]
-    env = (
-        f"XDG_RUNTIME_DIR=${runtimeDir} LYS_WM_SOCKET={sock} WAYLAND_DISPLAY={display} "
-        "DBUS_SESSION_BUS_ADDRESS=unix:path=${runtimeDir}/bus"
-    )
+    env = f"{bus} LYS_WM_SOCKET={sock} WAYLAND_DISPLAY={display}"
 
     def run(command):
         return machine.succeed(f"su - ${user} -c '{env} {command}'")
