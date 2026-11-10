@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stubbedev/lys-desktop/service/pulse/native"
+	"github.com/stubbedev/lys-lib/pulse/native"
 )
 
 func wav(format, channels, bits uint16, rate uint32, data []byte) []byte {

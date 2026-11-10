@@ -62,8 +62,8 @@ linters:
           - unparam
       # Two's-complement reinterpretation of a decoded or encoded wire
       # word of the same width (s16 PCM, inotify wd, IPP integers, evdev
-      # values, PulseAudio 'r' fields): the bits are the value.
-      - path: ^(cava|internal/fswatch|internal/ipp|service/keytoggles|service/pulse/native)/
+      # values): the bits are the value.
+      - path: ^(cava|internal/fswatch|internal/ipp|service/keytoggles)/
         linters:
           - gosec
         text: "G115: integer overflow conversion (uint16 -> int16|uint32 -> int32|uint64 -> int64|int64 -> uint64)$"

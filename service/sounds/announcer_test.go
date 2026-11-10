@@ -14,9 +14,9 @@ import (
 	"github.com/stubbedev/lys-desktop/fakeclock"
 	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
 	"github.com/stubbedev/lys-desktop/service/pulse"
-	"github.com/stubbedev/lys-desktop/service/pulse/native"
-	"github.com/stubbedev/lys-desktop/service/pulse/pulsetest"
 	"github.com/stubbedev/lys-desktop/service/sounds/soundpolicy"
+	"github.com/stubbedev/lys-lib/pulse/native"
+	"github.com/stubbedev/lys-lib/pulse/pulsetest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/notifications"

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-desktop/service/pulse"
-	"github.com/stubbedev/lys-desktop/service/pulse/native"
 	"github.com/stubbedev/lys-desktop/service/sounds/soundpolicy"
+	"github.com/stubbedev/lys-lib/pulse/native"
 	"github.com/stubbedev/lys-lib/sockdir"
 
 	"github.com/stubbedev/lys-shell/service/notifications"
