@@ -10,7 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // D-Bus names for the SNI protocol.
@@ -46,6 +49,10 @@ type Host struct {
 	owned   bool
 	watcher *watcher // non-nil: we serve the watcher role ourselves
 	stop    chan struct{}
+	// names follows the bus names that lose their owner, each handed to
+	// the signal loop through vanished.
+	names    *dbusx.Watch
+	vanished chan string
 
 	mu sync.Mutex
 	// owners maps each item key to its connection's unique name, so a
@@ -70,6 +77,7 @@ func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 		conn:        conn,
 		store:       store,
 		stop:        make(chan struct{}),
+		vanished:    make(chan string),
 		owners:      make(map[string]string),
 		menus:       make(map[string][]chan struct{}),
 		pixmapSizes: make(map[int]int),
@@ -78,7 +86,8 @@ func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 	signals := make(chan *dbus.Signal, 64)
 	conn.Signal(signals)
 	if err := h.claim(); err != nil {
-		conn.RemoveSignal(signals)
+		close(h.stop)
+		bussignal.Remove(conn, signals)
 		return nil, errors.Join(err, h.release())
 	}
 	go h.run(signals)
@@ -140,8 +149,9 @@ func (h *Host) registerHost() error {
 }
 
 // subscribe matches the watcher's registration signals, every item's
-// change signals and PropertiesChanged, the menus' change signals, and
-// bus-name ownership changes (for the watcher role and item exits).
+// change signals and PropertiesChanged and the menus' change signals,
+// and watches the bus names that lose their owner (for the watcher role
+// and item exits).
 func (h *Host) subscribe() error {
 	for _, rule := range hostMatches() {
 		if err := h.conn.AddMatchSignal(rule...); err != nil {
@@ -149,6 +159,19 @@ func (h *Host) subscribe() error {
 		}
 		h.matched++
 	}
+	names, err := dbusx.WatchSignals(context.Background(), h.conn, dbusx.FromBus(),
+		func(err error) { log.Printf("sni: %v", err) },
+		bussignal.OnNameLost(func(name string) error {
+			select {
+			case h.vanished <- name:
+			case <-h.stop:
+			}
+			return nil
+		}))
+	if err != nil {
+		return fmt.Errorf("sni: %w", err)
+	}
+	h.names = names
 	return nil
 }
 
@@ -158,12 +181,17 @@ func hostMatches() [][]dbus.MatchOption {
 		{dbus.WithMatchInterface(ItemIface)},
 		{dbus.WithMatchInterface(PropsIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, ItemIface)},
 		{dbus.WithMatchInterface(MenuIface)},
-		{dbus.WithMatchInterface("org.freedesktop.DBus"), dbus.WithMatchMember("NameOwnerChanged")},
 	}
 }
 
 func (h *Host) release() error {
 	var errs []error
+	if h.names != nil {
+		if err := h.names.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+			errs = append(errs, fmt.Errorf("sni: %w", err))
+		}
+		h.names = nil
+	}
 	for _, rule := range hostMatches()[:h.matched] {
 		if err := h.conn.RemoveMatchSignal(rule...); err != nil {
 			errs = append(errs, fmt.Errorf("sni: remove match: %w", err))
@@ -187,9 +215,9 @@ func (h *Host) release() error {
 	return errors.Join(errs...)
 }
 
-// run consumes the signals until Close.
+// run consumes the signals and the vanished names until Close.
 func (h *Host) run(signals chan *dbus.Signal) {
-	defer h.conn.RemoveSignal(signals)
+	defer bussignal.Remove(h.conn, signals)
 	for {
 		select {
 		case <-h.stop:
@@ -199,6 +227,9 @@ func (h *Host) run(signals chan *dbus.Signal) {
 				return
 			}
 			h.handle(sig)
+			bussignal.Discard(sig)
+		case name := <-h.vanished:
+			h.nameVanished(name)
 		case <-h.retrack:
 			for _, it := range h.store.Items() {
 				h.track(it.Bus + it.Path)
@@ -285,21 +316,16 @@ func (h *Host) handle(sig *dbus.Signal) {
 		for _, key := range h.menuItemsOf(sig.Sender, string(sig.Path)) {
 			h.notifyMenu(key)
 		}
-	case sig.Name == "org.freedesktop.DBus.NameOwnerChanged":
-		if len(sig.Body) != 3 {
-			return
-		}
-		name, _ := sig.Body[0].(string)
-		newOwner, _ := sig.Body[2].(string)
-		if newOwner != "" {
-			return
-		}
-		if h.watcher != nil {
-			h.watcher.nameVanished(name)
-			return
-		}
-		h.forgetName(name)
 	}
+}
+
+// nameVanished drops what a connection that left the bus registered.
+func (h *Host) nameVanished(name string) {
+	if h.watcher != nil {
+		h.watcher.nameVanished(name)
+		return
+	}
+	h.forgetName(name)
 }
 
 // firstString is a one-string signal body.
@@ -582,8 +608,8 @@ func parseTooltip(v any) Tooltip {
 	return tip
 }
 
-// Close stops the loop and takes back the matches, the watcher object
-// and its name; the connection stays open.
+// Close stops the loop and takes back the matches, the watch on bus
+// names, the watcher object and its name; the connection stays open.
 func (h *Host) Close() error {
 	close(h.stop)
 	return h.release()

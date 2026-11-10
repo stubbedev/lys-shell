@@ -1,12 +1,16 @@
 package idleinhibit
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the
@@ -26,23 +30,23 @@ func NewDaemon(state *State) *Daemon { return &Daemon{state: state} }
 // bus; the returned release stops all of it.
 func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 	d.conn = conn
-	match := []dbus.MatchOption{
-		dbus.WithMatchSender("org.freedesktop.DBus"),
-		dbus.WithMatchInterface("org.freedesktop.DBus"),
-		dbus.WithMatchMember("NameOwnerChanged"),
+	departed, err := dbusx.WatchSignals(context.Background(), conn, dbusx.FromBus(),
+		func(err error) { log.Printf("idle inhibit: %v", err) },
+		bussignal.OnNameLost(func(name string) error {
+			d.state.ReleaseOwner(name)
+			return nil
+		}))
+	if err != nil {
+		return nil, fmt.Errorf("idle inhibit: %w", err)
 	}
-	if err := conn.AddMatchSignal(match...); err != nil {
-		return nil, fmt.Errorf("idle inhibit: watch NameOwnerChanged: %w", err)
+	unwatch := func() {
+		if err := departed.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+			log.Printf("idle inhibit: %v", err)
+		}
 	}
-	signals := make(chan *dbus.Signal, 16)
-	conn.Signal(signals)
-	done := make(chan struct{})
-	go d.releaseDeparted(signals, done)
 	release, err := d.serve(conn)
 	if err != nil {
-		conn.RemoveSignal(signals)
-		close(done)
-		_ = conn.RemoveMatchSignal(match...)
+		unwatch()
 		return nil, err
 	}
 	screenSaver, err := d.serveScreenSaver(conn)
@@ -53,30 +57,8 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 	return func() {
 		screenSaver()
 		release()
-		conn.RemoveSignal(signals)
-		close(done)
-		_ = conn.RemoveMatchSignal(match...)
+		unwatch()
 	}, nil
-}
-
-// releaseDeparted drops the holds of every bus name that loses its
-// owner, until done closes.
-func (d *Daemon) releaseDeparted(signals <-chan *dbus.Signal, done <-chan struct{}) {
-	for {
-		select {
-		case <-done:
-			return
-		case sig := <-signals:
-			if sig.Name != "org.freedesktop.DBus.NameOwnerChanged" || len(sig.Body) != 3 {
-				continue
-			}
-			name, _ := sig.Body[0].(string)
-			newOwner, _ := sig.Body[2].(string)
-			if newOwner == "" {
-				d.state.ReleaseOwner(name)
-			}
-		}
-	}
 }
 
 func (d *Daemon) serve(conn *dbus.Conn) (func(), error) {

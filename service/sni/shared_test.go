@@ -16,6 +16,9 @@ func TestCloseHandsTheWatcherAndASharedConnectionBack(t *testing.T) {
 	if err := host.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
+	if rules := dbustest.MatchRules(t, conn); len(rules) != 0 {
+		t.Fatalf("Close left the match rules %q", rules)
+	}
 	if err := conn.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
 		t.Fatalf("Close closed the shared connection: %v", err)
 	}

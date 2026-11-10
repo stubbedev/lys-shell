@@ -379,3 +379,23 @@ func TestDaemonRefusesDurationsPastTheLimit(t *testing.T) {
 		}
 	}
 }
+
+// The daemon follows departing callers through a watch on the shell's
+// shared connection: releasing it takes the watch's match rule off the
+// connection again.
+func TestAReleasedDaemonLeavesTheConnectionAsItWas(t *testing.T) {
+	bus := dbustest.Start(t)
+	conn := bus.Conn(t)
+	state := NewState(minutes(t, 0))
+	release, err := NewDaemon(state).Export(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rules := dbustest.MatchRules(t, conn); len(rules) == 0 {
+		t.Fatal("the daemon holds no match rule: nothing tells it of a caller leaving")
+	}
+	release()
+	if rules := dbustest.MatchRules(t, conn); len(rules) != 0 {
+		t.Fatalf("the released daemon left the match rules %q", rules)
+	}
+}

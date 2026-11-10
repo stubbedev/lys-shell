@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,8 +11,10 @@ import (
 
 	"github.com/stubbedev/lys-desktop/rusterr"
 	"github.com/stubbedev/lys-desktop/settingspage"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 )
@@ -98,15 +101,19 @@ func panelStop(m *cli.Matches) error {
 		return err
 	}
 	defer func() { _ = conn.Close() }()
-	released, err := watchRelease(conn)
+	released, failed := make(chan struct{}, 1), make(chan error, 1)
+	watch, err := watchRelease(conn, released, failed)
 	if err != nil {
-		return err
+		return cliMessage("Failed to subscribe to name changes: " + err.Error())
 	}
+	defer func() { _ = watch.Stop() }()
 	if err := activateAction(conn, shellipc.ActionQuit); err != nil {
 		return cliMessage("Failed to stop panel: " + rusterr.Zbus(err))
 	}
 	select {
 	case <-released:
+	case err := <-failed:
+		return cliMessage("Failed to follow the panel stopping: " + err.Error())
 	case <-time.After(shutdownTimeout):
 		return cliMessage("Timeout waiting for panel to stop")
 	}
@@ -114,28 +121,24 @@ func panelStop(m *cli.Matches) error {
 	return nil
 }
 
-// watchRelease is proxy.rs's wait_for_shutdown subscription: it fires
-// once the application id has no owner.
-func watchRelease(conn *dbus.Conn) (<-chan struct{}, error) {
-	if err := conn.AddMatchSignal(
-		dbus.WithMatchSender("org.freedesktop.DBus"),
-		dbus.WithMatchMember("NameOwnerChanged"),
-		dbus.WithMatchArg(0, shellipc.AppID),
-	); err != nil {
-		return nil, cliMessage("Failed to subscribe to name changes: " + err.Error())
-	}
-	signals := make(chan *dbus.Signal, 8)
-	conn.Signal(signals)
-	done := make(chan struct{})
-	go func() {
-		for sig := range signals {
-			if len(sig.Body) == 3 && sig.Body[0] == shellipc.AppID && sig.Body[2] == "" {
-				close(done)
-				return
+// watchRelease is proxy.rs's wait_for_shutdown subscription: it tells
+// released once the application id has no owner, and failed of an
+// announcement of the bus's it could not read.
+func watchRelease(conn *dbus.Conn, released chan<- struct{}, failed chan<- error) (*dbusx.Watch, error) {
+	return dbusx.WatchSignals(context.Background(), conn, dbusx.FromBus(),
+		func(err error) {
+			select {
+			case failed <- err:
+			default:
 			}
-		}
-	}()
-	return done, nil
+		},
+		bussignal.OnNameLost(func(string) error {
+			select {
+			case released <- struct{}{}:
+			default:
+			}
+			return nil
+		}).WithArg0(shellipc.AppID))
 }
 
 func activateAction(conn *dbus.Conn, action string) error {

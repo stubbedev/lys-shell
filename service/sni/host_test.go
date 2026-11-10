@@ -10,6 +10,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // fakeMenu is a DBusMenu with one check row, a submenu, and a
@@ -462,4 +464,75 @@ func (m *fakeMenu) clickedCalls() []int32 {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return slices.Clone(m.clicked)
+}
+
+// quietWatcher is an external watcher that lists what it is told and
+// never says an item left: a host hosting against it learns of an
+// item's exit from the bus alone.
+type quietWatcher struct{}
+
+func (quietWatcher) RegisterStatusNotifierHost(string) *dbus.Error { return nil }
+
+func startQuietWatcher(t *testing.T, bus *dbustest.Bus) *dbus.Conn {
+	t.Helper()
+	conn := bus.Conn(t)
+	if err := conn.Export(quietWatcher{}, WatcherPath, WatcherIface); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := prop.Export(conn, WatcherPath, prop.Map{WatcherIface: {
+		"RegisteredStatusNotifierItems": {Value: []string{}, Emit: prop.EmitFalse},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if reply, err := conn.RequestName(WatcherName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatalf("own %s: %v %v", WatcherName, reply, err)
+	}
+	return conn
+}
+
+// Against an external watcher the host drops the items of a connection
+// that leaves the bus, whether or not the watcher unregisters them, and
+// keeps those of the connections still there.
+func TestHostForgetsTheItemsOfAConnectionThatLeft(t *testing.T) {
+	bus := dbustest.Start(t)
+	watcher := startQuietWatcher(t, bus)
+	store := NewStore()
+	host, err := NewHostOn(bus.Conn(t), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+	if host.watcher != nil {
+		t.Fatal("the host took the watcher role from the watcher on the bus")
+	}
+	leaving, staying := startItem(t, bus, "leaving"), startItem(t, bus, "staying")
+	for _, item := range []*fakeItem{leaving, staying} {
+		if err := watcher.Emit(WatcherPath, WatcherIface+".StatusNotifierItemRegistered", item.conn.Names()[0]+"/StatusNotifierItem"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	waitItems(t, store, func(i []Item) bool { return len(i) == 2 })
+	if err := leaving.conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	items := waitItems(t, store, func(i []Item) bool { return len(i) == 1 })
+	if items[0].ID != "staying" {
+		t.Fatalf("the host kept %+v, want the item whose connection stayed", items[0])
+	}
+}
+
+// The host reads every item's signals and takes over none of the
+// descriptors one carries: each is closed once the signal is handled.
+func TestHostClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
+	bus := dbustest.Start(t)
+	host, err := NewHostOn(bus.Conn(t), NewStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+	fd, closed := bussignaltest.Descriptor(t)
+	if err := bus.Conn(t).Emit("/StatusNotifierItem", ItemIface+".NewIcon", fd); err != nil {
+		t.Fatal(err)
+	}
+	closed("the host handled an item signal carrying a descriptor")
 }

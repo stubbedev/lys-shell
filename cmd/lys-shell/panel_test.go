@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
@@ -228,5 +229,37 @@ func TestPanelFocusHandsABarTheKeyboard(t *testing.T) {
 	defer mu.Unlock()
 	if want := []string{"", "DP-2", "HDMI-9"}; !slices.Equal(focused, want) {
 		t.Errorf("focused %q, want %q", focused, want)
+	}
+}
+
+// The stop is told once the application id has lost its owner, and its
+// watch takes its match rule off the connection again.
+func TestPanelStopIsToldOfTheApplicationIDLosingItsOwner(t *testing.T) {
+	bus := dbustest.Start(t)
+	conn := bus.Conn(t)
+	released, failed := make(chan struct{}, 1), make(chan error, 1)
+	watch, err := watchRelease(conn, released, failed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shell := bus.Conn(t)
+	if reply, err := shell.RequestName(shellipc.AppID, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatalf("own %s: %v %v", shellipc.AppID, reply, err)
+	}
+	if err := shell.Close(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-released:
+	case err := <-failed:
+		t.Fatalf("the watch failed: %v", err)
+	case <-time.After(shutdownTimeout):
+		t.Fatal("the application id lost its owner and the stop was not told")
+	}
+	if err := watch.Stop(); err != nil {
+		t.Fatalf("stop the watch: %v", err)
+	}
+	if rules := dbustest.MatchRules(t, conn); len(rules) != 0 {
+		t.Fatalf("the watch left the match rules %q", rules)
 	}
 }
