@@ -6,9 +6,11 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/network/openconnect"
@@ -249,6 +251,58 @@ func TestAgentReregistersWhenNetworkManagerComesBack(t *testing.T) {
 	if got.id != AgentID {
 		t.Errorf("re-registered as %q", got.id)
 	}
+}
+
+// An NM that takes its name while a registration is unanswered is the
+// one answering it, and a second registration under one identifier is
+// what NM refuses: the agent registers with it once, and again only
+// with an NM that appears after the answer.
+func TestAnNMThatAppearedBeforeARegistrationWasAnsweredIsNotAskedAgain(t *testing.T) {
+	f := startFakeNM(t)
+	reappear := func() {
+		if _, err := f.conn.ReleaseName(BusName); err != nil {
+			t.Errorf("fake NM: release its name: %v", err)
+		}
+		if reply, err := f.conn.RequestName(BusName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+			t.Errorf("fake NM: take its name again: %v %v", reply, err)
+		}
+	}
+	var asked atomic.Int32
+	f.mu.Lock()
+	f.onRegister = func() {
+		if asked.Add(1) == 1 {
+			reappear()
+		}
+	}
+	f.mu.Unlock()
+	conn := f.client()
+	appearances := make(chan dbus.Sequence, 2)
+	unwatch, err := dbusx.WatchOwner(t.Context(), conn, BusName, func(announced dbus.Sequence) { appearances <- announced })
+	must(t, err)
+	t.Cleanup(func() { must(t, unwatch()) })
+	appeared := func() dbus.Sequence {
+		t.Helper()
+		select {
+		case announced := <-appearances:
+			return announced
+		case <-time.After(liveness):
+			t.Fatal("the bus did not announce NM taking its name")
+			return dbus.NoSequence
+		}
+	}
+
+	r := &agentRegistration{conn: conn}
+	r.register(t.Context(), dbus.NoSequence)
+	r.register(t.Context(), appeared())
+	if got := asked.Load(); got != 1 {
+		t.Fatalf("%d registrations with an NM that appeared before it answered the first, want 1", got)
+	}
+	reappear()
+	r.register(t.Context(), appeared())
+	if got := asked.Load(); got != 2 {
+		t.Fatalf("%d registrations once NM appeared after the answer, want 2", got)
+	}
+	must(t, r.unregister())
 }
 
 func TestAgentWithoutInteractionHasNoSecrets(t *testing.T) {

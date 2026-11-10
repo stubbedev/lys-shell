@@ -631,11 +631,11 @@ func serveAgent(ctx context.Context, conn *dbus.Conn, obj *agentObject) (stop fu
 	r := &agentRegistration{conn: conn}
 	// Only a new owner is interesting; NM going away takes the
 	// registration with it and there is nothing to redo.
-	unwatch, err := dbusx.WatchOwner(ctx, conn, BusName, func() { r.register(ctx) })
+	unwatch, err := dbusx.WatchOwner(ctx, conn, BusName, func(announced dbus.Sequence) { r.register(ctx, announced) })
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("network: %w", err), unexport())
 	}
-	r.register(ctx)
+	r.register(ctx, dbus.NoSequence)
 	return func() error { return errors.Join(unwatch(), r.unregister(), unexport()) }, nil
 }
 
@@ -645,6 +645,14 @@ type agentRegistration struct {
 	// asked is set once a registration went out: NM may have taken one
 	// whose answer never arrived.
 	asked atomic.Bool
+
+	// registering holds one registration at a time, so each is judged
+	// against the answer to the one before it.
+	registering sync.Mutex
+	// answered is the sequence of the latest answer to a registration:
+	// an owner the bus announced before it is the one that was asked, or
+	// was gone again by then.
+	answered dbus.Sequence
 }
 
 // NM's answers to an Unregister that has nothing to withdraw: the agent
@@ -654,12 +662,22 @@ const (
 	errServiceUnknown     = "org.freedesktop.DBus.Error.ServiceUnknown"
 )
 
-// register announces the agent to NM's agent manager.
-func (r *agentRegistration) register(ctx context.Context) {
+// register announces the agent to the NM that gained its name with the
+// bus announcement appeared, or to whichever runs now for NoSequence.
+// It asks nobody when a registration was answered after that
+// announcement: the NM that appeared is the one already asked, and NM
+// refuses a second agent under one identifier.
+func (r *agentRegistration) register(ctx context.Context, appeared dbus.Sequence) {
+	r.registering.Lock()
+	defer r.registering.Unlock()
+	if appeared < r.answered {
+		return
+	}
 	r.asked.Store(true)
-	err := r.conn.Object(BusName, agentManagerPath).CallWithContext(ctx,
-		agentManagerIface+".RegisterWithCapabilities", 0, AgentID, capabilityVPNHints).Err
-	if err != nil {
+	call := r.conn.Object(BusName, agentManagerPath).CallWithContext(ctx,
+		agentManagerIface+".RegisterWithCapabilities", 0, AgentID, capabilityVPNHints)
+	r.answered = max(r.answered, call.ResponseSequence)
+	if err := call.Err; err != nil {
 		log.Printf("network: cannot register as secret agent; VPN prompts will not appear: %v", err)
 		return
 	}

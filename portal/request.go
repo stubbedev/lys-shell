@@ -152,7 +152,7 @@ func (c *call) awaitOwner(service string) error {
 		return nil
 	}
 	appeared := make(chan struct{}, 1)
-	stop, err := dbusx.WatchOwner(c.ctx, c.conn, service, func() {
+	stop, err := dbusx.WatchOwner(c.ctx, c.conn, service, func(dbus.Sequence) {
 		select {
 		case appeared <- struct{}{}:
 		default:
