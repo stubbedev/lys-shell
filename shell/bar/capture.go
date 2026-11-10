@@ -69,7 +69,6 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		}
 		return put(content)
 	}
-	putOffLoop := awaitLoop(application, put)
 	s := &captureServices{host: &screenshot.Host{
 		Config:   func() config.ScreenshotConfig { return current().Screenshot },
 		Monitors: monitors,
@@ -78,10 +77,7 @@ func newCaptureServices(application *app.Application, outputs func() []*app.Outp
 		Picker:   colorpicker.New(application, gate, outputs, font, colorpicker.HistoryPath(), func() config.ColorFormat { return current().ColorPicker.Format }),
 		Focus:    focus,
 		Copy:     awaitLoop(application, copyImage),
-		CopyText: func(text string) error {
-			_, err := putOffLoop(transfer.Text(text))
-			return err
-		},
+		CopyText: copyTextOffLoop(application, clip),
 		Forget: func(ids []render.ImageID) {
 			application.Invoke(func() {
 				for _, id := range ids {

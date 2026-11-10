@@ -40,7 +40,7 @@ in
       description = ''
         Enable the backing system services lys-shell integrates with: UPower
         (battery), BlueZ (bluetooth), and GeoClue (location for the night light
-        auto-schedule), plus wl-clipboard and xdg-utils. Set with `mkDefault` so
+        auto-schedule), plus xdg-utils. Set with `mkDefault` so
         your own settings win. Networking (NetworkManager),
         power-profiles-daemon, and PipeWire are intentionally left out — enable
         those deliberately to avoid clashing with your setup.
@@ -193,8 +193,7 @@ in
         };
 
         environment.systemPackages =
-          lib.optional (pkgs ? wl-clipboard) pkgs.wl-clipboard
-          ++ lib.optional (pkgs ? xdg-utils) pkgs.xdg-utils;
+          lib.optional (pkgs ? xdg-utils) pkgs.xdg-utils;
       })
     ]
   );

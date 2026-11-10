@@ -193,7 +193,7 @@ func iconsList(m *cli.Matches) error {
 		return nil
 	}
 	if m.Flag("interactive") {
-		return runFzf(out, m.Stderr(), names)
+		return runFzf(out, names)
 	}
 	fmt.Fprintf(out, "\nInstalled icons (%d):\n\n", len(names))
 	for _, n := range names {
@@ -203,8 +203,9 @@ func iconsList(m *cli.Matches) error {
 	return nil
 }
 
-// runFzf is list.rs's run_fzf: pick one name, copy it with wl-copy.
-func runFzf(out, errOut io.Writer, names []string) error {
+// runFzf is list.rs's run_fzf: pick one name, copy it through the
+// running shell.
+func runFzf(out io.Writer, names []string) error {
 	cmd := exec.Command("fzf", "--prompt", "Search icons: ")
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -231,36 +232,9 @@ func runFzf(out, errOut io.Writer, names []string) error {
 		return nil
 	}
 	if err := copyToClipboard(selected); err != nil {
-		fmt.Fprintf(errOut, "Failed to copy to clipboard: %s\n", err)
-		return nil
+		return err
 	}
 	fmt.Fprintf(out, "Copied to clipboard: %s\n", selected)
-	return nil
-}
-
-func copyToClipboard(text string) error {
-	cmd := exec.Command("wl-copy")
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		return cliError(err.Error())
-	}
-	if err := cmd.Start(); err != nil {
-		return cliError("wl-copy not found. Install wl-clipboard.")
-	}
-	if _, err := io.WriteString(stdin, text); err != nil {
-		_ = stdin.Close()
-		_ = cmd.Wait()
-		return cliError("Failed to write to wl-copy: " + icons.IOErrorString(err))
-	}
-	_ = stdin.Close()
-	if err := cmd.Wait(); err != nil {
-		if _, ok := errors.AsType[*exec.ExitError](err); ok {
-			return cliError("wl-copy failed: " + stderr.String())
-		}
-		return cliError(icons.IOErrorString(err))
-	}
 	return nil
 }
 

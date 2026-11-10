@@ -34,13 +34,12 @@ let
   bitwardenSettings = cfg.settings.modules.bitwarden or { };
 
   # Soft dependencies lys-shell shells out to, selected from the config. Theme
-  # providers are spawned for wallpaper-driven color extraction; wl-clipboard
-  # and xdg-utils back copy / open-link actions; notmuch backs the mail module.
+  # providers are spawned for wallpaper-driven color extraction; xdg-utils
+  # backs emails with attachments; notmuch backs the mail module.
   # Missing packages are skipped.
   themeProvider = cfg.settings.styling.theme-provider or "lys-shell";
   softDeps =
-    pkgIfPresent "wl-clipboard"
-    ++ pkgIfPresent "xdg-utils"
+    pkgIfPresent "xdg-utils"
     ++ lib.optionals (themeProvider == "matugen") (pkgIfPresent "matugen")
     ++ lib.optionals (themeProvider == "wallust") (pkgIfPresent "wallust")
     ++ lib.optionals (themeProvider == "pywal") (pkgIfPresent "pywal")
@@ -77,8 +76,7 @@ in
       default = false;
       description = ''
         Install the user-space soft dependencies lys-shell's config implies
-        (theme-provider tools like matugen/wallust/pywal, wl-clipboard and
-        xdg-utils, plus notmuch when the `mail` module is in the layout).
+        (theme-provider tools like matugen/wallust/pywal, xdg-utils, plus notmuch when the `mail` module is in the layout).
         System-level dependencies (NetworkManager, bluez, upower,
         power-profiles-daemon, GeoClue for the night light auto-schedule,
         pipewire/wireplumber) are not installed by home-manager — enable those

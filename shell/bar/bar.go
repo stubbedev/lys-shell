@@ -601,6 +601,7 @@ func (s *shellStart) mount() {
 	captureSvc.host.Toast = baseCtx.Toast
 	s.down.add(captureSvc.close)
 	s.down.addAsync(func() func() { return captureSvc.serve(s.session) })
+	s.down.addAsync(func() func() { return serveClipboardCopy(s.session, copyTextOffLoop(application, baseCtx.Clipboard)) })
 	focused := screenshot.CompositorFocus{Hyprland: baseCtx.Hyprland}.FocusedOutput
 	s.down.addAsync(func() func() {
 		return servePortalHosts(s.session, application, sess.Outputs, current.Load, focused, font, theme.Sheet, s.systemUp.Load)

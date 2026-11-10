@@ -32,7 +32,7 @@ lys-shell is installed from this repository's flake. It exports `nixosModules.de
 | `programs.lys-shell.systemd.enable` | `false` | Run `lys-shell shell` as a systemd user service. |
 | `programs.lys-shell.systemd.target` | `"graphical-session.target"` | Target the service binds to. |
 | `programs.lys-shell.portal.enable` | `true` | Make lys-shell the xdg-desktop-portal backend for every interface (through `xdg.portal`, with `mkDefault` routing). |
-| `programs.lys-shell.autoInstallDependencies` | `false` | Enable UPower, BlueZ and GeoClue (allowing lys-shell to locate the night light schedule), and install wl-clipboard and xdg-utils. NetworkManager, power-profiles-daemon and PipeWire are left to you. |
+| `programs.lys-shell.autoInstallDependencies` | `false` | Enable UPower, BlueZ and GeoClue (allowing lys-shell to locate the night light schedule), and install xdg-utils. NetworkManager, power-profiles-daemon and PipeWire are left to you. |
 
 ## home-manager module
 
@@ -67,7 +67,7 @@ lys-shell is installed from this repository's flake. It exports `nixosModules.de
 | `enable`, `package`, `settingsApp.*`, `systemd.target` | as above | As in the NixOS module. |
 | `systemd.enable` | `true` | Run `lys-shell shell` as a systemd user service. Turn off if your compositor starts the shell. |
 | `settings` | `{}` | Written to `$XDG_CONFIG_HOME/lys-shell/config.yaml`. Empty leaves the file unmanaged. |
-| `autoInstallDependencies` | `false` | Install the user-space tools the config needs: the `styling.theme-provider` tool (matugen, wallust or pywal), wl-clipboard, xdg-utils, and notmuch when `mail` is in the layout. |
+| `autoInstallDependencies` | `false` | Install the user-space tools the config needs: the `styling.theme-provider` tool (matugen, wallust or pywal), xdg-utils, and notmuch when `mail` is in the layout. |
 | `portal.enable` | `false` | Install the portal backend at user level (portal and D-Bus files, a user service, a `portals.conf` routing every interface to lys-shell). Use this outside NixOS; on NixOS use the system option. |
 
 System services (NetworkManager, BlueZ, UPower, power-profiles-daemon, GeoClue, PipeWire) are not installed by home-manager.
