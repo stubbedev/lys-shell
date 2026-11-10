@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbusx"
+	login1 "github.com/stubbedev/lys-lib/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/idleinhibit"
@@ -56,9 +56,8 @@ type screensaver interface {
 type inhibitor struct {
 	conn     *dbus.Conn
 	sessions *sessions
-	// lock takes a logind lock for what ("idle:sleep:shutdown") with a
-	// reason.
-	lock func(what, why string) (*os.File, error)
+	// lock takes a logind block lock on what with a reason.
+	lock func(what login1.InhibitWhat, why string) (*os.File, error)
 	// holdIdle holds the shell's idle inhibitor for an app.
 	holdIdle    func(app, reason string) (release func(), err error)
 	screensaver screensaver
@@ -111,7 +110,7 @@ func (i *inhibitor) Inhibit(handle dbus.ObjectPath, appID, _ string, flags uint3
 	}
 	l := &inhibitLock{}
 	var failures []error
-	if what := inhibitWhat(flags); what != "" {
+	if what := inhibitWhat(flags); what != 0 {
 		fd, err := i.lock(what, why)
 		if err != nil {
 			failures = append(failures, err)
@@ -172,18 +171,18 @@ func (l *inhibitLock) Close() *dbus.Error {
 }
 
 // inhibitWhat is logind's what for the flags.
-func inhibitWhat(flags uint32) string {
-	var what []string
+func inhibitWhat(flags uint32) login1.InhibitWhat {
+	var what login1.InhibitWhat
 	if flags&inhibitIdle != 0 {
-		what = append(what, "idle")
+		what |= login1.InhibitIdle
 	}
 	if flags&inhibitSuspend != 0 {
-		what = append(what, "sleep")
+		what |= login1.InhibitSleep
 	}
 	if flags&inhibitLogout != 0 {
-		what = append(what, "shutdown")
+		what |= login1.InhibitShutdown
 	}
-	return strings.Join(what, ":")
+	return what
 }
 
 // CreateMonitor opens a monitoring session: it gets the current state

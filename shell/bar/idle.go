@@ -5,21 +5,29 @@ import (
 	"errors"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/service/idle/idlepolicy"
-	"github.com/stubbedev/lys-desktop/service/logind"
 	"github.com/stubbedev/lys-desktop/service/upower"
+	"github.com/stubbedev/lys-lib/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/idle"
 )
 
+// The waits of the idle policy's non-logind calls: how long lock-before-
+// sleep waits for the lock screen, and one read of the power source.
+const (
+	sleepLockWait = 5 * time.Second
+	upowerTimeout = 5 * time.Second
+)
+
 type idlePolicy struct {
-	svc     *idle.Service
-	comp    *idle.Compositor
-	system  *dbus.Conn
-	session *logind.Client
+	svc    *idle.Service
+	comp   *idle.Compositor
+	system *dbus.Conn
+	login  *idle.Login
 
 	mu        sync.Mutex
 	cfg       config.IdleConfig
@@ -33,19 +41,8 @@ func startIdlePolicy(system *dbus.Conn, backlights idle.Backlights, cfg config.I
 		log.Printf("idle: the built-in idle policy will not run: %v", err)
 		return nil, func() {}
 	}
-	p := &idlePolicy{comp: comp, system: system}
-	if system != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), logind.CallTimeout)
-		p.session, err = logind.NewClient(ctx, system)
-		cancel()
-		if err != nil {
-			log.Printf("idle: the lock and suspend stages will fail: %v", err)
-		}
-	}
-	actions := idle.System{Backlights: backlights, Outputs: comp}
-	if p.session != nil {
-		actions.Session, actions.Bus = p.session, system
-	}
+	p := &idlePolicy{comp: comp, system: system, login: idleLogin(system)}
+	actions := idle.System{Backlights: backlights, Login: p.login, Outputs: comp}
 	p.svc = idle.New(comp, actions)
 	life, stopPower := context.WithCancel(context.Background())
 	powerDone := p.followPowerSource(life)
@@ -63,6 +60,19 @@ func startIdlePolicy(system *dbus.Conn, backlights idle.Backlights, cfg config.I
 	}
 }
 
+func idleLogin(system *dbus.Conn) *idle.Login {
+	if system == nil {
+		return nil
+	}
+	m := logind.NewManager(system)
+	session, err := m.GetSession(context.Background(), logind.AutoSession)
+	if err != nil {
+		log.Printf("idle: the lock and suspend stages will fail: %v", err)
+		return nil
+	}
+	return &idle.Login{Manager: m, Session: session}
+}
+
 func (p *idlePolicy) configure(cfg config.IdleConfig) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -74,11 +84,11 @@ func (p *idlePolicy) configure(cfg config.IdleConfig) {
 	if !cfg.Enable || !cfg.LockBeforeSleep {
 		return
 	}
-	if p.session == nil {
+	if p.login == nil {
 		log.Print("idle: lock-before-sleep needs logind, which is not connected")
 		return
 	}
-	stop, err := idle.LockBeforeSleep(p.system, p.session, logind.CallTimeout)
+	stop, err := idle.LockBeforeSleep(*p.login, sleepLockWait)
 	if err != nil {
 		log.Printf("idle: %v", err)
 		return
@@ -125,7 +135,7 @@ func (p *idlePolicy) followPowerSource(ctx context.Context) <-chan struct{} {
 }
 
 func readPowerSource(ctx context.Context, battery *upower.System) idlepolicy.PowerSource {
-	reading, cancel := context.WithTimeout(ctx, logind.CallTimeout)
+	reading, cancel := context.WithTimeout(ctx, upowerTimeout)
 	defer cancel()
 	on, err := battery.OnBattery(reading)
 	if err != nil {

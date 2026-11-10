@@ -2,19 +2,13 @@ package portal
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/stubbedev/lys-desktop/identity"
-	login1 "github.com/stubbedev/lys-desktop/service/logind"
-	"github.com/stubbedev/lys-lib/dbusx"
+	login1 "github.com/stubbedev/lys-lib/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
-
-// logindTimeout bounds every call to logind.
-const logindTimeout = 5 * time.Second
 
 // logind is the backend's one system-bus link to systemd-logind,
 // connected on first use and shared by Inhibit's block locks and the
@@ -25,14 +19,14 @@ type logind struct {
 	err  error
 }
 
-func (l *logind) bus() (*dbus.Conn, error) {
+func (l *logind) manager() (login1.Manager, error) {
 	l.once.Do(func() {
-		l.conn, l.err = dbus.ConnectSystemBus()
-		if l.err != nil {
-			l.err = fmt.Errorf("connect to the system bus: %w", l.err)
-		}
+		l.conn, l.err = login1.Dial(context.Background())
 	})
-	return l.conn, l.err
+	if l.err != nil {
+		return login1.Manager{}, l.err
+	}
+	return login1.NewManager(l.conn), nil
 }
 
 // close drops the connection, if one was made.
@@ -42,91 +36,58 @@ func (l *logind) close() {
 	}
 }
 
-// lock takes a block inhibitor for what ("idle:sleep:shutdown"),
-// shown with why.
-func (l *logind) lock(what, why string) (*os.File, error) {
-	conn, err := l.bus()
+// lock takes a block inhibitor on what, shown with why.
+func (l *logind) lock(what login1.InhibitWhat, why string) (*os.File, error) {
+	m, err := l.manager()
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), logindTimeout)
-	defer cancel()
-	var fd dbus.UnixFD
-	err = conn.Object(login1.Service, login1.ManagerPath).CallWithContext(ctx, login1.ManagerIf+".Inhibit", 0, what, identity.Name+" portal", why, "block").Store(&fd)
-	if err != nil {
-		return nil, fmt.Errorf("logind Inhibit %s: %w", what, err)
-	}
-	return dbusx.File(fd, "inhibit")
+	return m.Inhibit(context.Background(), what, identity.Name+" portal", why, login1.InhibitBlock)
 }
 
-// session resolves the user's session object (login1.Session).
-func (l *logind) session(ctx context.Context) (*dbus.Conn, dbus.ObjectPath, error) {
-	conn, err := l.bus()
+// session resolves the user's session.
+func (l *logind) session(ctx context.Context) (login1.Session, error) {
+	m, err := l.manager()
 	if err != nil {
-		return nil, "", err
+		return login1.Session{}, err
 	}
-	path, err := login1.Session(ctx, conn)
-	if err != nil {
-		return nil, "", err
-	}
-	return conn, path, nil
+	return m.GetSession(ctx, login1.AutoSession)
 }
 
 // screensaverActive reads the session's LockedHint, which the lock
 // screen sets.
 func (l *logind) screensaverActive() (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), logindTimeout)
-	defer cancel()
-	conn, path, err := l.session(ctx)
+	ctx := context.Background()
+	s, err := l.session(ctx)
 	if err != nil {
 		return false, err
 	}
-	var locked bool
-	if err := conn.Object(login1.Service, path).CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, login1.SessionIf, "LockedHint").Store(&locked); err != nil {
-		return false, fmt.Errorf("logind LockedHint: %w", err)
-	}
-	return locked, nil
+	return s.LockedHint(ctx)
 }
 
 // watchScreensaver calls fn with LockedHint whenever logind announces
 // it changed, until stop.
 func (l *logind) watchScreensaver(fn func(active bool)) (stop func(), err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), logindTimeout)
-	defer cancel()
-	conn, path, err := l.session(ctx)
+	ctx := context.Background()
+	s, err := l.session(ctx)
 	if err != nil {
 		return nil, err
 	}
-	match := []dbus.MatchOption{
-		dbus.WithMatchObjectPath(path),
-		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
-		dbus.WithMatchMember("PropertiesChanged"),
-	}
-	if err := conn.AddMatchSignal(match...); err != nil {
-		return nil, fmt.Errorf("watch LockedHint: %w", err)
-	}
-	signals := make(chan *dbus.Signal, 8)
-	conn.Signal(signals)
-	done := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case sig := <-signals:
-				if sig.Path != path || len(sig.Body) < 2 || sig.Body[0] != login1.SessionIf {
-					continue
-				}
-				changed, _ := sig.Body[1].(map[string]dbus.Variant)
-				if v, ok := changed["LockedHint"].Value().(bool); ok {
-					fn(v)
-				}
-			}
+	w, err := s.Watch(ctx, func(e login1.Event, err error) {
+		if err != nil {
+			warnf("screensaver: %v", err)
+			return
 		}
-	}()
-	return sync.OnceFunc(func() {
-		conn.RemoveSignal(signals)
-		close(done)
-		_ = conn.RemoveMatchSignal(match...)
-	}), nil
+		if c, ok := e.(login1.LockedHintChanged); ok {
+			fn(c.Locked)
+		}
+	})
+	if err != nil {
+		return nil, err
+	}
+	return func() {
+		if err := w.Stop(); err != nil {
+			warnf("screensaver: %v", err)
+		}
+	}, nil
 }

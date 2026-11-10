@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	login1 "github.com/stubbedev/lys-lib/logind"
 	"github.com/stubbedev/lys-lib/portaldialogs"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
@@ -553,8 +554,8 @@ func newInhibitRig(t *testing.T) *inhibitRig {
 	t.Helper()
 	ir := &inhibitRig{saver: &fakeScreensaver{}}
 	ir.rig = newRig(t, func(b *Backend) {
-		b.inhibitor.lock = func(what, why string) (*os.File, error) {
-			ir.asked.Update(func(w []string) []string { return append(w, what+" "+why) })
+		b.inhibitor.lock = func(what login1.InhibitWhat, why string) (*os.File, error) {
+			ir.asked.Update(func(w []string) []string { return append(w, what.String()+" "+why) })
 			if err := ir.lockErr.Load(); err != nil {
 				return nil, err
 			}
@@ -583,7 +584,7 @@ func TestInhibitHoldsTheLockUntilClose(t *testing.T) {
 	if err := r.inhibit(inhibitIdle|inhibitSuspend|inhibitLogout, Vardict{"reason": dbus.MakeVariant("Playing music")}); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.asked.Load(); !slices.Equal(got, []string{"idle:sleep:shutdown Playing music"}) {
+	if got := r.asked.Load(); !slices.Equal(got, []string{"shutdown:sleep:idle Playing music"}) {
 		t.Fatalf("logind asked for %v, want the lock with the app's reason", got)
 	}
 	if r.idleHeld.Load() != 1 {

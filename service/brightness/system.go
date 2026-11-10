@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-desktop/fswatch"
+	"github.com/stubbedev/lys-lib/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"golang.org/x/sys/unix"
 )
@@ -30,8 +31,8 @@ var driftInterval = time.Second
 // are enabled, DDC/CI monitors found by a detached scan and re-scanned
 // on DRM hotplug.
 type System struct {
-	bus *dbus.Conn // logind; nil means sysfs writes only
-	ddc atomic.Pointer[ddcManager]
+	logind *logindBacklight // nil means sysfs writes only
+	ddc    atomic.Pointer[ddcManager]
 
 	mu        sync.Mutex
 	subs      map[chan struct{}]struct{}
@@ -48,17 +49,19 @@ type System struct {
 
 // NewSystem starts the source. external enables DDC/CI discovery
 // (the enable-external key); the first scan runs detached so internal
-// panels are usable at once. logind is the system bus logind's writes
+// panels are usable at once. system is the system bus logind's writes
 // go over, and stays the caller's; nil writes through sysfs. A missing
 // uevent socket degrades to no hotplug instead of failing.
-func NewSystem(logind *dbus.Conn, external bool) *System {
+func NewSystem(system *dbus.Conn, external bool) *System {
 	s := &System{
-		bus:       logind,
 		subs:      map[chan struct{}]struct{}{},
 		pending:   map[string]uint32{},
 		requested: map[string]uint32{},
 		stop:      make(chan struct{}),
 		settle:    hotplugSettle,
+	}
+	if system != nil {
+		s.logind = &logindBacklight{manager: logind.NewManager(system)}
 	}
 	s.start()
 	s.SetExternal(external)
@@ -274,7 +277,7 @@ func rawLevel(percent float64, top uint32) uint32 {
 // milliseconds a transaction, and a slider drag coalesces to the
 // latest value instead of queueing every step. Write failures are
 // logged, as the Rust caller does with the error it gets back.
-func (s *System) Set(_ context.Context, name string, percent float64) error {
+func (s *System) Set(ctx context.Context, name string, percent float64) error {
 	if m := s.ddc.Load(); m != nil {
 		if d, ok := m.display(name); ok {
 			s.queueDDC(m, name, rawLevel(percent, d.max))
@@ -288,12 +291,17 @@ func (s *System) Set(_ context.Context, name string, percent float64) error {
 	value := rawLevel(percent, device.Max)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.bus != nil {
-		if err := setLogind(s.bus, name, value); err == nil {
-			return nil
-		}
+	if s.logind == nil {
+		return writeSysfs(name, value)
 	}
-	return writeSysfs(name, value)
+	viaLogind := s.logind.set(ctx, name, value)
+	if viaLogind == nil {
+		return nil
+	}
+	if err := writeSysfs(name, value); err != nil {
+		return errors.Join(viaLogind, err)
+	}
+	return nil
 }
 
 // queueDDC records the latest target, reports it at once, and starts

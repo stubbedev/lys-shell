@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"strings"
 
-	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/logind"
 )
 
 // BacklightDir is the sysfs class directory for backlight devices; a
@@ -141,11 +141,25 @@ func writeSysfs(name string, value uint32) error {
 		[]byte(strconv.FormatUint(uint64(value), 10)), 0o644)
 }
 
-// setLogind drives logind's SetBrightness for the session
-// (backend/logind.rs's primary write path).
-func setLogind(conn *dbus.Conn, name string, value uint32) error {
-	obj := conn.Object("org.freedesktop.login1", "/org/freedesktop/login1/session/self")
-	return obj.Call("org.freedesktop.login1.Session.SetBrightness", 0, "backlight", name, value).Err
+// logindBacklight drives logind's SetBrightness for the user's session
+// (backend/logind.rs's primary write path), resolving the session once,
+// on the first write that can: "auto" is the display
+// session for a shell outside any session, a service of the systemd
+// user manager, where "self" is none. Its caller serialises set.
+type logindBacklight struct {
+	manager logind.Manager
+	session *logind.Session
+}
+
+func (l *logindBacklight) set(ctx context.Context, name string, value uint32) error {
+	if l.session == nil {
+		s, err := l.manager.GetSession(ctx, logind.AutoSession)
+		if err != nil {
+			return err
+		}
+		l.session = &s
+	}
+	return l.session.SetBrightness(ctx, logind.Backlight, name, value)
 }
 
 // AveragePercentage is the mean level across devices (helpers.rs): what

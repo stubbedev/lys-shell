@@ -18,10 +18,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-desktop/service/logind/logindtest"
 	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/capture"
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/logind/logindtest"
 	"github.com/stubbedev/lys-lib/sockdir"
 	"github.com/stubbedev/lys-lib/wmipc"
 
@@ -207,8 +207,8 @@ func startBareSession(t *testing.T) (loginCalls string) {
 }
 
 func TestShellUnderTestNeverReachesTheHostsLogind(t *testing.T) {
-	host := logindtest.Start(t, "/org/freedesktop/login1/session/c1")
-	host.LockedHint.Store(true)
+	host := logindtest.Start(t, logindtest.Config{Display: "c1"})
+	host.SetLockedHint(t, "c1", true)
 	host.Bus.UseAsSystemBus(t)
 	loginCalls := startBareSession(t)
 	image := filepath.Join(t.TempDir(), "red.jpg")
@@ -223,8 +223,8 @@ func TestShellUnderTestNeverReachesTheHostsLogind(t *testing.T) {
 	if strings.Contains(s.logs(t), "session was locked at startup") {
 		t.Error("the shell read a locked session off the host's logind")
 	}
-	if n := host.Asked.Load(); n != 0 {
-		t.Errorf("the shell asked the host's logind for its session %d times", n)
+	if calls := host.Methods(); len(calls) != 0 {
+		t.Errorf("the shell called the host's logind: %v", calls)
 	}
 	if calls, err := os.ReadFile(loginCalls); err == nil && strings.Contains(string(calls), "lock") {
 		t.Errorf("the shell started the lock screen: %s", calls)

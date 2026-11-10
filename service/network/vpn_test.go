@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-desktop/service/logind"
+	"github.com/stubbedev/lys-lib/logind/logindtest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/network/openconnect"
@@ -28,6 +28,7 @@ var fastResume = resumeTiming{
 
 type serviceFixture struct {
 	nm     *fakeNM
+	logind *logindtest.Logind
 	svc    *Service
 	signIn *fakeSignIn
 	conn   *dbus.Conn
@@ -39,6 +40,7 @@ func startService(t *testing.T, setup func(f *fakeNM)) *serviceFixture {
 	if setup != nil {
 		setup(f)
 	}
+	ld := logindtest.Serve(t, f.bus, logindtest.Config{})
 	conn := f.client()
 	signIn := &fakeSignIn{}
 	svc, err := start(t.Context(), conn, signIn, nil, fastResume)
@@ -46,7 +48,7 @@ func startService(t *testing.T, setup func(f *fakeNM)) *serviceFixture {
 		t.Fatal(err)
 	}
 	f.registered(t)
-	return &serviceFixture{nm: f, svc: svc, signIn: signIn, conn: conn}
+	return &serviceFixture{nm: f, logind: ld, svc: svc, signIn: signIn, conn: conn}
 }
 
 func (fx *serviceFixture) row(t *testing.T, uuid string) VPN {
@@ -407,10 +409,10 @@ func TestTheSSOCallbackReachesAWaitingSignIn(t *testing.T) {
 	}
 }
 
-// sleep emits logind's PrepareForSleep from its own peer.
+// sleep emits logind's PrepareForSleep from logind's name.
 func (fx *serviceFixture) sleep(t *testing.T, start bool) {
 	t.Helper()
-	must(t, logind.PrepareForSleep.Emit(fx.nm.bus.Conn(t), logind.ManagerPath, logind.Sleep{Start: start}))
+	fx.logind.PrepareForSleep(t, start)
 }
 
 func TestATunnelUpAtSuspendIsBroughtBackUnattendedOnWake(t *testing.T) {

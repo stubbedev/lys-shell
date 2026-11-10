@@ -3,20 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/stubbedev/lys-desktop/service/logind"
 	"github.com/stubbedev/lys-desktop/service/lyswm"
-	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/logind"
 
 	"github.com/stubbedev/lys-shell/internal/cli"
 )
 
-// logoutTimeout bounds the logind round trips of a logout.
-const logoutTimeout = 10 * time.Second
-
 // logoutCommand ends the user's session: lys-wm's exit action while
-// lys-wm runs, else logind (logind.Logout).
+// lys-wm runs, else logind's Terminate of the session "auto" resolves to.
 func logoutCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "logout",
@@ -28,14 +23,23 @@ func logoutCommand() *cli.Command {
 				}
 				return nil
 			}
-			conn, err := dbus.ConnectSystemBus()
-			if err != nil {
-				return fmt.Errorf("log out: connect to the system bus: %w", err)
-			}
-			defer func() { _ = conn.Close() }()
-			ctx, cancel := context.WithTimeout(context.Background(), logoutTimeout)
-			defer cancel()
-			return logind.Logout(ctx, conn)
+			return logout(context.Background())
 		},
 	}
+}
+
+func logout(ctx context.Context) error {
+	conn, err := logind.Dial(ctx)
+	if err != nil {
+		return fmt.Errorf("log out: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+	session, err := logind.NewManager(conn).GetSession(ctx, logind.AutoSession)
+	if err != nil {
+		return fmt.Errorf("log out: %w", err)
+	}
+	if err := session.Terminate(ctx); err != nil {
+		return fmt.Errorf("log out: %w", err)
+	}
+	return nil
 }

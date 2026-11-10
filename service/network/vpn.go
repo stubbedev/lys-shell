@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-desktop/feed"
-	"github.com/stubbedev/lys-desktop/service/logind"
 	"github.com/stubbedev/lys-lib/dbusx"
+	"github.com/stubbedev/lys-lib/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 

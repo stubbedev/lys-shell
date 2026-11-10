@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/stubbedev/lys-desktop/service/idle/idlepolicy"
-	"github.com/stubbedev/lys-desktop/service/logind"
-	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+	"github.com/stubbedev/lys-lib/logind"
 
 	"github.com/stubbedev/lys-shell/service/brightness"
 )
@@ -18,6 +18,16 @@ type Backlights interface {
 	Set(ctx context.Context, name string, percent float64) error
 }
 
+// backlightTimeout bounds one dim or restore of every backlight.
+const backlightTimeout = 5 * time.Second
+
+// Login is logind as the stages use it: its manager and the user's
+// session, on one system bus connection.
+type Login struct {
+	Manager logind.Manager
+	Session logind.Session
+}
+
 // Outputs turn the outputs off; the returned restore turns them on.
 type Outputs interface {
 	PowerOff() (restore func() error, err error)
@@ -25,12 +35,11 @@ type Outputs interface {
 
 // System carries the stages out on the session: the backlights dim,
 // logind locks and suspends, and the compositor powers the outputs off.
-// A nil Backlights has nothing to dim; a nil Session or Bus cannot lock or
+// A nil Backlights has nothing to dim; a nil Login cannot lock or
 // suspend, which the stage reports.
 type System struct {
 	Backlights Backlights
-	Session    *logind.Client
-	Bus        *dbus.Conn
+	Login      *Login
 	Outputs    Outputs
 }
 
@@ -43,7 +52,7 @@ func (s System) Dim(share idlepolicy.DimPercent) (func() error, error) {
 	if s.Backlights == nil {
 		return nil, nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), logind.CallTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), backlightTimeout)
 	defer cancel()
 	devices, err := s.Backlights.Devices(ctx)
 	if err != nil {
@@ -58,7 +67,7 @@ func (s System) Dim(share idlepolicy.DimPercent) (func() error, error) {
 }
 
 func (s System) restoreLevels(devices []brightness.Device) error {
-	ctx, cancel := context.WithTimeout(context.Background(), logind.CallTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), backlightTimeout)
 	defer cancel()
 	var err error
 	for _, d := range devices {
@@ -71,12 +80,10 @@ func (s System) restoreLevels(devices []brightness.Device) error {
 
 // Lock asks logind to lock the session.
 func (s System) Lock() error {
-	if s.Session == nil {
+	if s.Login == nil {
 		return ErrNoLogind
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), logind.CallTimeout)
-	defer cancel()
-	return s.Session.Lock(ctx)
+	return s.Login.Session.Lock(context.Background())
 }
 
 // ScreenOff powers every output off.
@@ -89,10 +96,8 @@ func (s System) ScreenOff() (func() error, error) {
 
 // Suspend asks logind to suspend.
 func (s System) Suspend() error {
-	if s.Bus == nil {
+	if s.Login == nil {
 		return ErrNoLogind
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), logind.CallTimeout)
-	defer cancel()
-	return logind.Suspend(ctx, s.Bus)
+	return s.Login.Manager.Power(context.Background(), logind.Suspend)
 }
