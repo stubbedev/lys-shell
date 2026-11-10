@@ -328,10 +328,11 @@ func (s *spawned) env() Env {
 			defer s.mu.Unlock()
 			s.argv = append(s.argv, argv)
 		},
-		Open: func(target string) {
+		Open: func(target string) error {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			s.opened = append(s.opened, target)
+			return nil
 		},
 	}
 }

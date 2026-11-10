@@ -243,20 +243,17 @@ func (f *Files) Actions(e Entry) []Action {
 	}
 	parent := filepath.Dir(d.path)
 	open := Action{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-		f.env.Open(d.path)
-		return Close{}
+		return f.env.open(i18n.T("launcher-action-open"), d.path)
 	}}
 	reveal := Action{Title: i18n.T("launcher-action-reveal"), Icon: "ld-folder-open-symbolic", Run: func(context.Context) Outcome {
-		f.env.Open(parent)
-		return Close{}
+		return f.env.open(i18n.T("launcher-action-reveal"), parent)
 	}}
 	terminalAt := parent
 	if d.dir {
 		terminalAt = d.path
 	}
 	terminal := Action{Title: i18n.T("launcher-action-open-terminal-here"), Icon: "ld-terminal-symbolic", Run: func(context.Context) Outcome {
-		f.env.inTerminal("sh", "-c", `cd "$1" && exec "${SHELL:-sh}"`, "sh", terminalAt)
-		return Close{}
+		return f.env.inTerminal(i18n.T("launcher-action-open-terminal-here"), "sh", "-c", `cd "$1" && exec "${SHELL:-sh}"`, "sh", terminalAt)
 	}}
 	return []Action{
 		open, reveal, terminal,

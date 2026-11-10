@@ -40,21 +40,67 @@ var terminalFallbacks = []string{
 	"foot", "kitty", "alacritty", "wezterm", "ghostty", "gnome-terminal", "konsole", "xterm",
 }
 
+// NoTerminalError is no terminal emulator to run a command in: the
+// launcher's terminal setting names none, $TERMINAL is unset, and none of
+// Candidates is on $PATH.
+type NoTerminalError struct {
+	Candidates []string
+}
+
+func (e *NoTerminalError) Error() string {
+	return "launcher: no terminal emulator: launcher.terminal names none, $TERMINAL is unset, and none of " +
+		strings.Join(e.Candidates, ", ") + " is on $PATH"
+}
+
 // DetectTerminal resolves the terminal emulator: the configured one,
-// then $TERMINAL, then the first fallback on $PATH, else xterm.
-func DetectTerminal(configured string) string {
+// then $TERMINAL, then the first fallback on $PATH; a *NoTerminalError
+// when there is none.
+func DetectTerminal(configured string) (string, error) {
 	if t := strings.TrimSpace(configured); t != "" {
-		return t
+		return t, nil
 	}
 	if t := strings.TrimSpace(os.Getenv("TERMINAL")); t != "" {
-		return t
+		return t, nil
 	}
 	for _, candidate := range terminalFallbacks {
 		if InPath(candidate) {
-			return candidate
+			return candidate, nil
 		}
 	}
-	return "xterm"
+	return "", &NoTerminalError{Candidates: terminalFallbacks}
+}
+
+// InTerminal is argv run inside the terminal DetectTerminal resolves
+// from configured, as `<terminal> -e <argv>`.
+func InTerminal(configured string, argv ...string) ([]string, error) {
+	terminal, err := DetectTerminal(configured)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string{terminal, "-e"}, argv...), nil
+}
+
+// RenderInTerminal renders template with values, and with {terminal} as
+// DetectTerminal resolves it from configured. The terminal is resolved
+// only when the template names it: a template that names a terminal of
+// its own needs none found.
+func RenderInTerminal(template, configured string, values map[string]string) (string, error) {
+	var missing error
+	rendered := Render(template, func(key string) (string, bool) {
+		if key != "terminal" {
+			return Values(values)(key)
+		}
+		terminal, err := DetectTerminal(configured)
+		if err != nil {
+			missing = err
+			return "", false
+		}
+		return terminal, true
+	})
+	if missing != nil {
+		return "", missing
+	}
+	return rendered, nil
 }
 
 // InPath reports whether program is a regular file in some $PATH
@@ -69,9 +115,13 @@ func InPath(program string) bool {
 }
 
 // Open opens target, an absolute path or a URI, with the user's default
-// app for its mimetype, a Terminal=true app inside terminal as
-// DetectTerminal resolves it, handing the app token to raise its window
-// ("" hands none).
+// app for its mimetype, handing the app token to raise its window ("" hands
+// none). A Terminal=true app runs inside terminal as DetectTerminal
+// resolves it, which is asked only for such an app: with no terminal the
+// error wraps its *NoTerminalError.
 func Open(target, terminal, token string) error {
-	return opener.Open(target, desktopentry.LaunchContext{ActivationToken: token, Terminal: DetectTerminal(terminal)})
+	return opener.Open(target, desktopentry.LaunchContext{
+		ActivationToken: token,
+		Terminal:        func() (string, error) { return DetectTerminal(terminal) },
+	})
 }

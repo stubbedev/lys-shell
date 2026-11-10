@@ -87,7 +87,7 @@ func startHeadlessPreview(t *testing.T) *headlessPreview {
 		Sheet:     sheet,
 		Clipboard: newLauncherClipboard(t, [2]string{"application/x-thing", "12345"}, [2]string{"text/plain", previewCode}),
 		Search: func() search.Deps {
-			return search.Deps{Env: search.Env{Spawn: func([]string) {}, SpawnShell: func(string) {}, Open: func(string) {}}}
+			return search.Deps{Env: search.Env{Spawn: func([]string) {}, SpawnShell: func(string) {}, Open: func(string) error { return nil }}}
 		},
 	})
 	var editor *widget.Label

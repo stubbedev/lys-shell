@@ -11,7 +11,9 @@ import (
 
 func TestDrunLinksOpenWithTheBuiltInOpenerByDefault(t *testing.T) {
 	browser := openertest.New(t).Handler(t, "browser", "x-scheme-handler/https")
-	NewDrun(DefaultDrunConfig(), nil).launch(drunEntry{isLink: true, url: "https://example.com/a b"})
+	if err := NewDrun(DefaultDrunConfig(), nil).launch(drunEntry{isLink: true, url: "https://example.com/a b"}); err != nil {
+		t.Fatal(err)
+	}
 	if got := browser.Ran(t); got != "https://example.com/a b|" {
 		t.Errorf("the https handler ran with %q", got)
 	}
@@ -23,7 +25,9 @@ func TestDrunLinksOpenWithTheConfiguredURLLauncher(t *testing.T) {
 	mine := desktop.Tool(t, "mylauncher")
 	cfg := DefaultDrunConfig()
 	cfg.URLLauncher = "mylauncher --flag"
-	NewDrun(cfg, nil).launch(drunEntry{isLink: true, url: "https://example.com/'q'"})
+	if err := NewDrun(cfg, nil).launch(drunEntry{isLink: true, url: "https://example.com/'q'"}); err != nil {
+		t.Fatal(err)
+	}
 	if got := mine.Ran(t); got != "--flag https://example.com/'q'|" {
 		t.Errorf("the configured launcher ran with %q", got)
 	}
@@ -38,7 +42,7 @@ func TestFileBrowserOpensFilesWithTheBuiltInOpenerByDefault(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	NewFileBrowser(DefaultFileBrowserConfig()).open(dir)
+	wantClosed(t, NewFileBrowser(DefaultFileBrowserConfig()).open(dir))
 	if got := files.Ran(t); got != fileuri.FromPath(dir)+"|" {
 		t.Errorf("the directory handler ran with %q, want the directory's file URI", got)
 	}

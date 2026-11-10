@@ -183,8 +183,7 @@ func (s *Scripts) Actions(e Entry) []Action {
 			return s.next(ctx, sc, nil)
 		}},
 		{Title: i18n.T("launcher-action-reveal"), Icon: "ld-folder-open-symbolic", Run: func(context.Context) Outcome {
-			s.env.Open(filepath.Dir(sc.Path))
-			return Close{}
+			return s.env.open(i18n.T("launcher-action-reveal"), filepath.Dir(sc.Path))
 		}},
 		copyAction(i18n.T("launcher-action-copy-path"), sc.Path),
 	}
@@ -213,8 +212,7 @@ func (s *Scripts) run(ctx context.Context, sc Script, args []string) Outcome {
 	argv := append([]string{sc.Path}, args...)
 	switch sc.Output {
 	case ScriptTerminal:
-		s.env.inTerminal(argv...)
-		return Close{}
+		return s.env.inTerminal(sc.Title, argv...)
 	case ScriptCopy:
 		ctx, cancel := context.WithTimeout(ctx, scriptCopyTimeout)
 		defer cancel()

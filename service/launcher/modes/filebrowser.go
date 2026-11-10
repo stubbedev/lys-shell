@@ -117,14 +117,15 @@ func (f *FileBrowser) state() launcher.ModeState {
 	return launcher.ModeState{Items: items, Prompt: displayDir(f.current)}
 }
 
-func (f *FileBrowser) open(path string) {
+func (f *FileBrowser) open(path string) launcher.Action {
 	if strings.TrimSpace(f.cfg.Command) != "" {
 		launcher.RunShell(f.cfg.Command + " " + shlex.MustQuote(path))
-		return
+		return launcher.ActionClose{}
 	}
 	if err := launcher.Open(path, f.cfg.Terminal, ""); err != nil {
-		log.Printf("launcher: open %s: %v", path, err)
+		return failed(f.state(), err)
 	}
+	return launcher.ActionClose{}
 }
 
 // Load lists the current directory.
@@ -135,8 +136,7 @@ func (f *FileBrowser) Activate(_ context.Context, target launcher.Target, kind l
 	if i, ok := target.Row(); ok && int(i) < len(f.entries) {
 		e := f.entries[i]
 		if e.kind == entryFile {
-			f.open(e.path)
-			return launcher.ActionClose{}
+			return f.open(e.path)
 		}
 		f.current = e.path
 		return launcher.ActionReload{State: f.state()}
@@ -154,8 +154,7 @@ func (f *FileBrowser) Activate(_ context.Context, target launcher.Target, kind l
 		f.current = path
 		return launcher.ActionReload{State: f.state()}
 	case st.Mode().IsRegular():
-		f.open(path)
-		return launcher.ActionClose{}
+		return f.open(path)
 	}
 	return launcher.ActionNothing{}
 }

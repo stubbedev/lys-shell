@@ -216,8 +216,7 @@ func (w *Web) Actions(e Entry) []Action {
 	}
 	return []Action{
 		{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-			w.env.Open(target)
-			return Close{}
+			return w.env.open(i18n.T("launcher-action-open"), target)
 		}},
 		copyAction(i18n.T("launcher-action-copy-url"), target),
 	}
@@ -257,8 +256,7 @@ func (s *Shell) Actions(e Entry) []Action {
 			return Close{}
 		}},
 		{Title: i18n.T("launcher-action-run-in-terminal"), Icon: "ld-terminal-symbolic", Run: func(context.Context) Outcome {
-			s.env.inTerminal("sh", "-c", cmd)
-			return Close{}
+			return s.env.inTerminal(cmd, "sh", "-c", cmd)
 		}},
 		copyAction(i18n.T("launcher-action-copy-command"), cmd),
 	}

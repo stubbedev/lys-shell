@@ -2,6 +2,7 @@ package modes
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"slices"
 	"strings"
@@ -106,35 +107,31 @@ func (d *Drun) record(id string) {
 	}
 }
 
-func (d *Drun) launch(e drunEntry) {
-	if e.isLink {
-		d.openLink(e.url)
-		return
-	}
-	var err error
+func (d *Drun) launch(e drunEntry) error {
 	switch {
+	case e.isLink:
+		return d.openLink(e.url)
 	case e.action != "":
-		err = e.app.LaunchAction(e.action)
+		return e.app.LaunchAction(e.action)
 	case e.app.Terminal():
-		d.launchInTerminal(*e.app)
-	default:
-		err = e.app.Launch()
+		return d.launchInTerminal(*e.app)
 	}
-	if err != nil {
-		log.Printf("launcher: launch %s failed: %v", e.desktopID, err)
-	}
+	return e.app.Launch()
 }
 
 // launchInTerminal runs the Exec line, field codes stripped, inside a
 // terminal: gio's own terminal lookup rarely fits Wayland setups.
-func (d *Drun) launchInTerminal(app desktopentry.App) {
+func (d *Drun) launchInTerminal(app desktopentry.App) error {
 	argv, ok := shlex.Split(app.Exec())
 	if !ok {
-		log.Printf("launcher: unparseable Exec line %q", app.Exec())
-		return
+		return fmt.Errorf("unparseable Exec line %q", app.Exec())
 	}
-	argv = slices.DeleteFunc(argv, isFieldCode)
-	launcher.RunArgv(append([]string{launcher.DetectTerminal(d.cfg.Terminal), "-e"}, argv...))
+	in, err := launcher.InTerminal(d.cfg.Terminal, slices.DeleteFunc(argv, isFieldCode)...)
+	if err != nil {
+		return err
+	}
+	launcher.RunArgv(in)
+	return nil
 }
 
 func isFieldCode(token string) bool {
@@ -171,16 +168,19 @@ func (d *Drun) Load(context.Context) launcher.ModeState {
 	return launcher.ModeState{Items: items, Prompt: "drun", MarkupRows: true}
 }
 
-// Activate launches the row (recording it); custom input runs as a
-// command, as rofi's drun does.
-func (d *Drun) Activate(_ context.Context, target launcher.Target, kind launcher.ActivateKind, _ string) launcher.Action {
+// Activate launches the row (recording it); a row that does not launch,
+// one that runs in a terminal with none to run it in included, stays open
+// and says why. Custom input runs as a command, as rofi's drun does.
+func (d *Drun) Activate(ctx context.Context, target launcher.Target, kind launcher.ActivateKind, _ string) launcher.Action {
 	if i, ok := target.Row(); ok {
 		if int(i) >= len(d.entries) {
 			return launcher.ActionNothing{}
 		}
 		e := d.entries[i]
+		if err := d.launch(e); err != nil {
+			return failed(d.Load(ctx), fmt.Errorf("launch %s: %w", e.desktopID, err))
+		}
 		d.record(e.desktopID)
-		d.launch(e)
 		return launcher.ActionClose{}
 	}
 	if custom, ok := kind.(launcher.ActivateCustom); ok {
@@ -317,12 +317,10 @@ func drunVars(name, generic, exec, categories, comment string) map[string]string
 	}
 }
 
-func (d *Drun) openLink(url string) {
+func (d *Drun) openLink(url string) error {
 	if strings.TrimSpace(d.cfg.URLLauncher) != "" {
 		launcher.RunShell(d.cfg.URLLauncher + " " + shlex.MustQuote(url))
-		return
+		return nil
 	}
-	if err := launcher.Open(url, d.cfg.Terminal, ""); err != nil {
-		log.Printf("launcher: open link %s: %v", url, err)
-	}
+	return launcher.Open(url, d.cfg.Terminal, "")
 }

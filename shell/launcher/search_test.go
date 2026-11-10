@@ -65,7 +65,10 @@ func newPanelHarness(t *testing.T) *panelHarness {
 			Env: search.Env{
 				Spawn:      func(argv []string) { ph.record(strings.Join(argv, " ")) },
 				SpawnShell: func(line string) { ph.record(line) },
-				Open:       func(target string) { ph.record("open " + target) },
+				Open: func(target string) error {
+					ph.record("open " + target)
+					return nil
+				},
 			},
 			Windows: ph.windows,
 		}

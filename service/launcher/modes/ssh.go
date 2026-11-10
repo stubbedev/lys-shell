@@ -2,6 +2,7 @@ package modes
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -44,17 +45,19 @@ func NewSSH(cfg SSHConfig, history *launcher.History) *SSH { return &SSH{cfg: cf
 // Name is "ssh".
 func (*SSH) Name() string { return "ssh" }
 
-func (s *SSH) connect(host string) {
-	terminal := launcher.DetectTerminal(s.cfg.Terminal)
-	launcher.RunShell(launcher.Render(s.cfg.Command, launcher.Values(map[string]string{
-		"host": host, "terminal": terminal, "ssh-client": s.cfg.Client,
-	})))
+func (s *SSH) connect(host string) error {
+	command, err := launcher.RenderInTerminal(s.cfg.Command, s.cfg.Terminal, map[string]string{"host": host, "ssh-client": s.cfg.Client})
+	if err != nil {
+		return fmt.Errorf("connect to %s in a terminal: %w", host, err)
+	}
+	launcher.RunShell(command)
 	if s.history == nil {
-		return
+		return nil
 	}
 	if err := s.history.Record("ssh", host, s.cfg.MaxHistory); err != nil {
 		log.Printf("launcher: ssh history record failed: %v", err)
 	}
+	return nil
 }
 
 // Load lists ~/.ssh/config hosts (plus known_hosts and /etc/hosts when
@@ -81,8 +84,9 @@ func (s *SSH) Load(context.Context) launcher.ModeState {
 	return launcher.ModeState{Items: items, Prompt: "ssh"}
 }
 
-// Activate connects to the row's host or the typed one.
-func (s *SSH) Activate(_ context.Context, target launcher.Target, kind launcher.ActivateKind, _ string) launcher.Action {
+// Activate connects to the row's host or the typed one; with no terminal
+// to connect in it stays open and says so.
+func (s *SSH) Activate(ctx context.Context, target launcher.Target, kind launcher.ActivateKind, _ string) launcher.Action {
 	var host string
 	if row, ok := target.Row(); ok {
 		if int(row) >= len(s.hosts) {
@@ -97,7 +101,9 @@ func (s *SSH) Activate(_ context.Context, target launcher.Target, kind launcher.
 	if strings.TrimSpace(host) == "" {
 		return launcher.ActionNothing{}
 	}
-	s.connect(strings.TrimSpace(host))
+	if err := s.connect(strings.TrimSpace(host)); err != nil {
+		return failed(s.Load(ctx), err)
+	}
 	return launcher.ActionClose{}
 }
 

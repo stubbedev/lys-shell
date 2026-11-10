@@ -43,6 +43,8 @@ bind = SUPER, SPACE, exec, lys-shell launcher
 
 With an empty field the list suggests what you use most. Picks are remembered overall and per query, so `f` comes to mean Firefox if you keep choosing it; a use counts half as much after two weeks. The data is in `$XDG_STATE_HOME/lys-shell/launcher-frecency.json`; `launcher.history.enable: false` turns it off.
 
+What runs in a terminal (a `Terminal=true` app, a file or link whose default app is one, a script command with `@lys.output terminal`, the run-in-terminal and open-terminal-here actions, `run` and `ssh`) uses `launcher.terminal`, else `$TERMINAL`, else the first of foot, kitty, alacritty, wezterm, ghostty, gnome-terminal, konsole and xterm on `$PATH`. With none of them nothing is run: the panel stays open and says that there is no terminal emulator.
+
 ## Keys
 
 | Key | Does |

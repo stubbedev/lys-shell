@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -11,8 +12,15 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/stubbedev/lys-shell/internal/pango"
 	"github.com/stubbedev/lys-shell/service/launcher"
 )
+
+func failed(state launcher.ModeState, err error) launcher.Action {
+	message := pango.Escape(err.Error())
+	state.Message = &message
+	return launcher.ActionReload{State: state}
+}
 
 // IsIgnored reports whether an entry is one the user keeps out of
 // history (rofi -ignored-prefixes). It matches the command - the
@@ -63,21 +71,24 @@ func NewRun(cfg RunConfig, history *launcher.History) *Run {
 // Name is "run".
 func (*Run) Name() string { return "run" }
 
-func (r *Run) execute(command string, inTerminal bool) {
+func (r *Run) execute(command string, inTerminal bool) error {
 	var rendered string
 	if inTerminal {
-		terminal := launcher.DetectTerminal(r.cfg.Terminal)
-		rendered = launcher.Render(r.cfg.ShellCommand, launcher.Values(map[string]string{"cmd": command, "terminal": terminal}))
+		var err error
+		if rendered, err = launcher.RenderInTerminal(r.cfg.ShellCommand, r.cfg.Terminal, map[string]string{"cmd": command}); err != nil {
+			return fmt.Errorf("run %q in a terminal: %w", command, err)
+		}
 	} else {
 		rendered = launcher.Render(r.cfg.RunCommand, launcher.Values(map[string]string{"cmd": command}))
 	}
 	launcher.RunShell(rendered)
 	if IsIgnored(command, r.cfg.IgnoredPrefixes) || r.history == nil {
-		return
+		return nil
 	}
 	if err := r.history.Record("run", command, r.cfg.MaxHistory); err != nil {
 		log.Printf("launcher: run history record failed: %v", err)
 	}
+	return nil
 }
 
 // Load lists the $PATH executables (plus the list command's lines),
@@ -102,8 +113,8 @@ func (r *Run) Load(ctx context.Context) launcher.ModeState {
 }
 
 // Activate runs the row's command or the typed one; Alt runs it in a
-// terminal.
-func (r *Run) Activate(_ context.Context, target launcher.Target, kind launcher.ActivateKind, _ string) launcher.Action {
+// terminal, and with no terminal to run it in stays open and says so.
+func (r *Run) Activate(ctx context.Context, target launcher.Target, kind launcher.ActivateKind, _ string) launcher.Action {
 	var command string
 	if row, ok := target.Row(); ok {
 		if int(row) >= len(r.commands) {
@@ -119,7 +130,9 @@ func (r *Run) Activate(_ context.Context, target launcher.Target, kind launcher.
 		return launcher.ActionNothing{}
 	}
 	_, alt := kind.(launcher.ActivateAlt)
-	r.execute(command, alt)
+	if err := r.execute(command, alt); err != nil {
+		return failed(r.Load(ctx), err)
+	}
 	return launcher.ActionClose{}
 }
 

@@ -90,7 +90,7 @@ func (a *Apps) Load(_ context.Context, publish func([]Entry)) {
 func (a *Apps) launch(app *desktopentry.App, terminal bool) Outcome {
 	if !terminal && !app.Terminal() {
 		if err := app.Launch(); err != nil {
-			return Stay{Message: i18n.T("launcher-failed", i18n.Str("what", app.DisplayName()), i18n.Str("error", err.Error()))}
+			return failed(app.DisplayName(), err)
 		}
 		return Close{}
 	}
@@ -104,8 +104,7 @@ func (a *Apps) launch(app *desktopentry.App, terminal bool) Outcome {
 			kept = append(kept, tok)
 		}
 	}
-	a.env.inTerminal(kept...)
-	return Close{}
+	return a.env.inTerminal(app.DisplayName(), kept...)
 }
 
 func isFieldCode(tok string) bool {
@@ -118,8 +117,7 @@ func (a *Apps) Actions(e Entry) []Action {
 	if d.app == nil {
 		return []Action{
 			{Title: i18n.T("launcher-action-open"), Icon: "ld-external-link-symbolic", Run: func(context.Context) Outcome {
-				a.env.Open(d.url)
-				return Close{}
+				return a.env.open(i18n.T("launcher-action-open"), d.url)
 			}},
 			copyAction(i18n.T("launcher-action-copy-url"), d.url),
 		}
@@ -131,7 +129,7 @@ func (a *Apps) Actions(e Entry) []Action {
 	for _, action := range app.Actions() {
 		out = append(out, Action{Title: app.ActionName(action), Icon: "ld-play-symbolic", Run: func(context.Context) Outcome {
 			if err := app.LaunchAction(action); err != nil {
-				return Stay{Message: i18n.T("launcher-failed", i18n.Str("what", app.ActionName(action)), i18n.Str("error", err.Error()))}
+				return failed(app.ActionName(action), err)
 			}
 			return Close{}
 		}})
