@@ -345,17 +345,13 @@ func readSecret(path string) ([]byte, error) {
 }
 
 // secretPath is where the app's secret file was kept before the
-// keyring: under $XDG_DATA_HOME (when absolute) or ~/.local/share.
+// keyring: under the shell's XDG data directory.
 func secretPath(appID string) (string, error) {
-	base := os.Getenv("XDG_DATA_HOME")
-	if !filepath.IsAbs(base) {
-		home, ok := os.LookupEnv("HOME")
-		if !ok {
-			return "", errors.New("neither XDG_DATA_HOME nor HOME is set")
-		}
-		base = filepath.Join(home, ".local/share")
+	dir, ok := xdg.OS.DataDir(identity.Name)
+	if !ok {
+		return "", errors.New("neither XDG_DATA_HOME nor HOME is an absolute path")
 	}
-	return filepath.Join(base, "lys-shell/portal/secrets", sanitizeAppID(appID)), nil
+	return filepath.Join(dir, "portal", "secrets", sanitizeAppID(appID)), nil
 }
 
 // sanitizeAppID maps an app id to one safe path component: anything

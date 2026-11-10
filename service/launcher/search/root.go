@@ -2,7 +2,10 @@ package search
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -76,10 +79,23 @@ func expandHome(path, home string) string {
 	return path
 }
 
+// rootEnv is the environment the root's directories are found in: the
+// process's, with home for its HOME.
+func rootEnv(home string) xdg.Env {
+	return func(name string) string {
+		if name == "HOME" {
+			return home
+		}
+		return os.Getenv(name)
+	}
+}
+
 // NewRoot builds the root level from the configuration: one provider per
-// enabled source, nothing loaded yet.
+// enabled source, nothing loaded yet. A source whose directories neither
+// the configuration nor the environment names is left out, and logged.
 func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, home string) *Level {
 	has := func(p config.LauncherSearchProvider) bool { return slices.Contains(cfg.Providers, p) }
+	env := rootEnv(home)
 	root := &Level{Placeholder: i18n.T("launcher-placeholder-search")}
 	add := func(p config.LauncherSearchProvider, make func() Provider) {
 		if has(p) {
@@ -105,18 +121,24 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	add(config.SearchWindows, func() Provider { return NewWindows(d.Windows) })
 	add(config.SearchSystem, func() Provider { return NewSystem(d.Env, power) })
 	add(config.SearchLinks, func() Provider { return NewLinks(d.Env, cfg.Quicklinks, cfg.Snippets, cfg.Previews) })
-	add(config.SearchScripts, func() Provider {
-		dir := commandsDir(cfg.CommandsDir, home)
-		return keep("scripts\x00"+dir, wholeSource(NewScripts(d.Env, dir)), keepSpec{paths: []string{dir}})
-	})
+	if has(config.SearchScripts) {
+		if dir, err := commandsDir(cfg.CommandsDir, home, env); err != nil {
+			log.Printf("launcher: no scripts: %v", err)
+		} else {
+			root.Providers = append(root.Providers, keep("scripts\x00"+dir, wholeSource(NewScripts(d.Env, dir)), keepSpec{paths: []string{dir}}))
+		}
+	}
 	if has(config.SearchSettings) && d.SettingsPages != nil {
 		root.Providers = append(root.Providers, keep("settings", wholeSource(NewSettings(d.Env, d.SettingsPages)), keepSpec{}))
 	}
-	add(config.SearchFiles, func() Provider {
-		fc := filesConfig(cfg, home)
-		key := fmt.Sprintf("files\x00%q\x00%q\x00%s\x00%s\x00%t", fc.Roots, fc.Exclude, fc.CachePath, fc.RecentPath, fc.Previews)
-		return keep(key, stagedSource(NewFiles(d.Env, fc)), keepSpec{paths: []string{filepath.Dir(fc.RecentPath), filepath.Dir(fc.CachePath)}, maxAge: fileIndexMaxAge})
-	})
+	if has(config.SearchFiles) {
+		if fc, err := filesConfig(cfg, home, env); err != nil {
+			log.Printf("launcher: no files: %v", err)
+		} else {
+			key := fmt.Sprintf("files\x00%q\x00%q\x00%s\x00%s\x00%t", fc.Roots, fc.Exclude, fc.CachePath, fc.RecentPath, fc.Previews)
+			root.Providers = append(root.Providers, keep(key, stagedSource(NewFiles(d.Env, fc)), keepSpec{paths: []string{filepath.Dir(fc.RecentPath), filepath.Dir(fc.CachePath)}, maxAge: fileIndexMaxAge}))
+		}
+	}
 	if has(config.SearchClipboard) && d.Clipboard != nil {
 		root.Providers = append(root.Providers, NewClipboard(d.Clipboard, cfg.Previews))
 	}
@@ -169,17 +191,23 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	return root
 }
 
-func commandsDir(configured, home string) string {
+// commandsDir is where the scripts are: the configured directory, else
+// launcher/commands under the shell's XDG config directory.
+func commandsDir(configured, home string, env xdg.Env) (string, error) {
 	if configured != "" {
-		return expandHome(configured, home)
+		return expandHome(configured, home), nil
 	}
-	if dir, ok := xdg.OS.ConfigDir(identity.Name); ok {
-		return filepath.Join(dir, "launcher", "commands")
+	dir, ok := env.ConfigDir(identity.Name)
+	if !ok {
+		return "", errors.New("no commands directory: neither XDG_CONFIG_HOME nor HOME is an absolute path")
 	}
-	return filepath.Join(home, ".config", identity.Name, "launcher", "commands")
+	return filepath.Join(dir, "launcher", "commands"), nil
 }
 
-func filesConfig(cfg config.LauncherSearchConfig, home string) FilesConfig {
+// filesConfig is what the files source reads: the configured roots, home
+// without any, the index under the shell's XDG cache directory and the
+// desktop's recent files under the XDG data home.
+func filesConfig(cfg config.LauncherSearchConfig, home string, env xdg.Env) (FilesConfig, error) {
 	roots := make([]string, 0, max(len(cfg.FileRoots), 1))
 	for _, r := range cfg.FileRoots {
 		roots = append(roots, expandHome(r, home))
@@ -187,18 +215,18 @@ func filesConfig(cfg config.LauncherSearchConfig, home string) FilesConfig {
 	if len(roots) == 0 {
 		roots = []string{home}
 	}
-	cache := filepath.Join(home, ".cache", identity.Name, fileIndexFileName)
-	if dir, ok := xdg.OS.CacheDir(identity.Name); ok {
-		cache = filepath.Join(dir, fileIndexFileName)
+	cache, ok := env.CacheDir(identity.Name)
+	if !ok {
+		return FilesConfig{}, errors.New("no directory for the index: neither XDG_CACHE_HOME nor HOME is an absolute path")
 	}
-	recent := filepath.Join(home, ".local", "share", "recently-used.xbel")
-	if dir, ok := xdg.OS.DataDir(identity.Name); ok {
-		recent = filepath.Join(filepath.Dir(dir), "recently-used.xbel")
+	data, ok := env.DataHome()
+	if !ok {
+		return FilesConfig{}, errors.New("no directory of recent files: neither XDG_DATA_HOME nor HOME is an absolute path")
 	}
 	return FilesConfig{
-		Roots: roots, Exclude: cfg.FileExclude, CachePath: cache, RecentPath: recent, Home: home,
+		Roots: roots, Exclude: cfg.FileExclude, CachePath: filepath.Join(cache, fileIndexFileName), RecentPath: filepath.Join(data, "recently-used.xbel"), Home: home,
 		Previews: cfg.Previews, Now: time.Now,
-	}
+	}, nil
 }
 
 func sessionLanguage() string {

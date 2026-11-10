@@ -25,6 +25,7 @@ import (
 	"github.com/stubbedev/lys-desktop/shell/lockclient"
 	"github.com/stubbedev/lys-desktop/spawn"
 	"github.com/stubbedev/lys-desktop/styling"
+	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/render"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/wlr"
@@ -154,7 +155,7 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	servicesUp := make(chan struct{})
 	go func() {
 		defer close(servicesUp)
-		system, err := dbus.ConnectSystemBus()
+		system, err := dbusx.DialSystem(context.Background(), systemDialTimeout)
 		if err != nil {
 			log.Printf("bar: system bus: %v", err)
 		}
@@ -170,6 +171,9 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 }
 
 const (
+	// systemDialTimeout bounds the connect to the system bus, which the
+	// bar's first frame waits for.
+	systemDialTimeout  = 5 * time.Second
 	configFlushTimeout = 5 * time.Second
 	pollIdleAfter      = 5 * time.Minute
 )

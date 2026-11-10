@@ -20,6 +20,7 @@ import (
 	"github.com/stubbedev/lys-desktop/feed"
 	"github.com/stubbedev/lys-desktop/fswatch"
 	"github.com/stubbedev/lys-desktop/ipcsock"
+	"github.com/stubbedev/lys-lib/xdg"
 	"golang.org/x/sys/unix"
 )
 
@@ -130,25 +131,25 @@ func (s Status) WorstBucket() Bucket {
 	return BucketStable
 }
 
+// socketName is treeman's socket in the directory it is found in.
+const socketName = "treeman.sock"
+
 // SocketPath mirrors treeman's own lookup order: $TREEMAN_SOCKET →
 // $XDG_RUNTIME_DIR/treeman.sock → $XDG_DATA_HOME/treeman/treeman.sock
-// → ~/.local/share/treeman/treeman.sock.
+// → ~/.local/share/treeman/treeman.sock, the XDG directories as the
+// specification reads them: one that is not an absolute path is unset.
 func SocketPath() (string, bool) {
 	if p := os.Getenv("TREEMAN_SOCKET"); p != "" {
 		return p, true
 	}
-	if rt := os.Getenv("XDG_RUNTIME_DIR"); rt != "" {
-		return filepath.Join(rt, "treeman.sock"), true
+	if dir, ok := xdg.OS.RuntimeHome(); ok {
+		return filepath.Join(dir, socketName), true
 	}
-	dataHome := os.Getenv("XDG_DATA_HOME")
-	if dataHome == "" {
-		home := os.Getenv("HOME")
-		if home == "" {
-			return "", false
-		}
-		dataHome = filepath.Join(home, ".local/share")
+	dir, ok := xdg.OS.DataDir("treeman")
+	if !ok {
+		return "", false
 	}
-	return filepath.Join(dataHome, "treeman", "treeman.sock"), true
+	return filepath.Join(dir, socketName), true
 }
 
 const subscribeRequest = `{"method":"event_subscribe","event_subscribe":{}}` + "\n"

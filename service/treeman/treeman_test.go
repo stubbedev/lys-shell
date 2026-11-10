@@ -51,6 +51,28 @@ func TestSocketPathLookup(t *testing.T) {
 	}
 }
 
+// An XDG directory that is not an absolute path is unset, as the
+// specification reads it: the lookup moves on instead of naming a socket
+// relative to the working directory, and ends without a path.
+func TestSocketPathIgnoresRelativeXDGDirectories(t *testing.T) {
+	t.Setenv("TREEMAN_SOCKET", "")
+	t.Setenv("XDG_RUNTIME_DIR", "run")
+	t.Setenv("XDG_DATA_HOME", "data")
+	t.Setenv("HOME", "/home/u")
+	if p, ok := SocketPath(); !ok || p != "/home/u/.local/share/treeman/treeman.sock" {
+		t.Errorf("relative XDG directories = %q ok=%v, want the home fallback", p, ok)
+	}
+	t.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
+	if p, ok := SocketPath(); !ok || p != "/run/user/1000/treeman.sock" {
+		t.Errorf("an absolute runtime dir = %q ok=%v", p, ok)
+	}
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	t.Setenv("HOME", "home")
+	if p, ok := SocketPath(); ok {
+		t.Errorf("nothing absolute = %q, want no path", p)
+	}
+}
+
 // fakeTreemanBin writes a treeman that answers only `status --format
 // json`, printing the JSON lines of the file at lines in turn (one per
 // run, the last repeating); a line "FAIL" exits non-zero. Any other

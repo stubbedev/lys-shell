@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-desktop/i18n"
+	"github.com/stubbedev/lys-lib/peercred"
 	"golang.org/x/sys/unix"
 
 	"github.com/stubbedev/lys-shell/service/launcher"
@@ -139,24 +140,14 @@ func waylandCompositorPid(ctx context.Context, runtimeDir, display string) (int,
 	if !ok {
 		return 0, fmt.Errorf("%s is not a unix socket", path)
 	}
-	raw, err := unixConn.SyscallConn()
+	cred, err := peercred.Of(unixConn)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("peer of %s: %w", path, err)
 	}
-	var cred *unix.Ucred
-	var credErr error
-	if err := raw.Control(func(fd uintptr) {
-		cred, credErr = unix.GetsockoptUcred(int(fd), unix.SOL_SOCKET, unix.SO_PEERCRED)
-	}); err != nil {
-		return 0, err
-	}
-	if credErr != nil {
-		return 0, fmt.Errorf("peer of %s: %w", path, credErr)
-	}
-	if cred.Pid <= 0 {
+	if cred.PID <= 0 {
 		return 0, fmt.Errorf("peer of %s is outside this pid namespace", path)
 	}
-	return int(cred.Pid), nil
+	return int(cred.PID), nil
 }
 
 // sessionPids are the given processes and everything that started them:
