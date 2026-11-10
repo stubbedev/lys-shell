@@ -147,7 +147,7 @@ func (v *notificationView) dndToggled(on bool) {
 // notification; the history's change comes back to rebuild.
 func (v *notificationView) dismissAll() {
 	if v.svc != nil {
-		go v.svc.DismissAll()
+		v.svc.Detach(v.svc.DismissAll)
 	}
 }
 
@@ -460,7 +460,8 @@ func (g *notifGroup) clear() {
 	for i, n := range g.notifs {
 		ids[i] = n.ID
 	}
-	go g.view.svc.Dismiss(ids)
+	svc := g.view.svc
+	svc.Detach(func() { svc.Dismiss(ids) })
 }
 
 // notifItem is NotificationItem: the notification as lys-ui's Item

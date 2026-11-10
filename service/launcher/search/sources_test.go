@@ -72,7 +72,7 @@ func firstFrame(t *testing.T, s *sink) Frame {
 	return s.frames[0]
 }
 
-func keptLevel(src *Sources, p Provider, spec keepSpec) *Level {
+func keptLevel(src *Sources, p source, spec keepSpec) *Level {
 	return &Level{Query: "fire", Providers: []Provider{src.keep("apps", p, spec)}}
 }
 
@@ -82,12 +82,12 @@ func TestAKeptSourceLoadsOnceAndFillsTheNextSessionsFirstFrame(t *testing.T) {
 	spec := keepSpec{paths: []string{"/apps"}}
 
 	first := &sink{}
-	stop := session(t, first, keptLevel(src, apps, spec), nil)
+	stop := session(t, first, keptLevel(src, wholeSource(apps), spec), nil)
 	until(t, first, "Firefox")
 	stop()
 
 	second := &sink{}
-	session(t, second, keptLevel(src, apps, spec), nil)
+	session(t, second, keptLevel(src, wholeSource(apps), spec), nil)
 	if got := titles(firstFrame(t, second)); !slices.Equal(got, []string{"Firefox"}) {
 		t.Errorf("the second session's first frame = %q, want the kept rows", got)
 	}
@@ -112,7 +112,7 @@ func TestASourceStillInItsLoadWhenTheSessionEndsIsKept(t *testing.T) {
 	spec := keepSpec{paths: []string{"/apps"}}
 
 	first := &sink{}
-	e := startLevel(t, first, keptLevel(src, apps, spec), nil)
+	e := startLevel(t, first, keptLevel(src, wholeSource(apps), spec), nil)
 	release := sync.OnceFunc(func() { close(apps.release) })
 	t.Cleanup(release)
 	until(t, first, "Firefox")
@@ -121,7 +121,7 @@ func TestASourceStillInItsLoadWhenTheSessionEndsIsKept(t *testing.T) {
 	stopped(t, e)
 
 	second := &sink{}
-	stop := session(t, second, keptLevel(src, apps, spec), nil)
+	stop := session(t, second, keptLevel(src, wholeSource(apps), spec), nil)
 	if got := titles(firstFrame(t, second)); !slices.Equal(got, []string{"Firefox"}) {
 		t.Errorf("the second session's first frame = %q, want the rows the first one showed", got)
 	}
@@ -140,13 +140,17 @@ type stagedProvider struct {
 
 func (p *stagedProvider) Spec() Spec { return p.spec }
 
-func (p *stagedProvider) Load(ctx context.Context, publish func([]Entry)) {
+func (p *stagedProvider) Load(ctx context.Context, publish func([]Entry)) { p.LoadStaged(ctx, publish) }
+
+func (p *stagedProvider) LoadStaged(ctx context.Context, publish func([]Entry)) bool {
 	p.loads.Add(1)
 	publish(p.entries[:1])
 	select {
 	case <-p.rest:
 		publish(p.entries)
+		return true
 	case <-ctx.Done():
+		return false
 	}
 }
 
@@ -158,12 +162,12 @@ func TestAStagedSourceIsKeptOnlyOnceItsLoadRanToItsEnd(t *testing.T) {
 	spec := keepSpec{paths: []string{"/files"}}
 
 	first := &sink{}
-	stop := session(t, first, keptLevel(src, files, spec), nil)
+	stop := session(t, first, keptLevel(src, stagedSource(files), spec), nil)
 	until(t, first, "Firefox")
 	stop()
 
 	second := &sink{}
-	stop = session(t, second, keptLevel(src, files, spec), nil)
+	stop = session(t, second, keptLevel(src, stagedSource(files), spec), nil)
 	if got := titles(firstFrame(t, second)); len(got) != 0 {
 		t.Errorf("the second session's first frame = %q, want nothing kept of a load the session's end cut short", got)
 	}
@@ -175,7 +179,7 @@ func TestAStagedSourceIsKeptOnlyOnceItsLoadRanToItsEnd(t *testing.T) {
 	}
 
 	third := &sink{}
-	stop = session(t, third, keptLevel(src, files, spec), nil)
+	stop = session(t, third, keptLevel(src, stagedSource(files), spec), nil)
 	if got := titles(firstFrame(t, third)); !slices.Equal(got, []string{"Firefox", "Firewall"}) {
 		t.Errorf("the third session's first frame = %q, want the rows of the load that ran to its end", got)
 	}
@@ -192,7 +196,7 @@ func TestAChangeUnderAWatchedPathLoadsTheSourceAgain(t *testing.T) {
 	spec := keepSpec{paths: []string{"/apps"}}
 
 	first := &sink{}
-	stop := session(t, first, keptLevel(src, apps, spec), nil)
+	stop := session(t, first, keptLevel(src, wholeSource(apps), spec), nil)
 	until(t, first, "Firefox")
 	stop()
 	if len(w.paths) != 1 || !slices.Equal(w.paths[0], []string{"/apps"}) {
@@ -202,7 +206,7 @@ func TestAChangeUnderAWatchedPathLoadsTheSourceAgain(t *testing.T) {
 	w.changed()
 	apps.entries = []Entry{entry("Firefox Nightly")}
 	second := &sink{}
-	session(t, second, keptLevel(src, apps, spec), nil)
+	session(t, second, keptLevel(src, wholeSource(apps), spec), nil)
 	if got := titles(firstFrame(t, second)); !slices.Equal(got, []string{"Firefox"}) {
 		t.Errorf("first frame = %q, want the kept rows while the source loads again", got)
 	}
@@ -218,7 +222,7 @@ func TestAnUnwatchableSourceLoadsInEverySession(t *testing.T) {
 	spec := keepSpec{paths: []string{"/apps"}}
 	for range 2 {
 		s := &sink{}
-		stop := session(t, s, keptLevel(src, apps, spec), nil)
+		stop := session(t, s, keptLevel(src, wholeSource(apps), spec), nil)
 		until(t, s, "Firefox")
 		stop()
 	}
@@ -234,7 +238,7 @@ func TestAKeptSourceGoesStaleWithAge(t *testing.T) {
 	spec := keepSpec{paths: []string{"/files"}, maxAge: time.Minute}
 	run := func() {
 		s := &sink{}
-		stop := session(t, s, keptLevel(src, apps, spec), nil)
+		stop := session(t, s, keptLevel(src, wholeSource(apps), spec), nil)
 		until(t, s, "Firefox")
 		stop()
 	}
@@ -260,7 +264,7 @@ func TestAnEmptyListSettlesInOneUpdateOnceTheSourcesAreKept(t *testing.T) {
 	src := NewSources((&fakeWatch{}).watch, time.Now)
 	apps := &countingProvider{spec: Spec{Section: SectionApps}, entries: []Entry{entry("Firefox"), entry("Files")}}
 	level := func(live *fakeProvider) *Level {
-		return &Level{Providers: []Provider{src.keep("apps", apps, keepSpec{paths: []string{"/apps"}}), live}}
+		return &Level{Providers: []Provider{src.keep("apps", wholeSource(apps), keepSpec{paths: []string{"/apps"}}), live}}
 	}
 
 	first := &sink{}

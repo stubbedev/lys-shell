@@ -58,7 +58,7 @@ func (s *Service) SetDND(on bool) {
 	} else {
 		s.focus.override = nil
 		s.focus.manual = on
-		s.enqueueLocked(func() { s.dnd.save(on) })
+		s.saveDNDLocked(on)
 	}
 	s.refocusUnlock(true)
 }

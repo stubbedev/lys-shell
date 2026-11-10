@@ -98,9 +98,35 @@ func (k *keptRows) store(gen uint64, entries []Entry, at time.Time) {
 	k.entries, k.has, k.loaded, k.at = entries, true, gen, at
 }
 
+// source is a provider a Sources keeps: loadWhole is its Load, reporting
+// whether the rows it published last are its whole list.
+type source struct {
+	Provider
+	loadWhole func(ctx context.Context, publish func([]Entry)) bool
+}
+
+// wholeSource is p as a source: whatever it published is its whole list.
+func wholeSource[P interface {
+	Provider
+	Whole
+}](p P) source {
+	return source{Provider: p, loadWhole: func(ctx context.Context, publish func([]Entry)) bool {
+		p.Load(ctx, publish)
+		return true
+	}}
+}
+
+// stagedSource is p as a source: its load says whether it was cut short.
+func stagedSource[P interface {
+	Provider
+	Staged
+}](p P) source {
+	return source{Provider: p, loadWhole: p.LoadStaged}
+}
+
 // keep is p with its rows kept under key. A key no session asked for since
 // the last retain is dropped with its watch.
-func (s *Sources) keep(key string, p Provider, spec keepSpec) Provider {
+func (s *Sources) keep(key string, p source, spec keepSpec) Provider {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	k := s.kept[key]
@@ -116,7 +142,7 @@ func (s *Sources) keep(key string, p Provider, spec keepSpec) Provider {
 		}
 		s.kept[key] = k
 	}
-	return &kept{Provider: p, rows: k, now: s.now}
+	return &kept{source: p, rows: k, now: s.now}
 }
 
 // retain drops every kept source but keys, stopping their watches.
@@ -135,11 +161,10 @@ func (s *Sources) retain(keys []string) {
 }
 
 // kept is a session's provider over rows kept between sessions: its Load
-// is the provider's, remembering the rows it published last once they are
-// its whole list: at once for a Whole provider, for any other only when the
-// load ran to its end before the session did.
+// is the source's, remembering the rows it published last when they are
+// its whole list, whether or not the session outlived the load.
 type kept struct {
-	Provider
+	source
 	rows *keptRows
 	now  func() time.Time
 }
@@ -149,14 +174,11 @@ func (k *kept) Load(ctx context.Context, publish func([]Entry)) {
 	gen := k.rows.begin()
 	var last []Entry
 	got := false
-	k.Provider.Load(ctx, func(entries []Entry) {
+	whole := k.loadWhole(ctx, func(entries []Entry) {
 		last, got = entries, true
 		publish(entries)
 	})
-	if !got {
-		return
-	}
-	if _, whole := k.Provider.(Whole); whole || ctx.Err() == nil {
+	if got && whole {
 		k.rows.store(gen, last, k.now())
 	}
 }

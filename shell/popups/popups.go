@@ -460,7 +460,8 @@ func (p *Popups) setHovered(st *stack, on bool) {
 // clearStack is the clear-all button: every popup of the stack's
 // group leaves the history as the dropdown's clear all does, those
 // popup-max-visible keeps off screen included, so none moves up into
-// the cleared stack.
+// the cleared stack. The service runs it off the loop, where its flush
+// waits for it.
 func (p *Popups) clearStack(st *stack) {
 	key := stackKey(p.cfg.Notification.PopupStack)
 	var ids []uint32
@@ -469,7 +470,7 @@ func (p *Popups) clearStack(st *stack) {
 			ids = append(ids, n.ID)
 		}
 	}
-	go p.svc.Dismiss(ids)
+	p.svc.Detach(func() { p.svc.Dismiss(ids) })
 }
 
 // liveIDs are the ids of the stack's cards not leaving, front first.
@@ -660,7 +661,7 @@ func (p *Popups) closeCard(id uint32) {
 func (p *Popups) invokeAction(id uint32, key string) {
 	notifyui.WithActivationToken(p.minter, func(token string) {
 		p.svc.DismissPopup(id)
-		p.offLoop(func() {
+		p.change(func() {
 			p.svc.InvokeAction(id, key, token)
 			p.svc.Close(id, notifications.Dismissed)
 		})
@@ -673,7 +674,7 @@ func (p *Popups) invokeAction(id uint32, key string) {
 func (p *Popups) invokeDefault(id uint32) {
 	notifyui.WithActivationToken(p.minter, func(token string) {
 		remove := p.cfg.Notification.PopupCloseBehavior == config.PopupCloseBehaviorRemove
-		p.offLoop(func() {
+		p.change(func() {
 			p.svc.InvokeAction(id, notifications.DefaultActionID, token)
 			if remove {
 				p.svc.Close(id, notifications.Dismissed)
@@ -845,6 +846,17 @@ func (p *Popups) offLoop(fn func()) {
 	go fn()
 }
 
+// change runs fn, which changes the service, off the loop as the
+// service detaches it: its flush waits for fn and the write it queues.
+// Headless it runs in place.
+func (p *Popups) change(fn func()) {
+	if p.app == nil {
+		fn()
+		return
+	}
+	p.svc.Detach(fn)
+}
+
 func setProgress(bar *widget.ProgressBar, p notifications.Progress) {
 	percent, ok := p.Percent()
 	bar.SetVisible(ok)
@@ -902,7 +914,7 @@ func (p *Popups) replyEntry(n *notifications.Notification, px float64) *widget.E
 		if text == "" {
 			return
 		}
-		p.offLoop(func() { p.svc.Reply(id, text) })
+		p.change(func() { p.svc.Reply(id, text) })
 	}
 	e.OnEscape = func() bool {
 		e.SetText("")

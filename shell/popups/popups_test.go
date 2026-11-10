@@ -743,7 +743,8 @@ func TestReloadReleasesAHoveredStack(t *testing.T) {
 // off the screen, out of the history and out of the store, the ones
 // popup-max-visible keeps off screen included, whatever the close
 // button's behavior, and only those; a collapsed stack or a stack of
-// one offers no clear all.
+// one offers no clear all. The clear runs off the loop, yet the first
+// flush of the service after the click has its write.
 func TestClearAllRemovesTheStacksNotifications(t *testing.T) {
 	for _, behavior := range []config.PopupCloseBehavior{config.PopupCloseBehaviorDismiss, config.PopupCloseBehaviorRemove} {
 		cfg := config.DefaultsNotification()
@@ -763,9 +764,9 @@ func TestClearAllRemovesTheStacksNotifications(t *testing.T) {
 		}
 		s.hover(s.card(mail[2]).summary)
 		s.click(stack.clear)
-		waitFor(t, "the mail stack leaving the store", func() bool { return !notifytest.IDs(st.Stored(t))[mail[0]] })
+		onDisk := notifytest.IDs(st.Stored(t))
 		s.p.sync()
-		up, kept, onDisk := notifytest.IDs(s.svc.Popups()), notifytest.IDs(notifytest.History(t, s.svc)), notifytest.IDs(st.Stored(t))
+		up, kept := notifytest.IDs(s.svc.Popups()), notifytest.IDs(notifytest.History(t, s.svc))
 		for _, id := range mail {
 			if up[id] || kept[id] || onDisk[id] {
 				t.Errorf("%s: clear all left mail %d: popped %v, in history %v, stored %v", behavior, id, up[id], kept[id], onDisk[id])

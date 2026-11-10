@@ -13,6 +13,7 @@ import (
 
 	"github.com/stubbedev/lys-desktop/config"
 
+	"github.com/stubbedev/lys-shell/internal/pango"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/launcher/modes"
 )
@@ -618,19 +619,82 @@ func TestWalkFilesRespectsItsBounds(t *testing.T) {
 	if err := os.Symlink(root, filepath.Join(root, "loop")); err != nil {
 		t.Fatal(err)
 	}
-	got, complete := walkFiles(context.Background(), []string{root}, []string{"skipme"}, 100)
+	got, end := walkFiles(context.Background(), []string{root}, []string{"skipme"}, 100)
 	slices.Sort(got)
 	want := []string{filepath.Join(root, "a.txt"), filepath.Join(root, "sub") + "/", filepath.Join(root, "sub", "b.txt")}
-	if !complete || !slices.Equal(got, want) {
-		t.Errorf("walk = %v (complete %v), want %v", got, complete, want)
+	if end != walkDone || !slices.Equal(got, want) {
+		t.Errorf("walk = %v (end %v), want %v and walkDone", got, end, want)
 	}
-	if got, complete := walkFiles(context.Background(), []string{root}, nil, 1); complete || len(got) != 1 {
-		t.Errorf("limit: %v %v", got, complete)
+	if got, end := walkFiles(context.Background(), []string{root}, nil, 1); end != walkFull || len(got) != 1 {
+		t.Errorf("limit: %v, end %v, want one path and walkFull", got, end)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, complete := walkFiles(ctx, []string{root}, nil, 100); complete {
-		t.Error("a cancelled walk is not complete")
+	if got, end := walkFiles(ctx, []string{root}, nil, 100); end != walkCut || len(got) != 0 {
+		t.Errorf("a cancelled walk: %v, end %v, want nothing and walkCut", got, end)
+	}
+}
+
+// keptFiles is a Files over a home holding notes.txt, with no index yet,
+// kept by a Sources: the provider a session loads, and the rows kept of
+// it.
+func keptFiles(t *testing.T) (Provider, func() (titles []string, has bool)) {
+	t.Helper()
+	home := t.TempDir()
+	if err := os.WriteFile(filepath.Join(home, "notes.txt"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	state := t.TempDir()
+	files := NewFiles(Env{}, FilesConfig{
+		Roots: []string{home}, CachePath: filepath.Join(state, "idx"), RecentPath: filepath.Join(state, "recently-used.xbel"),
+		Home: home, Now: time.Now,
+	})
+	p := NewSources(nil, time.Now).keep("files", stagedSource(files), keepSpec{maxAge: fileIndexMaxAge})
+	return p, func() ([]string, bool) {
+		entries, has, _ := p.(*kept).rows.snapshot(time.Now())
+		titles := make([]string, len(entries))
+		for i, e := range entries {
+			titles[i] = e.Title
+		}
+		return titles, has
+	}
+}
+
+// A walk that finishes as the session ends is kept: the session ending
+// while the walked rows are published, before Load returns, loses
+// nothing of a load that ran to its end.
+func TestAFilesWalkThatFinishesAsTheSessionEndsIsKept(t *testing.T) {
+	p, keptRows := keptFiles(t)
+	session, end := context.WithCancel(context.Background())
+	defer end()
+	publishes := 0
+	p.Load(session, func([]Entry) {
+		if publishes++; publishes == 2 {
+			end()
+		}
+	})
+	if publishes != 2 {
+		t.Fatalf("%d publishes, want the index and then the walk", publishes)
+	}
+	if titles, has := keptRows(); !has || !slices.Equal(titles, []string{"notes.txt"}) {
+		t.Errorf("kept %q (any: %v), want the walk that finished: notes.txt", titles, has)
+	}
+}
+
+// A walk the session's end cut short is not kept: the next session walks
+// again.
+func TestAFilesWalkTheSessionCutShortIsNotKept(t *testing.T) {
+	p, keptRows := keptFiles(t)
+	session, end := context.WithCancel(context.Background())
+	defer end()
+	publishes := 0
+	p.Load(session, func([]Entry) {
+		if publishes++; publishes == 1 {
+			end()
+		}
+	})
+	if titles, has := keptRows(); has {
+		t.Errorf("kept %q of a walk the session ended before it began", titles)
 	}
 }
 
@@ -759,6 +823,19 @@ func TestSystemConfirmsWhatEndsTheSession(t *testing.T) {
 	prov.Actions(confirm[0])[0].Run(context.Background())
 	if !slices.Equal(ran, []string{"rebootit"}) {
 		t.Errorf("confirmed ran %v", ran)
+	}
+}
+
+// The confirm level's message holds the action's title as text,
+// whatever the title has of markup.
+func TestTheConfirmMessageHoldsTheTitleAsText(t *testing.T) {
+	title := `Reboot <b>now</b> & lose "work"`
+	push, ok := confirmed(Action{Title: title}).Run(context.Background()).(Push)
+	if !ok {
+		t.Fatal("a confirmed action must ask first")
+	}
+	if text, ok := pango.PlainText(push.Level.Message); !ok || !strings.Contains(text, title) {
+		t.Errorf("the message %q reads %q (markup parsed: %v), want the title as text: %q", push.Level.Message, text, ok, title)
 	}
 }
 

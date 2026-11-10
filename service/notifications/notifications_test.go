@@ -488,6 +488,7 @@ func BenchmarkDismiss(b *testing.B) {
 				}
 				b.StartTimer()
 				s.Dismiss(ids)
+				settle(s)
 				b.StopTimer()
 				if err := st.Close(); err != nil {
 					b.Fatal(err)

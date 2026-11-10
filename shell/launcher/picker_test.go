@@ -1,9 +1,11 @@
 package launcher
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/render"
@@ -19,6 +21,8 @@ type fakeWalls struct {
 	ended    int
 	commits  [][2]string
 	loads    []string
+	// commitErr refuses every commit.
+	commitErr error
 }
 
 func (f *fakeWalls) Images() ([]string, error)    { return f.images, nil }
@@ -28,7 +32,7 @@ func (f *fakeWalls) Preview(path, _ string) error { f.previews = append(f.previe
 
 func (f *fakeWalls) Commit(path, mon string) error {
 	f.commits = append(f.commits, [2]string{path, mon})
-	return nil
+	return f.commitErr
 }
 
 func (f *fakeWalls) LoadThumbnail(path string) (image.Image, error) {
@@ -207,6 +211,22 @@ func TestPickerEnterSetsTheFocusedMonitorAndControlEnterEveryOne(t *testing.T) {
 	all.press("Control+Return")
 	if !slices.Equal(all.walls.commits, [][2]string{{"/w/a.png", ""}}) {
 		t.Errorf("control+enter committed %v, want every monitor", all.walls.commits)
+	}
+}
+
+// A wallpaper that cannot be set says why as text, what the error
+// holds of markup escaped, and the picker stays open.
+func TestPickerAFailedCommitSaysTheErrorAsText(t *testing.T) {
+	h := newPickerHarness(t, "/w/a.png")
+	h.walls.commitErr = errors.New("write <b>a.png</b>: disk full")
+	p := h.openPicker()
+	h.press("Return")
+	markup := p.chrome.message.Markup()
+	if !p.chrome.message.Visible() || !strings.Contains(markup, "&lt;b&gt;a.png&lt;/b&gt;: disk full") || strings.Contains(markup, "<b>") {
+		t.Errorf("the failed commit shows %q (visible %t), want the error as text", markup, p.chrome.message.Visible())
+	}
+	if h.s.picker != p {
+		t.Error("the failed commit closed the picker")
 	}
 }
 

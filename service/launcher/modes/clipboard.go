@@ -120,10 +120,7 @@ func (c *Clipboard) Activate(_ context.Context, target launcher.Target, kind lau
 			return launcher.ActionReload{State: c.state()}
 		case togglePin:
 			if err := c.togglePin(target, id); err != nil {
-				msg := err.Error()
-				state := c.state()
-				state.Message = &msg
-				return launcher.ActionReload{State: state}
+				return failed(c.state(), err)
 			}
 			return launcher.ActionReload{State: c.state()}
 		}

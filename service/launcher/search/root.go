@@ -91,37 +91,37 @@ func NewRoot(cfg config.LauncherSearchConfig, power config.PowerConfig, d Deps, 
 	})
 	add(config.SearchShell, func() Provider { return NewShell(d.Env) })
 	var keys []string
-	keep := func(key string, p Provider, spec keepSpec) Provider {
+	keep := func(key string, p source, spec keepSpec) Provider {
 		if d.Sources == nil {
-			return p
+			return p.Provider
 		}
 		keys = append(keys, key)
 		return d.Sources.keep(key, p, spec)
 	}
 	add(config.SearchApps, func() Provider {
 		dirs := desktopentry.ApplicationDirs()
-		return keep("apps\x00"+strings.Join(dirs, "\x00"), NewApps(d.Env, dirs), keepSpec{paths: dirs, recursive: true})
+		return keep("apps\x00"+strings.Join(dirs, "\x00"), wholeSource(NewApps(d.Env, dirs)), keepSpec{paths: dirs, recursive: true})
 	})
 	add(config.SearchWindows, func() Provider { return NewWindows(d.Windows) })
 	add(config.SearchSystem, func() Provider { return NewSystem(d.Env, power) })
 	add(config.SearchLinks, func() Provider { return NewLinks(d.Env, cfg.Quicklinks, cfg.Snippets, cfg.Previews) })
 	add(config.SearchScripts, func() Provider {
 		dir := commandsDir(cfg.CommandsDir, home)
-		return keep("scripts\x00"+dir, NewScripts(d.Env, dir), keepSpec{paths: []string{dir}})
+		return keep("scripts\x00"+dir, wholeSource(NewScripts(d.Env, dir)), keepSpec{paths: []string{dir}})
 	})
 	if has(config.SearchSettings) && d.SettingsPages != nil {
-		root.Providers = append(root.Providers, keep("settings", NewSettings(d.Env, d.SettingsPages), keepSpec{}))
+		root.Providers = append(root.Providers, keep("settings", wholeSource(NewSettings(d.Env, d.SettingsPages)), keepSpec{}))
 	}
 	add(config.SearchFiles, func() Provider {
 		fc := filesConfig(cfg, home)
 		key := fmt.Sprintf("files\x00%q\x00%q\x00%s\x00%s\x00%t", fc.Roots, fc.Exclude, fc.CachePath, fc.RecentPath, fc.Previews)
-		return keep(key, NewFiles(d.Env, fc), keepSpec{paths: []string{filepath.Dir(fc.RecentPath), filepath.Dir(fc.CachePath)}, maxAge: fileIndexMaxAge})
+		return keep(key, stagedSource(NewFiles(d.Env, fc)), keepSpec{paths: []string{filepath.Dir(fc.RecentPath), filepath.Dir(fc.CachePath)}, maxAge: fileIndexMaxAge})
 	})
 	if has(config.SearchClipboard) && d.Clipboard != nil {
 		root.Providers = append(root.Providers, NewClipboard(d.Clipboard, cfg.Previews))
 	}
 	add(config.SearchEmoji, func() Provider {
-		return keep(fmt.Sprintf("emoji\x00%d", d.SkinTone), NewEmoji(modes.AvailableEmoji, d.SkinTone, d.SetSkinTone), keepSpec{})
+		return keep(fmt.Sprintf("emoji\x00%d", d.SkinTone), wholeSource(NewEmoji(modes.AvailableEmoji, d.SkinTone, d.SetSkinTone)), keepSpec{})
 	})
 	add(config.SearchCharacters, func() Provider { return NewCharacters(charnames.Shared) })
 	for _, group := range []struct {

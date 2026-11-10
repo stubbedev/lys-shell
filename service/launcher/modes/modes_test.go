@@ -2,6 +2,7 @@ package modes
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	"github.com/stubbedev/lys-desktop/service/clipboard/historybudget"
 	"github.com/stubbedev/lys-lib/wmipc"
 
+	"github.com/stubbedev/lys-shell/internal/pango"
 	"github.com/stubbedev/lys-shell/service/launcher"
 	"github.com/stubbedev/lys-shell/service/mango"
 )
@@ -607,6 +609,8 @@ type fakeClipboard struct {
 	history *clipboard.History
 	copied  []uint64
 	cleared bool
+	// pinErr refuses every pin.
+	pinErr error
 }
 
 // newFakeClipboard remembers each selection, oldest first, and
@@ -637,7 +641,12 @@ func (f *fakeClipboard) ClearUnpinned() { f.history.ClearUnpinned(); f.cleared =
 
 func (*fakeClipboard) CanPin() bool { return true }
 
-func (f *fakeClipboard) Pin(id uint64) error { return f.history.Pin(id) }
+func (f *fakeClipboard) Pin(id uint64) error {
+	if f.pinErr != nil {
+		return f.pinErr
+	}
+	return f.history.Pin(id)
+}
 
 func (f *fakeClipboard) Unpin(id uint64) error {
 	f.history.Unpin(id)
@@ -723,6 +732,25 @@ func TestClipboardKbCustom3TogglesThePin(t *testing.T) {
 	f.history.Remove(ids[0])
 	if r, _ := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateKbCustom{N: 3}, "").(launcher.ActionReload); r.State.Message == nil {
 		t.Error("a refused pin must say why")
+	}
+}
+
+// A refused pin is said as its text: what the error holds of markup
+// reaches the message row escaped, and nothing is pinned.
+func TestClipboardARefusedPinIsSaidAsText(t *testing.T) {
+	f, _ := newFakeClipboard(t, [2]string{"text/plain", "keep"})
+	f.pinErr = errors.New(`pinning <b>"keep"</b> & the rest failed`)
+	m := NewClipboard(f)
+	m.Load(bg)
+	r, ok := m.Activate(bg, launcher.RowTarget(0), launcher.ActivateKbCustom{N: togglePin}, "").(launcher.ActionReload)
+	if !ok || r.State.Message == nil {
+		t.Fatalf("a refused pin = %#v, want a reload saying why", r)
+	}
+	if text, ok := pango.PlainText(*r.State.Message); !ok || text != f.pinErr.Error() {
+		t.Errorf("the message %q reads %q (markup parsed: %v), want the error as text: %q", *r.State.Message, text, ok, f.pinErr)
+	}
+	if r.State.Items[0].Flags.Has(launcher.FlagActive) {
+		t.Error("the refused pin shows as pinned")
 	}
 }
 

@@ -219,6 +219,14 @@ type Immediate interface{ Immediate() }
 // returned, so a Sources keeps it.
 type Whole interface{ Whole() }
 
+// Staged marks a provider whose Load publishes in stages, the last its
+// whole list: LoadStaged is that Load, reporting whether the session's
+// end cut it short. One that was not cut published its whole list even
+// when the session ended as it returned, so a Sources keeps it.
+type Staged interface {
+	LoadStaged(ctx context.Context, publish func([]Entry)) (whole bool)
+}
+
 // Answerer is a provider whose rows answer the query rather than being
 // searched through (a calculation, a web search). Answer runs on every
 // query on the engine goroutine, so it must be quick.
@@ -250,7 +258,7 @@ type Level struct {
 	Title string
 	// Placeholder is the empty field's text.
 	Placeholder string
-	// Message is shown above the rows.
+	// Message is shown above the rows, in Pango markup.
 	Message string
 	// Mask shows the field as dots: the input is a secret.
 	Mask bool

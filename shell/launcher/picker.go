@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/launcheripc"
+	"github.com/stubbedev/lys-shell/internal/pango"
 	engine "github.com/stubbedev/lys-shell/service/launcher"
 )
 
@@ -264,7 +265,7 @@ func (p *picker) commit(monitor string) {
 		return
 	}
 	if err := p.walls.Commit(path, monitor); err != nil {
-		p.chrome.setMessage(i18n.T("launcher-failed", i18n.Str("what", i18n.T("launcher-wallpaper-title")), i18n.Str("error", err.Error())))
+		p.chrome.setMessage(pango.Escape(i18n.T("launcher-failed", i18n.Str("what", i18n.T("launcher-wallpaper-title")), i18n.Str("error", err.Error()))))
 		return
 	}
 	p.finish(true, path)

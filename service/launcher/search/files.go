@@ -76,9 +76,13 @@ func (*Files) Spec() Spec {
 	return Spec{Section: SectionFiles, MinQuery: 2, Weight: -8}
 }
 
-// Load implements Provider: what it can have at once first, the walk
-// behind it if the index has gone stale.
-func (f *Files) Load(ctx context.Context, publish func([]Entry)) {
+// Load implements Provider.
+func (f *Files) Load(ctx context.Context, publish func([]Entry)) { f.LoadStaged(ctx, publish) }
+
+// LoadStaged implements Staged: what it can have at once first, the walk
+// behind it if the index has gone stale. Only the session's end cuts it
+// short: a walk its own bounds stopped is as whole as the index gets.
+func (f *Files) LoadStaged(session context.Context, publish func([]Entry)) bool {
 	recent := readRecentFiles(f.cfg.RecentPath, recentFilesMax)
 	indexed, age, err := readFileIndex(f.cfg.CachePath, f.cfg.Now)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -86,18 +90,20 @@ func (f *Files) Load(ctx context.Context, publish func([]Entry)) {
 	}
 	publish(f.entries(recent, indexed))
 	if indexed != nil && age < fileIndexMaxAge {
-		return
+		return true
 	}
-	ctx, cancel := context.WithTimeout(ctx, fileIndexBudget)
+	budget, cancel := context.WithTimeout(session, fileIndexBudget)
 	defer cancel()
-	walked, complete := walkFiles(ctx, f.cfg.Roots, f.cfg.Exclude, fileIndexMax)
-	if ctx.Err() != nil && !complete && len(walked) < len(indexed) {
-		return
+	walked, end := walkFiles(budget, f.cfg.Roots, f.cfg.Exclude, fileIndexMax)
+	whole := end != walkCut || errors.Is(budget.Err(), context.DeadlineExceeded)
+	if end == walkCut && len(walked) < len(indexed) {
+		return whole
 	}
 	publish(f.entries(recent, walked))
 	if err := writeFileIndex(f.cfg.CachePath, walked); err != nil {
 		log.Printf("launcher: file index: %v", err)
 	}
+	return whole
 }
 
 // entries are the rows: recents first and only once. A row shares its
@@ -360,12 +366,25 @@ func writeFileIndex(path string, paths []string) error {
 	})
 }
 
+// walkEnd is why a walk stopped.
+type walkEnd uint8
+
+const (
+	// walkDone listed everything under its roots.
+	walkDone walkEnd = iota
+	// walkFull reached its limit of paths.
+	walkFull
+	// walkCut saw its context end.
+	walkCut
+)
+
 // walkFiles lists files and directories under roots breadth first, up to
-// limit paths, directories marked by a trailing slash; complete is false
-// when a bound stopped it. It skips hidden names and the excluded trees,
-// follows no symlink, and stays on each root's filesystem so a network
-// mount cannot hang it.
-func walkFiles(ctx context.Context, roots, exclude []string, limit int) (paths []string, complete bool) {
+// limit paths, directories marked by a trailing slash, and says why it
+// stopped. It skips hidden names and the excluded trees, follows no
+// symlink, and stays on each root's filesystem so a network mount cannot
+// hang it.
+func walkFiles(ctx context.Context, roots, exclude []string, limit int) ([]string, walkEnd) {
+	var paths []string
 	skip := func(name string) bool {
 		return strings.HasPrefix(name, ".") || skippedDirs[name] || slices.Contains(exclude, name)
 	}
@@ -383,7 +402,7 @@ func walkFiles(ctx context.Context, roots, exclude []string, limit int) (paths [
 	}
 	for len(queue) > 0 {
 		if ctx.Err() != nil {
-			return paths, false
+			return paths, walkCut
 		}
 		d := queue[0]
 		queue = queue[1:]
@@ -413,9 +432,9 @@ func walkFiles(ctx context.Context, roots, exclude []string, limit int) (paths [
 				}
 			}
 			if len(paths) >= limit {
-				return paths, false
+				return paths, walkFull
 			}
 		}
 	}
-	return paths, true
+	return paths, walkDone
 }

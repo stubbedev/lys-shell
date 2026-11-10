@@ -19,6 +19,7 @@ import (
 	"github.com/stubbedev/lys-desktop/glob"
 	"github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-desktop/service/notifications/notifypolicy"
+	"github.com/stubbedev/lys-lib/atomicfile"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/xdg"
 
@@ -212,6 +213,10 @@ type Service struct {
 	// the last queued one is done, which a store read waits for.
 	writes    writeQueue
 	storeTail chan struct{}
+	// detached counts the changes Detach has running; settled closes
+	// once none is.
+	detached int
+	settled  chan struct{}
 	// clock stamps arrivals and arms the countdowns and expiries.
 	clock Clock
 }
@@ -874,7 +879,13 @@ func stateDNDFile() dndFile {
 	return dndFile(filepath.Join(dir, "dnd"))
 }
 
-// load restores the sticky flag; anything but "on" reads off.
+// The sticky flag as the file holds it.
+const (
+	dndOn  = "on"
+	dndOff = "off"
+)
+
+// load restores the sticky flag; anything but dndOn reads off.
 func (f dndFile) load() bool {
 	if f == "" {
 		return false
@@ -883,22 +894,39 @@ func (f dndFile) load() bool {
 	if err != nil {
 		return false
 	}
-	return strings.TrimSpace(string(body)) == "on"
+	return strings.TrimSpace(string(body)) == dndOn
 }
 
-// save mirrors the flag into the state dir; failures are quiet.
-func (f dndFile) save(on bool) {
+// save mirrors the flag into the state dir, the file replaced whole: a
+// reader sees the flag before or the flag after, and a failed save
+// leaves the one before.
+func (f dndFile) save(on bool) error {
 	if f == "" {
-		return
+		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(string(f)), 0o700); err != nil {
-		return
-	}
-	body := "off\n"
+	flag := dndOff
 	if on {
-		body = "on\n"
+		flag = dndOn
 	}
-	_ = os.WriteFile(string(f), []byte(body), 0o600)
+	err := os.MkdirAll(filepath.Dir(string(f)), 0o700)
+	if err == nil {
+		err = atomicfile.WriteFile(string(f), []byte(flag+"\n"), 0o600)
+	}
+	if err != nil {
+		return fmt.Errorf("save do-not-disturb %s: %w", flag, err)
+	}
+	return nil
+}
+
+// saveDNDLocked queues the save of the sticky flag behind the writes
+// queued before it; a failed one is logged, as nothing waits on it. The
+// caller holds mu.
+func (s *Service) saveDNDLocked(on bool) {
+	s.enqueueLocked(func() {
+		if err := s.dnd.save(on); err != nil {
+			log.Printf("notifications: %v", err)
+		}
+	})
 }
 
 // String renders the summary for logs and tests.
@@ -1010,16 +1038,52 @@ func (s *Service) enqueueLocked(job func()) {
 	})
 }
 
-// FlushWrites waits for the writes queued so far, or for timeout. It is for
-// shutdown, off the loop.
-func (s *Service) FlushWrites(timeout time.Duration) {
+// Detach runs change, a call that changes the service, on its own
+// goroutine: a caller on the UI loop waits for neither the store queue
+// nor the bus. FlushWrites waits for it as for the writes it queues.
+func (s *Service) Detach(change func()) {
 	s.mu.Lock()
-	tail := s.storeTail
+	if s.detached == 0 {
+		s.settled = make(chan struct{})
+	}
+	s.detached++
 	s.mu.Unlock()
-	select {
-	case <-tail:
-	case <-time.After(timeout):
-		log.Printf("notifications: a queued write did not finish in %v", timeout)
+	go func() {
+		defer func() {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.detached--
+			if s.detached == 0 {
+				close(s.settled)
+			}
+		}()
+		change()
+	}()
+}
+
+// FlushWrites waits for the detached changes running and the writes
+// queued so far, theirs included, or for timeout. It is for shutdown,
+// off the loop.
+func (s *Service) FlushWrites(timeout time.Duration) {
+	expired := time.After(timeout)
+	for {
+		s.mu.Lock()
+		running, settled, tail := s.detached > 0, s.settled, s.storeTail
+		s.mu.Unlock()
+		if !running {
+			select {
+			case <-tail:
+			case <-expired:
+				log.Printf("notifications: a queued write did not finish in %v", timeout)
+			}
+			return
+		}
+		select {
+		case <-settled:
+		case <-expired:
+			log.Printf("notifications: a detached change did not finish in %v", timeout)
+			return
+		}
 	}
 }
 

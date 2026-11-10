@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-desktop/i18n"
 	"github.com/stubbedev/lys-desktop/settingspage"
 
+	"github.com/stubbedev/lys-shell/internal/pango"
 	"github.com/stubbedev/lys-shell/service/launcher"
 )
 
@@ -83,7 +84,7 @@ func confirmed(run Action) Action {
 	return Action{Title: run.Title, Icon: run.Icon, Run: func(context.Context) Outcome {
 		return Push{Level: &Level{
 			Title:     run.Title,
-			Message:   i18n.T("launcher-system-confirm", i18n.Str("what", run.Title)),
+			Message:   pango.Escape(i18n.T("launcher-system-confirm", i18n.Str("what", run.Title))),
 			Providers: []Provider{&fixedProvider{entries: []Entry{{ID: "confirm", Title: run.Title, Icon: launcher.IconName(run.Icon), Data: run}}}},
 		}}
 	}}
