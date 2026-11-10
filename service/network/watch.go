@@ -8,6 +8,8 @@ import (
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // unwatchTimeout bounds removing a watch's match rules, which runs once
@@ -15,7 +17,8 @@ import (
 const unwatchTimeout = 5 * time.Second
 
 // signalWatch is a signal channel on the bar's shared system connection
-// and the match rules feeding it, held until stop.
+// and the match rules feeding it, held until stop. Its reader discards
+// each signal it has handled: none carries a descriptor it keeps.
 type signalWatch struct {
 	conn    *dbus.Conn
 	signals chan *dbus.Signal
@@ -36,11 +39,11 @@ func watchSignals(ctx context.Context, conn *dbus.Conn, size int, matches ...[]d
 	return w, nil
 }
 
-// stop removes the channel and every rule the watch added, leaving the
-// shared connection as it was before; a closed connection's rules went
-// with it.
+// stop removes the channel, discarding the signals nobody read, and
+// every rule the watch added, leaving the shared connection as it was
+// before; a closed connection's rules went with it.
 func (w *signalWatch) stop() error {
-	w.conn.RemoveSignal(w.signals)
+	bussignal.Remove(w.conn, w.signals)
 	ctx, cancel := context.WithTimeout(context.Background(), unwatchTimeout)
 	defer cancel()
 	var errs []error

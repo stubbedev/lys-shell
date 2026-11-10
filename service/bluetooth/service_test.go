@@ -7,6 +7,8 @@ import (
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // populated is a fake with an unpowered hci0, a powered hci1, one
@@ -502,4 +504,15 @@ func TestCloseEndsSubscriptions(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Errorf("second Close = %v, want nil", err)
 	}
+}
+
+// The service reads BlueZ's signals off a channel of its own and keeps
+// none of the descriptors one carries: each is closed once the signal
+// is handled.
+func TestTheServiceClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
+	f := populated(t)
+	f.service()
+	fd, closed := bussignaltest.Descriptor(t)
+	f.update(dev1, deviceIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)})
+	closed("the service handled a property change carrying a descriptor")
 }

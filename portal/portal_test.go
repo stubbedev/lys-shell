@@ -297,8 +297,17 @@ func TestSettingsFollowTheWallpaperPalette(t *testing.T) {
 	if got := r.changed(t); len(got) != 0 {
 		t.Fatalf("a palette file change alone emitted %v; the extraction signal announces it", got)
 	}
+	if err := wallpaper.ColorsExtracted.Emit(r.bus.Conn(t), wallpaper.ServicePath, struct{}{}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.changed(t); len(got) != 0 {
+		t.Fatalf("an extraction announced by a peer that is not the wallpaper service emitted %v", got)
+	}
 	shell := r.bus.Conn(t)
-	if err := shell.Emit(wallpaper.ServicePath, wallpaper.Interface+".ColorsExtracted"); err != nil {
+	if reply, err := shell.RequestName(wallpaper.ServiceName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
+		t.Fatalf("own %s: %v %v", wallpaper.ServiceName, reply, err)
+	}
+	if err := wallpaper.ColorsExtracted.Emit(shell, wallpaper.ServicePath, struct{}{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.changed(t); !slices.Equal(got, []string{AppearanceNS + " " + keyAccentColor}) {
@@ -307,7 +316,7 @@ func TestSettingsFollowTheWallpaperPalette(t *testing.T) {
 	if v, _ := r.read(AppearanceNS, keyAccentColor); !slices.Equal(v.([]any), []any{1.0, 0x90 / 255.0, 0x40 / 255.0}) {
 		t.Errorf("accent after the extraction = %v, want the new primary", v)
 	}
-	if err := shell.Emit(wallpaper.ServicePath, wallpaper.Interface+".ColorsExtracted"); err != nil {
+	if err := wallpaper.ColorsExtracted.Emit(shell, wallpaper.ServicePath, struct{}{}); err != nil {
 		t.Fatal(err)
 	}
 	if got := r.changed(t); len(got) != 0 {
@@ -663,5 +672,29 @@ func TestHostGTKSettingsReadGTK4sFiles(t *testing.T) {
 	write("gtk-4.0", "[Settings]\ngtk-cursor-theme-name=Vimix\ngtk-cursor-theme-size=22\n")
 	if got := loadGTKSettings(xdg.OS); got.CursorThemeName != "Vimix" || got.CursorThemeSize != 22 {
 		t.Errorf("gtk-4.0 settings = %+v", got)
+	}
+}
+
+// The backend follows the notification daemon and the wallpaper service
+// through watches on its connection, and takes them off when it stops.
+func TestAStoppedBackendLeavesItsConnectionWithoutMatchRules(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv(wmipc.SocketEnv, "")
+	bus := dbustest.Start(t)
+	conn := bus.Conn(t)
+	stop, err := New(conn, config.Load(t.TempDir(), config.DiscardDiagnostics)).Serve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rules := dbustest.MatchRules(t, conn); len(rules) == 0 {
+		stop()
+		t.Fatal("the serving backend holds no match rule: nothing tells it of an action or an extraction")
+	}
+	stop()
+	if rules := dbustest.MatchRules(t, conn); len(rules) != 0 {
+		t.Fatalf("the stopped backend left the match rules %q", rules)
 	}
 }

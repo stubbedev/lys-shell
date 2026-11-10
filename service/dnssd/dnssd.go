@@ -18,6 +18,8 @@ import (
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Avahi's names.
@@ -122,10 +124,8 @@ func instanceOf(body []any) (instance, string, bool) {
 	return instance{iface, proto}, Service{Name: name, Type: typ, Domain: domain}.Key(), true
 }
 
-// run hands over what the browsers announce until Stop. A service is
-// announced once per interface and protocol, each resolved to its own
-// address; found is told the best of them whenever one comes or goes,
-// and removed once the last went.
+// run hands over what the browsers announce until Stop, discarding each
+// signal once it is handled.
 func (b *Browser) run(server dbus.BusObject, found func(Service), removed func(string)) {
 	services := map[string]map[instance]Service{}
 	for {
@@ -136,34 +136,43 @@ func (b *Browser) run(server dbus.BusObject, found func(Service), removed func(s
 			if !ok {
 				return
 			}
-			if !b.ours(sig.Path) {
-				continue
-			}
-			inst, key, ok := instanceOf(sig.Body)
-			if !ok {
-				continue
-			}
-			switch sig.Name {
-			case BrowserIface + ".ItemNew":
-				s, ok := b.resolve(server, inst, sig.Body)
-				if !ok {
-					continue
-				}
-				if services[key] == nil {
-					services[key] = map[instance]Service{}
-				}
-				services[key][inst] = s
-				found(best(services[key]))
-			case BrowserIface + ".ItemRemove":
-				delete(services[key], inst)
-				if len(services[key]) == 0 {
-					delete(services, key)
-					removed(key)
-					continue
-				}
-				found(best(services[key]))
-			}
+			b.announce(sig, services, server, found, removed)
+			bussignal.Discard(sig)
 		}
+	}
+}
+
+// announce takes one browser item into services. A service is
+// announced once per interface and protocol, each resolved to its own
+// address; found is told the best of them whenever one comes or goes,
+// and removed once the last went.
+func (b *Browser) announce(sig *dbus.Signal, services map[string]map[instance]Service, server dbus.BusObject, found func(Service), removed func(string)) {
+	if !b.ours(sig.Path) {
+		return
+	}
+	inst, key, ok := instanceOf(sig.Body)
+	if !ok {
+		return
+	}
+	switch sig.Name {
+	case BrowserIface + ".ItemNew":
+		s, ok := b.resolve(server, inst, sig.Body)
+		if !ok {
+			return
+		}
+		if services[key] == nil {
+			services[key] = map[instance]Service{}
+		}
+		services[key][inst] = s
+		found(best(services[key]))
+	case BrowserIface + ".ItemRemove":
+		delete(services[key], inst)
+		if len(services[key]) == 0 {
+			delete(services, key)
+			removed(key)
+			return
+		}
+		found(best(services[key]))
 	}
 }
 
@@ -261,7 +270,7 @@ func (b *Browser) Stop() error {
 		if err := b.conn.RemoveMatchSignal(browserMatch()...); err != nil {
 			errs = append(errs, fmt.Errorf("dnssd: unwatching browsers: %w", err))
 		}
-		b.conn.RemoveSignal(b.signals)
+		bussignal.Remove(b.conn, b.signals)
 	})
 	return errors.Join(errs...)
 }

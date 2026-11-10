@@ -8,6 +8,8 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // leftOn is what the service holds on conn as the bus and NM see it:
@@ -67,4 +69,16 @@ func TestAStoppedServiceLeavesTheSharedConnectionAsItWas(t *testing.T) {
 		rules, exported, reg = leftOn(t, f, conn)
 		return len(rules) == 0 && !exported && !reg
 	})
+}
+
+// Every reader of the service's connection is handed its own copy of
+// the descriptors a signal carries and keeps none of them: each copy is
+// closed once the signal is handled.
+func TestTheServiceClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
+	fx := startService(t, nil)
+	sender := fx.nm.client()
+	fd, closed := bussignaltest.Descriptor(t)
+	must(t, sender.Emit(settingPath(1), connectionIface+".Updated", fd))
+	must(t, sender.Emit(fakePrimaryPath, activeIface+".StateChanged", fd, uint32(0)))
+	closed("the settings and VPN readers handled signals carrying a descriptor")
 }

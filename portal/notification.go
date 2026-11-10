@@ -113,103 +113,75 @@ func (n *notifier) forget(daemonID uint32) {
 // this portal created, and forgets them when the daemon closes them;
 // the returned func stops it.
 func (n *notifier) forward() (stop func(), err error) {
-	match := []dbus.MatchOption{dbus.WithMatchSender(notifications.Interface), dbus.WithMatchInterface(notifications.Interface)}
-	if err := n.conn.AddMatchSignal(match...); err != nil {
+	watch, err := dbusx.WatchSignals(context.Background(), n.conn, dbusx.FromOwner(notifications.Interface),
+		func(err error) { warnf("notification: %v", err) },
+		dbusx.On(notifications.ActivationToken, notifications.ObjPath, n.activationToken),
+		dbusx.On(notifications.ActionInvoked, notifications.ObjPath, n.actionInvoked),
+		dbusx.On(notifications.NotificationReplied, notifications.ObjPath, n.replied),
+		dbusx.On(notifications.NotificationClosed, notifications.ObjPath, n.closed))
+	if err != nil {
 		return nil, err
 	}
-	signals := make(chan *dbus.Signal, 16)
-	n.conn.Signal(signals)
 	n.listening.Store(true)
-	// godbus closes the channel itself when the connection goes, so the
-	// loop ends on quit or that, and stop never closes it.
-	quit, done := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(done)
-		for {
-			var s *dbus.Signal
-			select {
-			case <-quit:
-				return
-			case s = <-signals:
-			}
-			if s == nil {
-				return
-			}
-			n.handle(s)
-		}
-	}()
 	return func() {
 		n.listening.Store(false)
-		_ = n.conn.RemoveMatchSignal(match...)
-		n.conn.RemoveSignal(signals)
-		close(quit)
-		<-done
+		if err := watch.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+			warnf("notification: %v", err)
+		}
 	}, nil
 }
 
-func (n *notifier) handle(s *dbus.Signal) {
-	switch s.Name {
-	case notifications.Interface + ".ActivationToken":
-		if len(s.Body) != 2 {
-			return
-		}
-		id, _ := s.Body[0].(uint32)
-		token, _ := s.Body[1].(string)
-		n.mu.Lock()
-		if _, ok := n.byDaemon[id]; ok && token != "" {
-			n.tokens[id] = token
-		}
-		n.mu.Unlock()
-	case notifications.Interface + ".ActionInvoked":
-		if len(s.Body) != 2 {
-			return
-		}
-		id, _ := s.Body[0].(uint32)
-		key, _ := s.Body[1].(string)
-		n.mu.Lock()
-		token := n.tokens[id]
-		delete(n.tokens, id)
-		n.mu.Unlock()
-		if n.answer(id, key) {
-			return
-		}
-		n.mu.Lock()
-		sh, ok := n.byDaemon[id]
-		action, known := sh.actions[key]
-		n.mu.Unlock()
-		if !ok || !known {
-			return
-		}
-		parameter := []dbus.Variant{}
-		if action.target != nil {
-			parameter = append(parameter, *action.target)
-		}
-		if token != "" {
-			parameter = append(parameter, dbus.MakeVariant(Vardict{"activation-token": dbus.MakeVariant(token)}))
-		}
-		_ = n.conn.Emit(ObjectPath, NotificationIface+".ActionInvoked", sh.key.appID, sh.key.id, action.name, parameter)
-	case notifications.Interface + ".NotificationReplied":
-		if len(s.Body) != 2 {
-			return
-		}
-		id, _ := s.Body[0].(uint32)
-		text, _ := s.Body[1].(string)
-		n.mu.Lock()
-		sh, ok := n.byDaemon[id]
-		action, known := sh.actions[notifications.InlineReplyActionID]
-		n.mu.Unlock()
-		if ok && known {
-			_ = n.conn.Emit(ObjectPath, NotificationIface+".ActionInvoked", sh.key.appID, sh.key.id, action.name, []dbus.Variant{dbus.MakeVariant(text)})
-		}
-	case notifications.Interface + ".NotificationClosed":
-		if len(s.Body) != 2 {
-			return
-		}
-		if id, ok := s.Body[0].(uint32); ok {
-			n.answer(id, "")
-			n.forget(id)
-		}
+func (n *notifier) activationToken(grant notifications.TokenGrant, _ dbus.Sequence) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if _, ok := n.byDaemon[grant.ID]; ok && grant.Token != "" {
+		n.tokens[grant.ID] = grant.Token
 	}
+	return nil
+}
+
+func (n *notifier) actionInvoked(invoked notifications.ActionInvocation, _ dbus.Sequence) error {
+	id, key := invoked.ID, invoked.Key
+	n.mu.Lock()
+	token := n.tokens[id]
+	delete(n.tokens, id)
+	n.mu.Unlock()
+	if n.answer(id, key) {
+		return nil
+	}
+	n.mu.Lock()
+	sh, ok := n.byDaemon[id]
+	action, known := sh.actions[key]
+	n.mu.Unlock()
+	if !ok || !known {
+		return nil
+	}
+	parameter := []dbus.Variant{}
+	if action.target != nil {
+		parameter = append(parameter, *action.target)
+	}
+	if token != "" {
+		parameter = append(parameter, dbus.MakeVariant(Vardict{"activation-token": dbus.MakeVariant(token)}))
+	}
+	_ = n.conn.Emit(ObjectPath, NotificationIface+".ActionInvoked", sh.key.appID, sh.key.id, action.name, parameter)
+	return nil
+}
+
+func (n *notifier) replied(reply notifications.InlineReply, _ dbus.Sequence) error {
+	n.mu.Lock()
+	sh, ok := n.byDaemon[reply.ID]
+	action, known := sh.actions[notifications.InlineReplyActionID]
+	n.mu.Unlock()
+	if ok && known {
+		_ = n.conn.Emit(ObjectPath, NotificationIface+".ActionInvoked", sh.key.appID, sh.key.id, action.name, []dbus.Variant{dbus.MakeVariant(reply.Text)})
+	}
+	return nil
+}
+
+func (n *notifier) closed(closure notifications.Closure, _ dbus.Sequence) error {
+	n.answer(closure.ID, "")
+	n.forget(closure.ID)
+	return nil
 }
 
 // answer hands key to the ask waiting on daemon notification id;

@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
@@ -455,21 +457,41 @@ func (e *ConnectError) Error() string {
 // ConnectTimeout is how long a connect is watched (CONNECTION_TIMEOUT).
 const ConnectTimeout = 30 * time.Second
 
+// deviceTransition is what a device's StateChanged carries.
+type deviceTransition struct {
+	New    uint32 `dbus:"new_state"`
+	Old    uint32 `dbus:"old_state"`
+	Reason uint32 `dbus:"reason"`
+}
+
+var deviceStateChanged = dbusx.NewSignal[deviceTransition](deviceIface, "StateChanged")
+
 // ConnectAndWait connects and follows the device until it is up, fails,
 // or ConnectTimeout passes, reporting each intermediate state to
-// progress (the connection watcher). Subscribed before connecting, so
-// a fast activation is not missed.
+// progress (the connection watcher) from the caller's goroutine.
+// Subscribed before connecting, so a fast activation is not missed.
 func (w *Wifi) ConnectAndWait(ctx context.Context, apPath dbus.ObjectPath, password string, progress func(DeviceState)) error {
 	ctx, cancel := context.WithTimeout(ctx, ConnectTimeout)
 	defer cancel()
-	signals := make(chan *dbus.Signal, 32)
-	w.nm.conn.Signal(signals)
-	defer w.nm.conn.RemoveSignal(signals)
-	match := []dbus.MatchOption{dbus.WithMatchObjectPath(w.Device), dbus.WithMatchInterface(deviceIface), dbus.WithMatchMember("StateChanged")}
-	if err := w.nm.conn.AddMatchSignalContext(ctx, match...); err != nil {
+	transitions := make(chan deviceTransition, 32)
+	watch, err := dbusx.WatchSignals(ctx, w.nm.conn, dbusx.FromOwner(BusName),
+		func(err error) { log.Printf("network: %v", err) },
+		dbusx.On(deviceStateChanged, w.Device, func(change deviceTransition, _ dbus.Sequence) error {
+			select {
+			case transitions <- change:
+			case <-ctx.Done():
+			}
+			return nil
+		}))
+	if err != nil {
 		return fmt.Errorf("cannot watch the device: %w", err)
 	}
-	defer func() { _ = w.nm.conn.RemoveMatchSignal(match...) }()
+	defer func() {
+		cancel()
+		if err := watch.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+			log.Printf("network: %v", err)
+		}
+	}()
 	if _, err := w.Connect(ctx, apPath, password); err != nil {
 		return err
 	}
@@ -480,13 +502,8 @@ func (w *Wifi) ConnectAndWait(ctx context.Context, apPath dbus.ObjectPath, passw
 				return &ConnectError{Failure: FailureTimeout}
 			}
 			return ctx.Err()
-		case sig := <-signals:
-			if sig.Path != w.Device || sig.Name != deviceIface+".StateChanged" || len(sig.Body) != 3 {
-				continue
-			}
-			state, _ := sig.Body[0].(uint32)
-			reason, _ := sig.Body[2].(uint32)
-			done, err := deviceStep(DeviceState(state), DeviceReason(reason), progress)
+		case change := <-transitions:
+			done, err := deviceStep(DeviceState(change.New), DeviceReason(change.Reason), progress)
 			if done {
 				return err
 			}

@@ -10,6 +10,7 @@ import (
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/service/udisks/udiskstest"
 )
@@ -187,4 +188,45 @@ func TestWatchFollowsHotplug(t *testing.T) {
 		t.Error("a change after stop was reported")
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+// The watch reads UDisks2's signals off a channel of its own and keeps
+// none of the descriptors one carries: each is closed once the signal
+// is handled, and those of the signals unread when it stops are closed
+// with it.
+func TestWatchClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
+	u := udiskstest.Start(t)
+	conn := u.Client(t)
+	c := udisks.New(conn)
+	entered, release := make(chan struct{}, 1), make(chan struct{})
+	stop, err := c.Watch(func() {
+		select {
+		case entered <- struct{}{}:
+		default:
+		}
+		<-release
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	change := func(fd dbus.UnixFD) {
+		u.Emit(t, stickPart, "org.freedesktop.DBus.Properties.PropertiesChanged",
+			udisks.BlockIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)}, []string{})
+	}
+	handled, handledClosed := bussignaltest.Descriptor(t)
+	change(handled)
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the watch did not report the change")
+	}
+	unread, unreadClosed := bussignaltest.Descriptor(t)
+	change(unread)
+	if err := conn.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
+		t.Fatalf("wait for the connection to read the signal: %v", err)
+	}
+	stop()
+	unreadClosed("the watch stopped with a signal unread")
+	close(release)
+	handledClosed("the watch handled a property change carrying a descriptor")
 }

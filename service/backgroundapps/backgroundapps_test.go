@@ -12,6 +12,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // Monitor is a fake org.freedesktop.background.Monitor.
@@ -169,4 +171,22 @@ func TestNoMonitorListsNothingAndLogsOnce(t *testing.T) {
 	m := serveMonitor(t, bus.Conn(t))
 	m.set(t, entry("org.gnome.Fractal", "5", ""))
 	waitFor(t, apps, "the monitor appearing", func(l []App) bool { return len(l) == 1 })
+}
+
+// The apps read the monitor's signals off a channel of their own and
+// keep none of the descriptors one carries: each is closed once the
+// signal is handled.
+func TestAppsCloseTheDescriptorsOfTheSignalsTheyRead(t *testing.T) {
+	bus := dbustest.Start(t)
+	m := serveMonitor(t, bus.Conn(t))
+	apps, err := Follow(bus.Conn(t), describe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer apps.Close()
+	fd, closed := bussignaltest.Descriptor(t)
+	if err := m.conn.Emit(Path, propertiesChanged, Interface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)}, []string{}); err != nil {
+		t.Fatal(err)
+	}
+	closed("the apps handled a property change carrying a descriptor")
 }

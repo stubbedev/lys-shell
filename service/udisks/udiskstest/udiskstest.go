@@ -68,6 +68,18 @@ func Start(t *testing.T) *UDisks {
 // Client is a connection to the fake's bus, for udisks.New.
 func (u *UDisks) Client(t *testing.T) *dbus.Conn { return u.Bus.Conn(t) }
 
+// Emit sends the signal name from UDisks2's object at path, carrying
+// args, and returns once the bus has routed it.
+func (u *UDisks) Emit(t *testing.T, path dbus.ObjectPath, name string, args ...any) {
+	t.Helper()
+	if err := u.conn.Emit(path, name, args...); err != nil {
+		t.Fatalf("udiskstest: emit %s at %s: %v", name, path, err)
+	}
+	if err := u.conn.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
+		t.Fatalf("udiskstest: wait for the bus to route %s: %v", name, err)
+	}
+}
+
 // Drive is a drive the test adds.
 type Drive struct {
 	Removable, Ejectable, CanPowerOff bool

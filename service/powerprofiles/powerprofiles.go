@@ -9,7 +9,10 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Profile names as the daemon spells them.
@@ -124,49 +127,21 @@ func (s *System) SetActive(ctx context.Context, profile string) error {
 		dbus.MakeVariant(profile)).Err
 }
 
-// Subscribe matches the daemon's PropertiesChanged.
+// Subscribe ticks on the daemon's PropertiesChanged.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	if err := s.conn.AddMatchSignal(daemonMatch()...); err != nil {
-		return nil, nil, fmt.Errorf("powerprofiles: match properties: %w", err)
-	}
-	ticks := make(chan struct{}, 1)
-	signals := make(chan *dbus.Signal, 8)
-	s.conn.Signal(signals)
-	go func() {
-		defer close(ticks)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case sig, ok := <-signals:
-				if !ok {
-					return
-				}
-				if !daemonChanged(sig) {
-					continue
-				}
-				select {
-				case ticks <- struct{}{}:
-				default:
-				}
-			}
-		}
-	}()
-	stop := func() {
-		_ = s.conn.RemoveMatchSignal(daemonMatch()...)
-		s.conn.RemoveSignal(signals)
+	ticks, stop, err := bussignal.Ticks(ctx, s.conn, dbusx.FromOwner(BusName), "powerprofiles", daemonRoutes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("powerprofiles: %w", err)
 	}
 	return ticks, stop, nil
 }
 
-func daemonMatch() []dbus.MatchOption {
-	return []dbus.MatchOption{dbus.WithMatchInterface(properties), dbus.WithMatchArg(0, daemonIface), dbus.WithMatchSender(BusName)}
-}
-
-func daemonChanged(sig *dbus.Signal) bool {
-	if sig.Path != daemonPath || sig.Name != properties+".PropertiesChanged" || len(sig.Body) == 0 {
-		return false
+// daemonRoutes call changed for a change of the daemon's properties.
+func daemonRoutes(changed func()) []dbusx.Route {
+	return []dbusx.Route{
+		dbusx.On(dbusx.PropertiesChanged, daemonPath, func(dbusx.ChangedProperties, dbus.Sequence) error {
+			changed()
+			return nil
+		}).WithArg0(daemonIface),
 	}
-	iface, ok := sig.Body[0].(string)
-	return ok && iface == daemonIface
 }

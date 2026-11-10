@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -479,38 +480,19 @@ func watchFiles(paths []string, changed func()) (stop func(), err error) {
 // watchColorsExtracted runs extracted for every ColorsExtracted the
 // shell's wallpaper service emits; the returned func stops.
 func watchColorsExtracted(conn *dbus.Conn, extracted func()) (stop func(), err error) {
-	match := []dbus.MatchOption{
-		dbus.WithMatchInterface(wallpaper.Interface),
-		dbus.WithMatchMember("ColorsExtracted"),
-		dbus.WithMatchObjectPath(wallpaper.ServicePath),
+	watch, err := dbusx.WatchSignals(context.Background(), conn, dbusx.FromOwner(wallpaper.ServiceName),
+		func(err error) { warnf("settings: %v", err) },
+		dbusx.On(wallpaper.ColorsExtracted, wallpaper.ServicePath, func(struct{}, dbus.Sequence) error {
+			extracted()
+			return nil
+		}))
+	if err != nil {
+		return nil, fmt.Errorf("subscribing to %s: %w", wallpaper.ColorsExtracted.Name(), err)
 	}
-	if err := conn.AddMatchSignal(match...); err != nil {
-		return nil, fmt.Errorf("subscribing to %s.ColorsExtracted: %w", wallpaper.Interface, err)
-	}
-	signals := make(chan *dbus.Signal, 8)
-	conn.Signal(signals)
-	quit, done := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(done)
-		for {
-			select {
-			case <-quit:
-				return
-			case sig := <-signals:
-				if sig == nil {
-					return
-				}
-				if sig.Name == wallpaper.Interface+".ColorsExtracted" && sig.Path == wallpaper.ServicePath {
-					extracted()
-				}
-			}
-		}
-	}()
 	return func() {
-		close(quit)
-		<-done
-		_ = conn.RemoveMatchSignal(match...)
-		conn.RemoveSignal(signals)
+		if err := watch.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+			warnf("settings: %v", err)
+		}
 	}, nil
 }
 

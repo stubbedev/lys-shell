@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
@@ -249,6 +250,36 @@ func TestConnectAndWaitNamesAWrongPassword(t *testing.T) {
 	err := <-done
 	if ce, ok := errors.AsType[*ConnectError](err); !ok || ce.Failure != FailureAuth {
 		t.Errorf("err = %v, want an auth failure", err)
+	}
+}
+
+// Only NetworkManager moves the device: a peer that announces the
+// device activated does not end a connect that NM then fails, and the
+// connect's watch leaves the service's connection as it found it.
+func TestConnectAndWaitFollowsNetworkManagerOnly(t *testing.T) {
+	fx, w := wifiFixture(t, nil)
+	ap := fx.nm.wifi.addAP(fakeAP{ssid: "cafe", strength: 50, rsn: secKeyMgmtPSK})
+	before := dbustest.MatchRules(t, w.nm.conn)
+	done := make(chan error, 1)
+	go func() { done <- w.ConnectAndWait(t.Context(), ap, "wrong", nil) }()
+	waitFor(t, "the activation", func() bool { fx.nm.mu.Lock(); defer fx.nm.mu.Unlock(); return len(fx.nm.addAndActive) == 1 })
+	impostor := fx.nm.client()
+	must(t, impostor.Emit(fakeWifiPath, deviceIface+".StateChanged", uint32(DeviceActivated), uint32(DeviceIPConfig), uint32(DeviceReasonNone)))
+	must(t, impostor.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err)
+	fx.nm.wifi.deviceState(DeviceFailed, DeviceReasonNoSecrets)
+	select {
+	case err := <-done:
+		if ce, ok := errors.AsType[*ConnectError](err); !ok || ce.Failure != FailureAuth {
+			t.Fatalf("err = %v, want NM's auth failure: the impostor's activation ended the connect", err)
+		}
+	case <-time.After(liveness):
+		t.Fatal("the connect never finished")
+	}
+	after := dbustest.MatchRules(t, w.nm.conn)
+	slices.Sort(before)
+	slices.Sort(after)
+	if !slices.Equal(after, before) {
+		t.Fatalf("the connect left the match rules %q, want the %q before it", after, before)
 	}
 }
 

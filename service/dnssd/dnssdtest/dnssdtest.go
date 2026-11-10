@@ -53,6 +53,15 @@ func Start(t *testing.T) *Avahi {
 	return a
 }
 
+// Emit sends the signal name from Avahi's object at path, carrying
+// args.
+func (a *Avahi) Emit(t *testing.T, path dbus.ObjectPath, name string, args ...any) {
+	t.Helper()
+	if err := a.conn.Emit(path, name, args...); err != nil {
+		t.Fatalf("dnssdtest: emit %s at %s: %v", name, path, err)
+	}
+}
+
 // instance is the interface and protocol s is announced on: its
 // address's zone (an interface name) or defaultIface, and its family.
 func instance(s dnssd.Service) (int32, int32, error) {

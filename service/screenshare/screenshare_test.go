@@ -7,6 +7,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 type portal struct{ shares []Share }
@@ -52,4 +54,27 @@ func TestSharesFollowThePortalComingAndGoing(t *testing.T) {
 	}
 	release()
 	waitList(t, shares, 0)
+}
+
+// The shares read the portal's signals off a channel of their own and
+// keep none of the descriptors one carries: each is closed once the
+// signal is handled.
+func TestSharesCloseTheDescriptorsOfTheSignalsTheyRead(t *testing.T) {
+	bus := dbustest.Start(t)
+	shares, err := Follow(bus.Conn(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer shares.Close()
+	served := bus.Conn(t)
+	release, err := dbusx.Serve(served, dbusx.Service{Name: BusName, Path: Path, Interface: Interface, Methods: portal{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	fd, closed := bussignaltest.Descriptor(t)
+	if err := served.Emit(Path, Interface+".Handed", fd); err != nil {
+		t.Fatal(err)
+	}
+	closed("the shares handled a signal carrying a descriptor")
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/service/dnssd/dnssdtest"
 )
@@ -133,4 +134,23 @@ func TestBrowseFollowsEveryAddress(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the service gone from every address was not removed")
 	}
+}
+
+// A browse reads Avahi's signals off a channel of its own and keeps
+// none of the descriptors one carries: each is closed once the signal
+// is handled.
+func TestBrowseClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
+	a := dnssdtest.Start(t)
+	b, err := dnssd.New(a.Bus.Conn(t)).Browse(context.Background(), []string{"_ipps._tcp"}, func(dnssd.Service) {}, func(string) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := b.Stop(); err != nil {
+			t.Error(err)
+		}
+	}()
+	fd, closed := bussignaltest.Descriptor(t)
+	a.Emit(t, "/Client0/ServiceBrowser9", dnssd.BrowserIface+".ItemNew", fd)
+	closed("the browse handled a signal carrying a descriptor")
 }

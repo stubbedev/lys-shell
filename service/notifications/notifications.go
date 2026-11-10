@@ -690,7 +690,7 @@ func (s *Service) announce(c *closing) {
 		return
 	}
 	for _, id := range removed {
-		c.emit(Interface+".NotificationClosed", id, uint32(c.reason))
+		c.emit(NotificationClosed.Name(), id, uint32(c.reason))
 	}
 }
 
@@ -714,9 +714,9 @@ func (s *Service) InvokeAction(id uint32, key, token string) {
 	resident := n != nil && n.Resident
 	if emit != nil {
 		if token != "" {
-			emit(Interface+".ActivationToken", id, token)
+			emit(ActivationToken.Name(), id, token)
 		}
-		emit(Interface+".ActionInvoked", id, key)
+		emit(ActionInvoked.Name(), id, key)
 	}
 	if !resident {
 		s.Close(id, ClosedCall)
@@ -1160,7 +1160,7 @@ func (s *Service) Reply(id uint32, text string) bool {
 		return false
 	}
 	if emit != nil {
-		emit(Interface+".NotificationReplied", id, text)
+		emit(NotificationReplied.Name(), id, text)
 	}
 	s.Close(id, Dismissed)
 	return true

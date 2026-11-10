@@ -17,6 +17,8 @@ import (
 
 	"github.com/stubbedev/lys-desktop/feed"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Source is the UI's seam onto the service: the live state, change
@@ -153,7 +155,7 @@ func (s *Service) follow() error {
 	}
 	s.conn.Signal(s.signals)
 	if err := s.discover(); err != nil {
-		s.conn.RemoveSignal(s.signals)
+		bussignal.Remove(s.conn, s.signals)
 		return errors.Join(err, s.removeMatches(len(matchRules())))
 	}
 	return nil
@@ -186,7 +188,7 @@ func (s *Service) Close() error {
 	default:
 	}
 	close(s.done)
-	s.conn.RemoveSignal(s.signals)
+	bussignal.Remove(s.conn, s.signals)
 	s.wg.Wait()
 	s.withdraw(func(pending) agentAnswer { return canceled() })
 	s.ticks.Close()
@@ -235,6 +237,7 @@ func (s *Service) run() {
 				return
 			}
 			s.handle(sig)
+			bussignal.Discard(sig)
 		}
 	}
 }

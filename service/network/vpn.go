@@ -17,6 +17,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // This file is VPN state and control with NetworkManager as the single
@@ -540,6 +542,7 @@ func (s *VPNService) run(ctx context.Context, signals chan *dbus.Signal, profile
 				return
 			}
 			s.signal(ctx, sig, sleep, restart)
+			bussignal.Discard(sig)
 		}
 	}
 }

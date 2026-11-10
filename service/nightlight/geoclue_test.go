@@ -32,6 +32,10 @@ type fakeGeoClue struct {
 	released   chan struct{}
 	noFix      bool
 	deleted    chan dbus.ObjectPath
+	// impostor has another peer announce a fix as the client starts;
+	// stranger is that peer.
+	impostor bool
+	stranger *dbus.Conn
 }
 
 type agentRegistration struct {
@@ -65,6 +69,12 @@ func (g *fakeGeoClue) AddAgent(sender dbus.Sender, id string) *dbus.Error {
 type fakeGeoClient struct{ g *fakeGeoClue }
 
 func (c *fakeGeoClient) Start() *dbus.Error {
+	if c.g.stranger != nil {
+		if err := c.g.stranger.Emit("/org/freedesktop/GeoClue2/Client/1", geoclueClient+".LocationUpdated",
+			dbus.ObjectPath("/"), dbus.ObjectPath("/org/freedesktop/GeoClue2/Location/1")); err != nil {
+			return dbus.MakeFailedError(err)
+		}
+	}
 	if c.g.noFix {
 		return nil
 	}
@@ -90,6 +100,9 @@ func serveFakeGeoClue(t *testing.T, g *fakeGeoClue, latitude, longitude float64)
 	bus := dbustest.Start(t)
 	daemon := bus.Conn(t)
 	g.conn = daemon
+	if g.impostor {
+		g.stranger = bus.Conn(t)
+	}
 	g.agents = make(chan agentRegistration, 1)
 	g.deleted = make(chan dbus.ObjectPath, 4)
 	g.released = make(chan struct{})
@@ -381,5 +394,18 @@ func TestALookupOnASharedConnectionDeletesItsClient(t *testing.T) {
 	}
 	if err := conn.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
 		t.Fatalf("the lookup closed the shared connection: %v", err)
+	}
+	if rules := dbustest.MatchRules(t, conn); len(rules) != 0 {
+		t.Fatalf("the lookups left the match rules %q on the shared connection", rules)
+	}
+}
+
+// Only GeoClue places the machine: a fix another peer announces on the
+// client's path is not one, and the lookup ends without a location.
+func TestQueryLocationTakesItsFixFromGeoClueOnly(t *testing.T) {
+	_, conn := serveFakeGeoClue(t, &fakeGeoClue{noFix: true, impostor: true}, 55.6761, 12.5683)
+	loc, err := queryLocation(context.Background(), conn, quickWaits)
+	if err == nil || !strings.Contains(err.Error(), "no location fix") {
+		t.Fatalf("queryLocation = %+v, %v; want no fix: the impostor's announcement placed the machine", loc, err)
 	}
 }

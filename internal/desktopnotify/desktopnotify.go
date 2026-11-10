@@ -11,11 +11,13 @@ import (
 	"time"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 const (
-	busName = "org.freedesktop.Notifications"
-	path    = "/org/freedesktop/Notifications"
+	busName = notifications.Interface
+	path    = notifications.ObjPath
 	method  = busName + ".Notify"
 )
 

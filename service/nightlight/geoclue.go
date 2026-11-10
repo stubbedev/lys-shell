@@ -9,6 +9,7 @@ import (
 
 	desktopidentity "github.com/stubbedev/lys-desktop/identity"
 	"github.com/stubbedev/lys-desktop/service/nightlight/nightschedule"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
 )
@@ -139,14 +140,24 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (ni
 	if err := set("RequestedAccuracyLevel", accuracyCity); err != nil {
 		return nightschedule.Location{}, fmt.Errorf("geoclue: accuracy: %w", err)
 	}
-	match := []dbus.MatchOption{dbus.WithMatchObjectPath(clientPath), dbus.WithMatchInterface(geoclueClient), dbus.WithMatchMember("LocationUpdated")}
-	if err := conn.AddMatchSignal(match...); err != nil {
-		return nightschedule.Location{}, fmt.Errorf("geoclue: match: %w", err)
+	fixes := make(chan dbus.ObjectPath, 1)
+	watch, err := dbusx.WatchSignals(ctx, conn, dbusx.FromOwner(geoclueService),
+		func(err error) { log.Printf("geoclue: %v", err) },
+		dbusx.On(locationUpdated, clientPath, func(update locationUpdate, _ dbus.Sequence) error {
+			select {
+			case fixes <- update.New:
+			default:
+			}
+			return nil
+		}))
+	if err != nil {
+		return nightschedule.Location{}, fmt.Errorf("geoclue: %w", err)
 	}
-	defer func() { _ = conn.RemoveMatchSignal(match...) }()
-	signals := make(chan *dbus.Signal, 4)
-	conn.Signal(signals)
-	defer conn.RemoveSignal(signals)
+	defer func() {
+		if err := watch.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+			log.Printf("geoclue: %v", err)
+		}
+	}()
 	stop := func() { _ = client.CallWithContext(context.Background(), geoclueClient+".Stop", 0).Err }
 	if err := client.CallWithContext(ctx, geoclueClient+".Start", 0).Err; err != nil {
 		return nightschedule.Location{}, fmt.Errorf("geoclue: start: %w", err)
@@ -154,24 +165,24 @@ func queryLocation(ctx context.Context, conn *dbus.Conn, waits geoclueWaits) (ni
 	defer stop()
 	deadline := time.NewTimer(waits.fix)
 	defer deadline.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nightschedule.Location{}, fmt.Errorf("geoclue: wait for a location fix: %w", ctx.Err())
-		case <-deadline.C:
-			return nightschedule.Location{}, fmt.Errorf("geoclue: no location fix within %s: the likely cause, not a certain one, is that GeoClue has no source that can place this machine; check the wifi url and the static source in %s, or set latitude and longitude", waits.fix, geoclueConfigFiles)
-		case sig := <-signals:
-			if sig.Path != clientPath || sig.Name != geoclueClient+".LocationUpdated" || len(sig.Body) != 2 {
-				continue
-			}
-			locPath, ok := sig.Body[1].(dbus.ObjectPath)
-			if !ok {
-				continue
-			}
-			return readLocation(ctx, conn.Object(geoclueService, locPath))
-		}
+	select {
+	case <-ctx.Done():
+		return nightschedule.Location{}, fmt.Errorf("geoclue: wait for a location fix: %w", ctx.Err())
+	case <-deadline.C:
+		return nightschedule.Location{}, fmt.Errorf("geoclue: no location fix within %s: the likely cause, not a certain one, is that GeoClue has no source that can place this machine; check the wifi url and the static source in %s, or set latitude and longitude", waits.fix, geoclueConfigFiles)
+	case fix := <-fixes:
+		return readLocation(ctx, conn.Object(geoclueService, fix))
 	}
 }
+
+// locationUpdate is what a client's LocationUpdated carries: the
+// Location objects of the fix before and the fix now.
+type locationUpdate struct {
+	Old dbus.ObjectPath `dbus:"old"`
+	New dbus.ObjectPath `dbus:"new"`
+}
+
+var locationUpdated = dbusx.NewSignal[locationUpdate](geoclueClient, "LocationUpdated")
 
 // readLocation reads the Latitude and Longitude of a Location object.
 func readLocation(ctx context.Context, obj dbus.BusObject) (nightschedule.Location, error) {

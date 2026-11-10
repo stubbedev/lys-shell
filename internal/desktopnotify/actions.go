@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 // Action is one notification button: Key is what Ask reports, Label
@@ -16,22 +19,56 @@ type Action struct {
 	Label string
 }
 
+// outcome is what the daemon said of one notification: the key of the
+// button pressed, or that it closed.
+type outcome struct {
+	id      uint32
+	key     string
+	pressed bool
+	said    dbus.Sequence
+}
+
 // Ask posts a notification with buttons and waits for the user
 // (notify.rs's notify_with_actions + NotifyReceipt::action): the key of
 // the button pressed, or ok=false when the notification closed or
 // expired without one, or ctx ended first. timeout is the daemon's
 // expire timeout. The icon also goes in the image-path hint, as
-// libnotify does, which lys-shell's own popup reads.
+// libnotify does, which lys-shell's own popup reads. Only what the
+// daemon says after it answered Notify is about this notification: an
+// id it used before may be the one it hands out again.
 func (s *Sender) Ask(ctx context.Context, appName, summary, body, appIcon string, actions []Action, timeout time.Duration) (key string, ok bool, err error) {
-	// Subscribe before sending, so the answer cannot race the id.
-	match := []dbus.MatchOption{dbus.WithMatchInterface(busName), dbus.WithMatchObjectPath(path)}
-	if err := s.conn.AddMatchSignal(match...); err != nil {
-		return "", false, fmt.Errorf("desktopnotify: match signals: %w", err)
+	watching, stopWatching := context.WithCancel(ctx)
+	defer stopWatching()
+	outcomes, unreadable := make(chan outcome, 16), make(chan error, 1)
+	tell := func(o outcome) {
+		select {
+		case outcomes <- o:
+		case <-watching.Done():
+		}
 	}
-	defer func() { _ = s.conn.RemoveMatchSignal(match...) }()
-	signals := make(chan *dbus.Signal, 16)
-	s.conn.Signal(signals)
-	defer s.conn.RemoveSignal(signals)
+	// Watching before sending, so the answer cannot race the id.
+	watch, err := dbusx.WatchSignals(watching, s.conn, dbusx.FromOwner(busName),
+		func(err error) {
+			select {
+			case unreadable <- err:
+			default:
+			}
+		},
+		dbusx.On(notifications.ActionInvoked, path, func(invoked notifications.ActionInvocation, said dbus.Sequence) error {
+			tell(outcome{id: invoked.ID, key: invoked.Key, pressed: true, said: said})
+			return nil
+		}),
+		dbusx.On(notifications.NotificationClosed, path, func(closure notifications.Closure, said dbus.Sequence) error {
+			tell(outcome{id: closure.ID, said: said})
+			return nil
+		}))
+	if err != nil {
+		return "", false, fmt.Errorf("desktopnotify: %w", err)
+	}
+	defer func() {
+		stopWatching()
+		_ = watch.Stop()
+	}()
 
 	flat := make([]string, 0, 2*len(actions))
 	for _, a := range actions {
@@ -51,26 +88,15 @@ func (s *Sender) Ask(ctx context.Context, appName, summary, body, appIcon string
 		select {
 		case <-ctx.Done():
 			return "", false, nil
-		case sig, open := <-signals:
-			if !open {
-				return "", false, nil
-			}
-			if len(sig.Body) == 0 {
+		case <-watch.Done():
+			return "", false, nil
+		case err := <-unreadable:
+			return "", false, fmt.Errorf("desktopnotify: %w", err)
+		case o := <-outcomes:
+			if o.id != id || o.said < call.ResponseSequence {
 				continue
 			}
-			if got, _ := sig.Body[0].(uint32); got != id {
-				continue
-			}
-			switch sig.Name {
-			case busName + ".ActionInvoked":
-				if len(sig.Body) > 1 {
-					if key, isString := sig.Body[1].(string); isString {
-						return key, true, nil
-					}
-				}
-			case busName + ".NotificationClosed":
-				return "", false, nil
-			}
+			return o.key, o.pressed, nil
 		}
 	}
 }

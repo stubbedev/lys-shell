@@ -11,6 +11,8 @@ import (
 
 	"github.com/stubbedev/lys-desktop/feed"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Profile is one saved NetworkManager connection, the fields of
@@ -105,6 +107,7 @@ func (s *Settings) follow(ctx context.Context, signals chan *dbus.Signal) {
 				return
 			}
 			s.handle(ctx, sig)
+			bussignal.Discard(sig)
 		}
 	}
 }

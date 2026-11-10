@@ -13,6 +13,8 @@ import (
 	"github.com/stubbedev/lys-desktop/feed"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // D-Bus identity: the portal backend's name and object, where Interface
@@ -80,18 +82,18 @@ func Follow(conn *dbus.Conn) (*Shares, error) {
 	conn.Signal(signals)
 	match := []dbus.MatchOption{dbus.WithMatchSender(BusName), dbus.WithMatchObjectPath(Path), dbus.WithMatchInterface(Interface)}
 	if err := conn.AddMatchSignalContext(ctx, match...); err != nil {
-		conn.RemoveSignal(signals)
+		bussignal.Remove(conn, signals)
 		cancel()
 		return nil, fmt.Errorf("screen shares: watch %s: %w", Interface, err)
 	}
 	if err := conn.AddMatchSignalContext(ctx, dbusx.OwnerMatch(BusName)...); err != nil {
-		conn.RemoveSignal(signals)
+		bussignal.Remove(conn, signals)
 		cancel()
 		return nil, fmt.Errorf("screen shares: watch %s: %w", BusName, err)
 	}
 	s.refresh(ctx)
 	go func() {
-		defer conn.RemoveSignal(signals)
+		defer bussignal.Remove(conn, signals)
 		for {
 			select {
 			case <-ctx.Done():
@@ -103,6 +105,7 @@ func Follow(conn *dbus.Conn) (*Shares, error) {
 				if _, _, isOwner := dbusx.NameOwnerChange(sig, BusName); isOwner || sig.Name == Changed.Name() {
 					s.refresh(ctx)
 				}
+				bussignal.Discard(sig)
 			}
 		}
 	}()

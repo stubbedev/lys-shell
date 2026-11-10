@@ -14,6 +14,8 @@ import (
 	"unsafe"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // The UDisks2 names a client talks to.
@@ -198,6 +200,7 @@ func (c *Client) Watch(changed func()) (stop func(), err error) {
 					(sig.Name == propertiesIface+".PropertiesChanged" && udisksObject(sig.Path)) {
 					changed()
 				}
+				bussignal.Discard(sig)
 			}
 		}
 	}()
@@ -205,7 +208,7 @@ func (c *Client) Watch(changed func()) (stop func(), err error) {
 		for _, rule := range rules {
 			_ = c.conn.RemoveMatchSignal(rule...)
 		}
-		c.conn.RemoveSignal(signals)
+		bussignal.Remove(c.conn, signals)
 		close(done)
 	}, nil
 }

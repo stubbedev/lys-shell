@@ -15,6 +15,8 @@ import (
 	"github.com/stubbedev/lys-desktop/feed"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // D-Bus identity of the frontend's background monitor.
@@ -76,7 +78,7 @@ func Follow(conn *dbus.Conn, describe Describe) (*Apps, error) {
 	}
 	for _, m := range matches {
 		if err := conn.AddMatchSignalContext(ctx, m...); err != nil {
-			conn.RemoveSignal(signals)
+			bussignal.Remove(conn, signals)
 			cancel()
 			return nil, fmt.Errorf("background apps: watch %s: %w", BusName, err)
 		}
@@ -84,7 +86,7 @@ func Follow(conn *dbus.Conn, describe Describe) (*Apps, error) {
 	a.refresh(ctx)
 	go func() {
 		defer close(a.done)
-		defer conn.RemoveSignal(signals)
+		defer bussignal.Remove(conn, signals)
 		for {
 			select {
 			case <-ctx.Done():
@@ -96,6 +98,7 @@ func Follow(conn *dbus.Conn, describe Describe) (*Apps, error) {
 				if a.concerns(sig) {
 					a.refresh(ctx)
 				}
+				bussignal.Discard(sig)
 			}
 		}
 	}()

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/introspect"
 )
@@ -15,6 +16,10 @@ const (
 	ServicePath = dbus.ObjectPath("/dev/stubbe/lys/Wallpaper")
 	Interface   = "dev.stubbe.lys.Wallpaper1"
 )
+
+// ColorsExtracted is the signal the service sends from ServicePath each
+// time an extraction finished.
+var ColorsExtracted = dbusx.NewSignal[struct{}](Interface, "ColorsExtracted")
 
 const (
 	errFailed      = "org.freedesktop.DBus.Error.Failed"
@@ -82,7 +87,7 @@ func Export(conn *dbus.Conn, svc *Service) (func(), error) {
 			case <-done:
 				return
 			case <-extracted:
-				_ = conn.Emit(ServicePath, Interface+".ColorsExtracted")
+				_ = ColorsExtracted.Emit(conn, ServicePath, struct{}{})
 			}
 		}
 	}()

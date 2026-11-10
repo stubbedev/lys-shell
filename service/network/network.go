@@ -8,9 +8,11 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 const (
@@ -203,47 +205,35 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 	return snap, nil
 }
 
-// Subscribe matches NM's StateChanged plus property changes on the
+// Subscribe ticks on NM's StateChanged and on property changes of the
 // manager object.
 func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	if err := s.conn.AddMatchSignal(managerPropertiesMatch()...); err != nil {
-		return nil, nil, fmt.Errorf("network: match signal: %w", err)
-	}
-	if err := s.conn.AddMatchSignal(managerStateMatch()...); err != nil {
-		_ = s.conn.RemoveMatchSignal(managerPropertiesMatch()...)
-		return nil, nil, fmt.Errorf("network: match state signal: %w", err)
-	}
-	ticks := make(chan struct{}, 1)
-	signals := make(chan *dbus.Signal, 32)
-	s.conn.Signal(signals)
-	go func() {
-		defer close(ticks)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case sig, ok := <-signals:
-				if !ok {
-					return
-				}
-				if managerChanged(sig) {
-					tick(ticks)
-				}
-			}
-		}
-	}()
-	stop := func() {
-		_ = s.conn.RemoveMatchSignal(managerPropertiesMatch()...)
-		_ = s.conn.RemoveMatchSignal(managerStateMatch()...)
-		s.conn.RemoveSignal(signals)
+	ticks, stop, err := bussignal.Ticks(ctx, s.conn, dbusx.FromOwner(BusName), "network", managerRoutes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("network: %w", err)
 	}
 	return ticks, stop, nil
 }
 
-func tick(ticks chan struct{}) {
-	select {
-	case ticks <- struct{}{}:
-	default:
+// managerStateChange is what the manager's StateChanged carries.
+type managerStateChange struct {
+	State uint32 `dbus:"state"`
+}
+
+var managerStateChanged = dbusx.NewSignal[managerStateChange](nmIface, "StateChanged")
+
+// managerRoutes call changed for the manager's own changes: its state,
+// and the properties of its interface.
+func managerRoutes(changed func()) []dbusx.Route {
+	return []dbusx.Route{
+		dbusx.On(managerStateChanged, nmPath, func(managerStateChange, dbus.Sequence) error {
+			changed()
+			return nil
+		}),
+		dbusx.On(dbusx.PropertiesChanged, nmPath, func(dbusx.ChangedProperties, dbus.Sequence) error {
+			changed()
+			return nil
+		}).WithArg0(nmIface),
 	}
 }
 
@@ -258,8 +248,6 @@ func SignalIndex(strength uint8, numIcons int) int {
 	return min(clamped/bucket, numIcons-1)
 }
 
-var _ = time.Second
-
 // ip4 is a device's first IPv4 address (Ip4Config's AddressData), ""
 // when it has none.
 func (s *System) ip4(ctx context.Context, dev dbus.BusObject) string {
@@ -273,34 +261,4 @@ func (s *System) ip4(ctx context.Context, dev dbus.BusObject) string {
 		}
 	}
 	return ""
-}
-
-func managerPropertiesMatch() []dbus.MatchOption {
-	return []dbus.MatchOption{dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)), dbus.WithMatchArg(0, nmIface)}
-}
-
-func managerStateMatch() []dbus.MatchOption {
-	return []dbus.MatchOption{dbus.WithMatchObjectPath(dbus.ObjectPath(nmPath)), dbus.WithMatchInterface(nmIface)}
-}
-
-func managerChanged(sig *dbus.Signal) bool {
-	if sig.Path != dbus.ObjectPath(nmPath) {
-		return false
-	}
-	switch sig.Name {
-	case nmIface + ".StateChanged":
-		return true
-	case properties + ".PropertiesChanged":
-		iface, ok := firstString(sig.Body)
-		return ok && iface == nmIface
-	}
-	return false
-}
-
-func firstString(body []any) (string, bool) {
-	if len(body) == 0 {
-		return "", false
-	}
-	s, ok := body[0].(string)
-	return s, ok
 }
