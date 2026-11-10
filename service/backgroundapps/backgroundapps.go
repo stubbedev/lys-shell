@@ -8,9 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os/exec"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -30,15 +28,15 @@ const (
 
 const propertiesChanged = "org.freedesktop.DBus.Properties.PropertiesChanged"
 
-// callTimeout bounds a call to the monitor and a flatpak kill.
+// callTimeout bounds a call to the monitor.
 const callTimeout = 5 * time.Second
 
 // App is one sandboxed app running in the background.
 type App struct {
 	// ID is the app's id, the name of its desktop entry.
 	ID string
-	// Instance is the Flatpak instance id flatpak kill takes.
-	Instance string
+	// Instance is the app's Flatpak instance, which Stop kills.
+	Instance InstanceID
 	// Message is the status the app set with Background.SetStatus.
 	Message string
 	// Name and Icon are the desktop entry's display name and Icon=, or
@@ -49,26 +47,13 @@ type App struct {
 // Describe names an app id from its desktop entry.
 type Describe func(appID string) (name, icon string)
 
-// Run runs argv and waits for it.
-type Run func(ctx context.Context, argv []string) error
-
-// RunCommand runs argv directly, never through a shell, and reports
-// its output with a failure.
-func RunCommand(ctx context.Context, argv []string) error {
-	out, err := exec.CommandContext(ctx, argv[0], argv[1:]...).CombinedOutput() //nolint:gosec // a fixed program with an instance id argument, no shell
-	if err != nil {
-		return fmt.Errorf("%s: %w: %s", strings.Join(argv, " "), err, strings.TrimSpace(string(out)))
-	}
-	return nil
-}
-
 // Apps follows the background monitor on a session bus: the list is
 // read again on each PropertiesChanged and each time the monitor comes
 // or goes.
 type Apps struct {
 	conn     *dbus.Conn
 	describe Describe
-	run      Run
+	proc     string
 	cancel   context.CancelFunc
 	done     chan struct{}
 	changes  feed.Feed[struct{}]
@@ -79,10 +64,10 @@ type Apps struct {
 }
 
 // Follow starts following the background monitor on conn, naming each
-// app with describe and stopping one with run.
-func Follow(conn *dbus.Conn, describe Describe, run Run) (*Apps, error) {
+// app with describe.
+func Follow(conn *dbus.Conn, describe Describe) (*Apps, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &Apps{conn: conn, describe: describe, run: run, cancel: cancel, done: make(chan struct{})}
+	a := &Apps{conn: conn, describe: describe, proc: procRoot, cancel: cancel, done: make(chan struct{})}
 	signals := make(chan *dbus.Signal, 16)
 	conn.Signal(signals)
 	matches := [][]dbus.MatchOption{
@@ -165,11 +150,13 @@ func isAbsent(err error) bool {
 func (a *Apps) parse(raw []map[string]dbus.Variant) []App {
 	out := make([]App, 0, len(raw))
 	for _, e := range raw {
-		app := App{ID: str(e, "app_id"), Instance: str(e, "instance"), Message: str(e, "message")}
-		if app.ID == "" || !isInstanceID(app.Instance) {
-			log.Printf("background apps: skipping an entry with app id %q and instance %q", app.ID, app.Instance)
+		instance, err := ParseInstanceID(str(e, "instance"))
+		id := str(e, "app_id")
+		if id == "" || err != nil {
+			log.Printf("background apps: skipping an entry with app id %q and instance %q", id, str(e, "instance"))
 			continue
 		}
+		app := App{ID: id, Instance: instance, Message: str(e, "message")}
 		app.Name, app.Icon = a.describe(app.ID)
 		out = append(out, app)
 	}
@@ -191,12 +178,12 @@ func (a *Apps) List() []App {
 // Subscribe ticks whenever the list changed.
 func (a *Apps) Subscribe() (<-chan struct{}, func()) { return a.changes.Subscribe() }
 
-// Stop kills the Flatpak instance with flatpak kill, then reads the
+// Stop kills the Flatpak instance as flatpak kill does, then reads the
 // list again.
-func (a *Apps) Stop(ctx context.Context, instance string) error {
+func (a *Apps) Stop(ctx context.Context, instance InstanceID) error {
 	ctx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
-	if err := a.run(ctx, []string{"flatpak", "kill", instance}); err != nil {
+	if err := killInstance(instance, a.proc); err != nil {
 		return fmt.Errorf("background apps: stop instance %s: %w", instance, err)
 	}
 	a.refresh(ctx)
@@ -208,10 +195,4 @@ func (a *Apps) Close() {
 	a.cancel()
 	<-a.done
 	a.changes.Close()
-}
-
-// isInstanceID reports a Flatpak instance id: a decimal number, so it
-// can never read as one of flatpak kill's options.
-func isInstanceID(s string) bool {
-	return s != "" && strings.Trim(s, "0123456789") == ""
 }

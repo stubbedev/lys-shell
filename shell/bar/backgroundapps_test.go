@@ -43,29 +43,31 @@ func backgroundApp(id, instance, message string) map[string]dbus.Variant {
 	return map[string]dbus.Variant{"app_id": dbus.MakeVariant(id), "instance": dbus.MakeVariant(instance), "message": dbus.MakeVariant(message)}
 }
 
-// argvRecorder is the spawner Stop runs flatpak kill through.
-type argvRecorder struct {
-	mu    sync.Mutex
-	argvs [][]string
+// stopRecorder is the followed apps with Stop recorded instead of
+// killing anything; backgroundapps' own tests cover the kill.
+type stopRecorder struct {
+	*backgroundapps.Apps
+	mu      sync.Mutex
+	stopped []string
 }
 
-func (r *argvRecorder) run(_ context.Context, argv []string) error {
+func (r *stopRecorder) Stop(_ context.Context, instance backgroundapps.InstanceID) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.argvs = append(r.argvs, slices.Clone(argv))
+	r.stopped = append(r.stopped, instance.String())
 	return nil
 }
 
-func (r *argvRecorder) recorded() [][]string {
+func (r *stopRecorder) recorded() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return slices.Clone(r.argvs)
+	return slices.Clone(r.stopped)
 }
 
 // followBackgroundApps points the bar at the background monitor on a
 // private bus, a fake one when serve is set, naming apps from the
 // desktop entries under a private data home.
-func followBackgroundApps(t *testing.T, serve bool) (*fakeMonitor, *argvRecorder, ModuleContext) {
+func followBackgroundApps(t *testing.T, serve bool) (*fakeMonitor, *stopRecorder, ModuleContext) {
 	t.Helper()
 	data := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", data)
@@ -93,14 +95,14 @@ func followBackgroundApps(t *testing.T, serve bool) (*fakeMonitor, *argvRecorder
 		}
 		t.Cleanup(release)
 	}
-	rec := &argvRecorder{}
-	apps, err := backgroundapps.Follow(bus.Conn(t), describeApp, rec.run)
+	apps, err := backgroundapps.Follow(bus.Conn(t), describeApp)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(apps.Close)
 	ctx := newTestContext(t, config.Defaults())
-	ctx.BackgroundApps = apps
+	rec := &stopRecorder{Apps: apps}
+	ctx.BackgroundApps = rec
 	return f, rec, ctx
 }
 
@@ -162,8 +164,8 @@ func TestBackgroundAppsAreListedAndStopKillsTheInstance(t *testing.T) {
 	}
 	onHeadlessLoop(func() bool { stops[0].(*widget.Button).OnClick(); return true })
 	waitHeadless(t, "the kill", func() bool { return len(rec.recorded()) == 1 })
-	if got := rec.recorded(); !slices.Equal(got[0], []string{"flatpak", "kill", "77"}) {
-		t.Errorf("Stop ran %q, want the argv [flatpak kill 77]", got)
+	if got := rec.recorded(); !slices.Equal(got, []string{"77"}) {
+		t.Errorf("Stop stopped %q, want instance 77", got)
 	}
 }
 

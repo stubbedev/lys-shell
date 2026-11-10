@@ -25,7 +25,7 @@ const genericAppIcon = "ld-app-window-symbolic"
 type backgroundAppSource interface {
 	List() []backgroundapps.App
 	Subscribe() (<-chan struct{}, func())
-	Stop(ctx context.Context, instance string) error
+	Stop(ctx context.Context, instance backgroundapps.InstanceID) error
 }
 
 // startBackgroundApps follows the background monitor on the shell's
@@ -35,7 +35,7 @@ func startBackgroundApps(ctx *ModuleContext, conn *dbus.Conn) func() {
 	if conn == nil {
 		return func() {}
 	}
-	apps, err := backgroundapps.Follow(conn, describeApp, backgroundapps.RunCommand)
+	apps, err := backgroundapps.Follow(conn, describeApp)
 	if err != nil {
 		log.Printf("background-apps: %v", err)
 		return func() {}

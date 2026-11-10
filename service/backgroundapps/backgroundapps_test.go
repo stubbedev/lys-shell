@@ -2,8 +2,6 @@ package backgroundapps
 
 import (
 	"bytes"
-	"context"
-	"errors"
 	"log"
 	"slices"
 	"strings"
@@ -69,20 +67,6 @@ func describe(appID string) (string, string) {
 	return appID, ""
 }
 
-// recorder records each argv Stop runs.
-type recorder struct {
-	mu    sync.Mutex
-	argvs [][]string
-	err   error
-}
-
-func (r *recorder) run(_ context.Context, argv []string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.argvs = append(r.argvs, slices.Clone(argv))
-	return r.err
-}
-
 func waitFor(t *testing.T, a *Apps, what string, ok func([]App) bool) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -99,15 +83,14 @@ func TestAppsFollowTheMonitor(t *testing.T) {
 	m := serveMonitor(t, bus.Conn(t),
 		entry("org.gnome.Fractal", "1234", "Syncing messages"),
 		entry("com.example.NoEntry", "99", ""))
-	rec := &recorder{}
-	apps, err := Follow(bus.Conn(t), describe, rec.run)
+	apps, err := Follow(bus.Conn(t), describe)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer apps.Close()
 	want := []App{
-		{ID: "org.gnome.Fractal", Instance: "1234", Message: "Syncing messages", Name: "Fractal", Icon: "org.gnome.Fractal"},
-		{ID: "com.example.NoEntry", Instance: "99", Name: "com.example.NoEntry"},
+		{ID: "org.gnome.Fractal", Instance: instanceID(t, "1234"), Message: "Syncing messages", Name: "Fractal", Icon: "org.gnome.Fractal"},
+		{ID: "com.example.NoEntry", Instance: instanceID(t, "99"), Name: "com.example.NoEntry"},
 	}
 	if got := apps.List(); !slices.Equal(got, want) {
 		t.Fatalf("apps = %+v, want %+v", got, want)
@@ -122,18 +105,14 @@ func TestAppsFollowTheMonitor(t *testing.T) {
 		t.Fatal("the removal ticked nobody")
 	}
 
-	if err := apps.Stop(t.Context(), "99"); err != nil {
+	sleeper := startInstance(t, "99")
+	apps.proc = sleeper.proc
+	if err := apps.Stop(t.Context(), instanceID(t, "99")); err != nil {
 		t.Fatal(err)
 	}
-	rec.mu.Lock()
-	argvs := rec.argvs
-	rec.mu.Unlock()
-	if len(argvs) != 1 || !slices.Equal(argvs[0], []string{"flatpak", "kill", "99"}) {
-		t.Errorf("Stop ran %q, want [flatpak kill 99]", argvs)
-	}
-	rec.err = errors.New("exit status 1")
-	if err := apps.Stop(t.Context(), "99"); err == nil || !strings.Contains(err.Error(), "99") {
-		t.Errorf("a failed kill = %v, want an error naming the instance", err)
+	sleeper.killed(t)
+	if err := apps.Stop(t.Context(), instanceID(t, "1234")); err == nil || !strings.Contains(err.Error(), "1234") {
+		t.Errorf("stopping an instance with no directory = %v, want an error naming it", err)
 	}
 }
 
@@ -141,15 +120,17 @@ func TestAppsSkipEntriesNothingCouldStop(t *testing.T) {
 	bus := dbustest.Start(t)
 	serveMonitor(t, bus.Conn(t),
 		entry("org.gnome.Fractal", "--help", ""),
+		entry("org.gnome.Fractal", "../7", ""),
+		entry("org.gnome.Fractal", "7/8", ""),
 		entry("", "12", ""),
 		entry("org.gnome.Fractal", "", ""),
 		entry("org.gnome.Fractal", "7", ""))
-	apps, err := Follow(bus.Conn(t), describe, (&recorder{}).run)
+	apps, err := Follow(bus.Conn(t), describe)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer apps.Close()
-	if got := apps.List(); len(got) != 1 || got[0].Instance != "7" {
+	if got := apps.List(); len(got) != 1 || got[0].Instance.String() != "7" {
 		t.Errorf("apps = %+v, want only instance 7", got)
 	}
 }
@@ -171,7 +152,7 @@ func captureLog(t *testing.T) *bytes.Buffer {
 func TestNoMonitorListsNothingAndLogsOnce(t *testing.T) {
 	logged := captureLog(t)
 	bus := dbustest.Start(t)
-	apps, err := Follow(bus.Conn(t), describe, (&recorder{}).run)
+	apps, err := Follow(bus.Conn(t), describe)
 	if err != nil {
 		t.Fatal(err)
 	}
