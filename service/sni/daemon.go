@@ -3,7 +3,6 @@ package sni
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/intconv"
@@ -46,15 +45,13 @@ func (d *Daemon) List() ([]ListRow, *dbus.Error) {
 	return rows, nil
 }
 
-const activateTimeout = 25 * time.Second
-
 // Activate activates the first item whose SNI Id is id at (0, 0).
 func (d *Daemon) Activate(id string) *dbus.Error {
 	for _, it := range d.store.Items() {
 		if it.ID != id {
 			continue
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), activateTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), answerTimeout)
 		defer cancel()
 		if err := d.activator.Activate(ctx, it, 0, 0); err != nil {
 			return dbusx.Failed(activateError(err))

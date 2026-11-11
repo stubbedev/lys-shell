@@ -39,6 +39,10 @@ var (
 	menuDebounce = 100 * time.Millisecond
 )
 
+// answerTimeout is how long a peer, a tray item or an external watcher,
+// has to answer a call of the host's: the D-Bus default.
+const answerTimeout = 25 * time.Second
+
 // Host plays the host role against a watcher (ours or an existing
 // one), tracks items and their property changes, and hands out the
 // item controls.
@@ -48,16 +52,33 @@ type Host struct {
 
 	owned   bool
 	watcher *watcher // non-nil: we serve the watcher role ourselves
-	stop    chan struct{}
+	// ctx ends with Close, and with it every call under way and
+	// everything the host started, which work counts.
+	ctx    context.Context
+	cancel context.CancelFunc
+	work   sync.WaitGroup
+	// timeout is how long a peer has to answer, and failed is told what
+	// could not be read of an item or of an external watcher, on the
+	// goroutine that found out.
+	timeout time.Duration
+	failed  func(error)
 	// names follows the bus names that lose their owner, each handed to
 	// the signal loop through vanished.
 	names    *dbusx.Watch
 	vanished chan string
+	// tracks hands the signal loop the items to read from the goroutines
+	// that find them, and results what was read of each: items are
+	// tracked and forgotten on the signal loop alone.
+	tracks  chan string
+	results chan reading
+	// reads are the reads under way, by item key, and owners maps each
+	// tracked item's key to its connection's unique name, so a signal's
+	// sender resolves to the items it belongs to. Both are the signal
+	// loop's own.
+	reads  map[string]*read
+	owners map[string]string
 
 	mu sync.Mutex
-	// owners maps each item key to its connection's unique name, so a
-	// signal's sender resolves to the items it belongs to.
-	owners map[string]string
 	// menus are the open menus' change feeds, by item key.
 	menus map[string][]chan struct{}
 	// pixmapSizes counts the consumers wanting each pixmap size, in
@@ -73,11 +94,22 @@ type Host struct {
 // the roles: when no watcher is running, this process becomes the
 // watcher and hosts against itself.
 func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
+	return newHost(conn, store, answerTimeout, func(err error) { log.Printf("sni: %v", err) })
+}
+
+func newHost(conn *dbus.Conn, store *Store, timeout time.Duration, failed func(error)) (*Host, error) {
+	ctx, cancel := context.WithCancel(context.Background())
 	h := &Host{
 		conn:        conn,
 		store:       store,
-		stop:        make(chan struct{}),
+		ctx:         ctx,
+		cancel:      cancel,
+		timeout:     timeout,
+		failed:      failed,
 		vanished:    make(chan string),
+		tracks:      make(chan string),
+		results:     make(chan reading),
+		reads:       make(map[string]*read),
 		owners:      make(map[string]string),
 		menus:       make(map[string][]chan struct{}),
 		pixmapSizes: make(map[int]int),
@@ -86,17 +118,23 @@ func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 	signals := make(chan *dbus.Signal, 64)
 	conn.Signal(signals)
 	if err := h.claim(); err != nil {
-		close(h.stop)
+		cancel()
 		bussignal.Remove(conn, signals)
 		return nil, errors.Join(err, h.release())
 	}
-	go h.run(signals)
+	h.work.Go(func() { h.run(signals) })
 	if h.watcher == nil {
-		go h.resync()
+		h.work.Go(h.resync)
 	} else {
-		go h.orphanScan()
+		h.work.Go(h.orphanScan)
 	}
 	return h, nil
+}
+
+// answer is the context of the calls of one exchange with a peer: it
+// ends with the host, and once the peer has had the timeout to answer.
+func (h *Host) answer() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(h.ctx, h.timeout)
 }
 
 func (h *Host) claim() error {
@@ -145,7 +183,13 @@ func (h *Host) claimWatcher() error {
 
 // registerHost announces the host to an external watcher.
 func (h *Host) registerHost() error {
-	return h.conn.Object(WatcherName, WatcherPath).Call(WatcherIface+".RegisterStatusNotifierHost", 0, h.conn.Names()[0]).Err
+	ctx, cancel := h.answer()
+	defer cancel()
+	const method = WatcherIface + ".RegisterStatusNotifierHost"
+	if err := h.conn.Object(WatcherName, WatcherPath).CallWithContext(ctx, method, 0, h.conn.Names()[0]).Err; err != nil {
+		return fmt.Errorf("sni: %s within %s: %w", method, h.timeout, err)
+	}
+	return nil
 }
 
 // subscribe matches the watcher's registration signals, every item's
@@ -164,7 +208,7 @@ func (h *Host) subscribe() error {
 		bussignal.OnNameLost(func(name string) error {
 			select {
 			case h.vanished <- name:
-			case <-h.stop:
+			case <-h.ctx.Done():
 			}
 			return nil
 		}))
@@ -215,12 +259,15 @@ func (h *Host) release() error {
 	return errors.Join(errs...)
 }
 
-// run consumes the signals and the vanished names until Close.
+// run is the signal loop: it consumes the signals, the vanished names,
+// the items to read and what was read of them until Close or the end
+// of the connection, which ends the host's other work with it.
 func (h *Host) run(signals chan *dbus.Signal) {
 	defer bussignal.Remove(h.conn, signals)
+	defer h.cancel()
 	for {
 		select {
-		case <-h.stop:
+		case <-h.ctx.Done():
 			return
 		case sig, ok := <-signals:
 			if !ok {
@@ -230,6 +277,10 @@ func (h *Host) run(signals chan *dbus.Signal) {
 			bussignal.Discard(sig)
 		case name := <-h.vanished:
 			h.nameVanished(name)
+		case reg := <-h.tracks:
+			h.track(reg)
+		case res := <-h.results:
+			h.finish(res)
 		case <-h.retrack:
 			for _, it := range h.store.Items() {
 				h.track(it.Bus + it.Path)
@@ -307,9 +358,7 @@ func (h *Host) handle(sig *dbus.Signal) {
 		// NewToolTip, NewMenu, ... and PropertiesChanged: re-read the
 		// item's snapshot.
 		for _, key := range h.itemsOf(sig.Sender, string(sig.Path)) {
-			if it, ok := h.store.Get(key); ok {
-				h.track(it.Bus + it.Path)
-			}
+			h.track(key)
 		}
 	case iface == MenuIface:
 		// LayoutUpdated, ItemsPropertiesUpdated: open menus refetch.
@@ -340,8 +389,6 @@ func firstString(body []any) (string, bool) {
 // itemsOf lists the tracked items a signal from sender at path is
 // about.
 func (h *Host) itemsOf(sender, path string) []string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	var keys []string
 	for key, owner := range h.owners {
 		if owner != sender {
@@ -357,8 +404,6 @@ func (h *Host) itemsOf(sender, path string) []string {
 // menuItemsOf lists the tracked items whose menu object a signal came
 // from.
 func (h *Host) menuItemsOf(sender, path string) []string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
 	var keys []string
 	for key, owner := range h.owners {
 		if owner != sender {
@@ -373,12 +418,17 @@ func (h *Host) menuItemsOf(sender, path string) []string {
 
 // resync reads an external watcher's RegisteredStatusNotifierItems.
 func (h *Host) resync() {
+	ctx, cancel := h.answer()
+	defer cancel()
 	var regs []string
-	if err := h.conn.Object(WatcherName, WatcherPath).Call(PropsIface+".Get", 0, WatcherIface, "RegisteredStatusNotifierItems").Store(&regs); err != nil {
+	if err := h.conn.Object(WatcherName, WatcherPath).CallWithContext(ctx, PropsIface+".Get", 0, WatcherIface, "RegisteredStatusNotifierItems").Store(&regs); err != nil {
+		if h.ctx.Err() == nil {
+			h.failed(fmt.Errorf("read the items registered with %s within %s: %w", WatcherName, h.timeout, err))
+		}
 		return
 	}
 	for _, reg := range regs {
-		h.track(reg)
+		h.requestTrack(reg)
 	}
 }
 
@@ -389,12 +439,12 @@ func (h *Host) resync() {
 func (h *Host) orphanScan() {
 	for _, delay := range orphanScanSchedule {
 		select {
-		case <-h.stop:
+		case <-h.ctx.Done():
 			return
 		case <-time.After(delay):
 		}
 		var names []string
-		if err := h.conn.BusObject().Call("org.freedesktop.DBus.ListNames", 0).Store(&names); err != nil {
+		if err := h.conn.BusObject().CallWithContext(h.ctx, "org.freedesktop.DBus.ListNames", 0).Store(&names); err != nil {
 			return
 		}
 		own := h.conn.Names()[0]
@@ -412,39 +462,98 @@ func (h *Host) orphanScan() {
 // probe reports whether name serves a StatusNotifierItem at the
 // default path (its Id reads within the probe timeout).
 func (h *Host) probe(name string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	ctx, cancel := context.WithTimeout(h.ctx, probeTimeout)
 	defer cancel()
 	var v dbus.Variant
 	return h.conn.Object(name, "/StatusNotifierItem").CallWithContext(ctx, PropsIface+".Get", 0, ItemIface, "Id").Store(&v) == nil
 }
 
-// track reads one item's properties into the store and remembers its
-// owner.
-func (h *Host) track(reg string) {
-	bus, path := ParseAddress(reg)
-	item, err := readItem(h.conn, bus, path, h.wantedPixmapSizes())
-	if err != nil {
-		log.Printf("sni: %s: %v", reg, err)
-		return
-	}
-	owner := bus
-	if !strings.HasPrefix(bus, ":") {
-		var unique string
-		if err := h.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, bus).Store(&unique); err == nil {
-			owner = unique
-		}
-	}
-	h.mu.Lock()
-	h.owners[item.Key()] = owner
-	h.mu.Unlock()
-	h.store.Put(item)
+// read is one read of an item under way. again says the item was to be
+// read once more meanwhile: what this read brings may predate that.
+type read struct {
+	again bool
 }
 
-// forget drops one item.
+// reading is what a read brought back: the item and the unique name of
+// the connection serving it, or why it could not be read.
+type reading struct {
+	of        *read
+	bus, path string
+	item      *Item
+	owner     string
+	err       error
+}
+
+// requestTrack has the signal loop track an item, from any other
+// goroutine.
+func (h *Host) requestTrack(reg string) {
+	select {
+	case h.tracks <- reg:
+	case <-h.ctx.Done():
+	}
+}
+
+// track starts reading one item, off the signal loop, which finish
+// hears from. An item has one read under way at most: asked for again
+// meanwhile, it is read once more when that one ends.
+func (h *Host) track(reg string) {
+	bus, path := ParseAddress(reg)
+	if r, reading := h.reads[bus+path]; reading {
+		r.again = true
+		return
+	}
+	r := &read{}
+	h.reads[bus+path] = r
+	sizes := h.wantedPixmapSizes()
+	h.work.Go(func() {
+		res := h.read(bus, path, sizes)
+		res.of = r
+		select {
+		case h.results <- res:
+		case <-h.ctx.Done():
+		}
+	})
+}
+
+// read fetches one item and the owner of its bus name, which have the
+// timeout to answer.
+func (h *Host) read(bus, path string, sizes []int) reading {
+	res := reading{bus: bus, path: path, owner: bus}
+	ctx, cancel := h.answer()
+	defer cancel()
+	if res.item, res.err = readItem(ctx, h.conn, bus, path, sizes); res.err == nil && !strings.HasPrefix(bus, ":") {
+		res.owner, res.err = dbusx.NameOwner(ctx, h.conn, bus)
+	}
+	if res.err != nil {
+		res.err = fmt.Errorf("read item %s%s within %s: %w", bus, path, h.timeout, res.err)
+	}
+	return res
+}
+
+// finish stores what a read brought back and remembers the item's
+// owner, unless the item was forgotten while it was read. A read that
+// failed is reported and leaves the item as it was.
+func (h *Host) finish(res reading) {
+	key := res.bus + res.path
+	if h.reads[key] != res.of {
+		return
+	}
+	delete(h.reads, key)
+	if res.err != nil {
+		h.failed(res.err)
+	} else {
+		h.owners[key] = res.owner
+		h.store.Put(res.item)
+	}
+	if res.of.again {
+		h.track(key)
+	}
+}
+
+// forget drops one item, and what a read of it under way brings.
 func (h *Host) forget(bus, path string) {
-	h.mu.Lock()
 	delete(h.owners, bus+path)
-	h.mu.Unlock()
+	delete(h.reads, bus+path)
 	h.store.Remove(bus, path)
 }
 
@@ -452,10 +561,7 @@ func (h *Host) forget(bus, path string) {
 // watcher normally unregisters them, but a crashed item may not be).
 func (h *Host) forgetName(name string) {
 	for _, it := range h.store.Items() {
-		h.mu.Lock()
-		owner := h.owners[it.Key()]
-		h.mu.Unlock()
-		if owner == name || it.Bus == name {
+		if h.owners[it.Key()] == name || it.Bus == name {
 			h.forget(it.Bus, it.Path)
 		}
 	}
@@ -520,11 +626,11 @@ func (h *Host) notifyMenu(key string) {
 
 // readItem fetches the SNI property set, keeping of each pixmap
 // property the pixmaps picked for sizes.
-func readItem(conn *dbus.Conn, bus, path string, sizes []int) (*Item, error) {
+func readItem(ctx context.Context, conn *dbus.Conn, bus, path string, sizes []int) (*Item, error) {
 	obj := conn.Object(bus, dbus.ObjectPath(path))
 	var props map[string]dbus.Variant
-	if err := obj.Call(PropsIface+".GetAll", 0, ItemIface).Store(&props); err != nil {
-		return nil, fmt.Errorf("GetAll: %w", err)
+	if err := obj.CallWithContext(ctx, PropsIface+".GetAll", 0, ItemIface).Store(&props); err != nil {
+		return nil, fmt.Errorf("%s.GetAll: %w", PropsIface, err)
 	}
 	it := &Item{Bus: bus, Path: path}
 	str := func(name string) string {
@@ -608,10 +714,12 @@ func parseTooltip(v any) Tooltip {
 	return tip
 }
 
-// Close stops the loop and takes back the matches, the watch on bus
+// Close ends the calls under way, waits for the loop and everything
+// else the host started, and takes back the matches, the watch on bus
 // names, the watcher object and its name; the connection stays open.
 func (h *Host) Close() error {
-	close(h.stop)
+	h.cancel()
+	h.work.Wait()
 	return h.release()
 }
 
@@ -652,7 +760,7 @@ func (w *watcher) register(service string) {
 	w.items = append(w.items, service)
 	w.mu.Unlock()
 	_ = w.host.conn.Emit(WatcherPath, WatcherIface+".StatusNotifierItemRegistered", service)
-	w.host.track(service)
+	w.host.requestTrack(service)
 }
 
 // registered reports whether a bus name has any item registered.
