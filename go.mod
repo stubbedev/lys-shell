@@ -5,10 +5,10 @@ go 1.27.3
 require (
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-desktop v0.0.4
-	github.com/stubbedev/lys-lib v0.3.17
-	github.com/stubbedev/lys-secrets v0.3.17
-	github.com/stubbedev/lys-ui v0.2.20
+	github.com/stubbedev/lys-desktop v0.0.5
+	github.com/stubbedev/lys-lib v0.3.19-0.20261111181450-ed40d3ab6475
+	github.com/stubbedev/lys-secrets v0.3.18
+	github.com/stubbedev/lys-ui v0.2.21
 	github.com/stubbedev/memory-go v0.5.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.47.0
