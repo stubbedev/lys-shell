@@ -80,5 +80,6 @@ func TestTheServiceClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	fd, closed := bussignaltest.Descriptor(t)
 	must(t, sender.Emit(settingPath(1), connectionIface+".Updated", fd))
 	must(t, sender.Emit(fakePrimaryPath, activeIface+".StateChanged", fd, uint32(0)))
+	must(t, sender.Emit(nmPath, properties+".PropertiesChanged", nmIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)}, []string{}))
 	closed("the settings and VPN readers handled signals carrying a descriptor")
 }

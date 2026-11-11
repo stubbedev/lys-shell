@@ -11,6 +11,7 @@ import (
 	"github.com/stubbedev/lys-ui/app"
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 )
 
@@ -55,11 +56,7 @@ func TestShell1ConnectorsFollowHotplug(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer release()
-	if err := client.AddMatchSignal(dbus.WithMatchObjectPath(shellipc.ServicePath), dbus.WithMatchInterface("org.freedesktop.DBus.Properties"), dbus.WithMatchMember("PropertiesChanged")); err != nil {
-		t.Fatal(err)
-	}
-	signals := make(chan *dbus.Signal, 16)
-	client.Signal(signals)
+	signals, _ := bussignaltest.Signals(t, client, 16, dbus.WithMatchObjectPath(shellipc.ServicePath), dbus.WithMatchInterface("org.freedesktop.DBus.Properties"), dbus.WithMatchMember("PropertiesChanged"))
 
 	o := &fakeOpener{}
 	set := newSurfaceSet(o.open)

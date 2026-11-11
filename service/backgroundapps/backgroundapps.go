@@ -15,8 +15,6 @@ import (
 	"github.com/stubbedev/lys-desktop/feed"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // D-Bus identity of the frontend's background monitor.
@@ -27,8 +25,6 @@ const (
 	// Property is the monitor's aa{sv} list of background apps.
 	Property = "BackgroundApps"
 )
-
-const propertiesChanged = "org.freedesktop.DBus.Properties.PropertiesChanged"
 
 // callTimeout bounds a call to the monitor.
 const callTimeout = 5 * time.Second
@@ -50,14 +46,14 @@ type App struct {
 type Describe func(appID string) (name, icon string)
 
 // Apps follows the background monitor on a session bus: the list is
-// read again on each PropertiesChanged and each time the monitor comes
-// or goes.
+// read again on each PropertiesChanged of whichever connection owns the
+// monitor's name, and each time the monitor comes or goes.
 type Apps struct {
 	conn     *dbus.Conn
 	describe Describe
 	proc     string
 	cancel   context.CancelFunc
-	done     chan struct{}
+	watch    *dbusx.Watch
 	changes  feed.Feed[struct{}]
 
 	mu     sync.Mutex
@@ -69,51 +65,24 @@ type Apps struct {
 // app with describe.
 func Follow(conn *dbus.Conn, describe Describe) (*Apps, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &Apps{conn: conn, describe: describe, proc: procRoot, cancel: cancel, done: make(chan struct{})}
-	signals := make(chan *dbus.Signal, 16)
-	conn.Signal(signals)
-	matches := [][]dbus.MatchOption{
-		{dbus.WithMatchSender(BusName), dbus.WithMatchObjectPath(Path), dbus.WithMatchInterface("org.freedesktop.DBus.Properties"), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, Interface)},
-		dbusx.OwnerMatch(BusName),
+	a := &Apps{conn: conn, describe: describe, proc: procRoot, cancel: cancel}
+	watch, err := dbusx.WatchSignals(ctx, conn, dbusx.FromOwner(BusName),
+		func(err error) { log.Printf("background apps: %v", err) },
+		dbusx.OnOthers(dbusx.PropertiesInterface, Path, func(sig *dbus.Signal) error {
+			a.refresh(ctx)
+			return sig.CloseFDs()
+		}).WithArg0(Interface),
+		dbusx.OnOwnerChange(BusName, func(_, _ string, _ dbus.Sequence) error {
+			a.refresh(ctx)
+			return nil
+		}))
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("background apps: %w", err)
 	}
-	for _, m := range matches {
-		if err := conn.AddMatchSignalContext(ctx, m...); err != nil {
-			bussignal.Remove(conn, signals)
-			cancel()
-			return nil, fmt.Errorf("background apps: watch %s: %w", BusName, err)
-		}
-	}
+	a.watch = watch
 	a.refresh(ctx)
-	go func() {
-		defer close(a.done)
-		defer bussignal.Remove(conn, signals)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case sig, ok := <-signals:
-				if !ok {
-					return
-				}
-				if a.concerns(sig) {
-					a.refresh(ctx)
-				}
-				bussignal.Discard(sig)
-			}
-		}
-	}()
 	return a, nil
-}
-
-func (a *Apps) concerns(sig *dbus.Signal) bool {
-	if _, _, isOwner := dbusx.NameOwnerChange(sig, BusName); isOwner {
-		return true
-	}
-	if sig.Name != propertiesChanged || sig.Path != Path || len(sig.Body) == 0 {
-		return false
-	}
-	iface, _ := sig.Body[0].(string)
-	return iface == Interface
 }
 
 // refresh reads the list. A monitor that is not on the bus lists
@@ -193,9 +162,12 @@ func (a *Apps) Stop(ctx context.Context, instance InstanceID) error {
 	return nil
 }
 
-// Close stops following.
+// Close stops following, once the watch has taken its match rules
+// off the bus.
 func (a *Apps) Close() {
 	a.cancel()
-	<-a.done
+	if err := a.watch.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+		log.Printf("background apps: %v", err)
+	}
 	a.changes.Close()
 }

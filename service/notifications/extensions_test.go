@@ -8,6 +8,8 @@ import (
 	"github.com/stubbedev/lys-desktop/fakeclock"
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 func hint(key string, v any) map[string]dbus.Variant {
@@ -102,11 +104,7 @@ func TestAReplyIsSentAsNotificationRepliedToARealClient(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = server.Release() })
 	client := bus.Conn(t)
-	if err := client.AddMatchSignal(dbus.WithMatchInterface(Interface)); err != nil {
-		t.Fatal(err)
-	}
-	signals := make(chan *dbus.Signal, 8)
-	client.Signal(signals)
+	signals, _ := bussignaltest.Signals(t, client, 8, dbus.WithMatchInterface(Interface))
 	obj := client.Object(Interface, ObjPath)
 	var chat, plain uint32
 	if err := obj.Call(Interface+".Notify", 0, "chat", uint32(0), "", "Ada", "lunch?", []string{InlineReplyActionID, "Reply"}, hint("x-kde-reply-placeholder-text", "Reply to Ada"), int32(-1)).Store(&chat); err != nil {

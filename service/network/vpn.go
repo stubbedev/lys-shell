@@ -526,6 +526,10 @@ func (s *VPNService) applyFailure() {
 func (s *VPNService) run(ctx context.Context, signals chan *dbus.Signal, profiles, failures <-chan struct{}) {
 	sleep := &sleepResume{vpn: s}
 	restart := &restartResume{vpn: s}
+	owner := []dbusx.Route{dbusx.OnOwnerChange(BusName, func(oldOwner, newOwner string, _ dbus.Sequence) error {
+		restart.ownerChanged(ctx, oldOwner != "", newOwner != "")
+		return nil
+	})}
 	for {
 		select {
 		case <-ctx.Done():
@@ -541,13 +545,24 @@ func (s *VPNService) run(ctx context.Context, signals chan *dbus.Signal, profile
 			if !ok {
 				return
 			}
-			s.signal(ctx, sig, sleep, restart)
-			bussignal.Discard(sig)
+			s.signal(ctx, sig, sleep, owner)
 		}
 	}
 }
 
-func (s *VPNService) signal(ctx context.Context, sig *dbus.Signal, sleep *sleepResume, restart *restartResume) {
+// signal handles one signal of the watch and takes over the descriptors
+// it carries: NM's own on the paths of every active connection, which
+// no route can name yet (lys-lib#106), logind's, and NM's owner changing.
+func (s *VPNService) signal(ctx context.Context, sig *dbus.Signal, sleep *sleepResume, owner []dbusx.Route) {
+	switch sig.Name {
+	case properties + ".PropertiesChanged", activeIface + ".StateChanged", logind.PrepareForSleep.Name():
+	default:
+		if err := dbusx.Dispatch(sig, "", owner); err != nil {
+			log.Printf("network: %v", err)
+		}
+		return
+	}
+	defer bussignal.Discard(sig)
 	switch sig.Name {
 	case properties + ".PropertiesChanged":
 		if sig.Path != nmPath || len(sig.Body) < 2 {
@@ -574,10 +589,6 @@ func (s *VPNService) signal(ctx context.Context, sig *dbus.Signal, sleep *sleepR
 	case logind.PrepareForSleep.Name():
 		if s, err := logind.PrepareForSleep.Decode(sig); err == nil {
 			sleep.prepareForSleep(ctx, s.Start)
-		}
-	default:
-		if oldOwner, newOwner, ok := dbusx.NameOwnerChange(sig, BusName); ok {
-			restart.ownerChanged(ctx, oldOwner != "", newOwner != "")
 		}
 	}
 }

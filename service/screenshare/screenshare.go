@@ -5,7 +5,9 @@ package screenshare
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"slices"
 	"sync"
 	"time"
@@ -13,8 +15,6 @@ import (
 	"github.com/stubbedev/lys-desktop/feed"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // D-Bus identity: the portal backend's name and object, where Interface
@@ -68,6 +68,7 @@ const callTimeout = 2 * time.Second
 type Shares struct {
 	conn    *dbus.Conn
 	cancel  context.CancelFunc
+	watch   *dbusx.Watch
 	changes feed.Feed[struct{}]
 
 	mu   sync.Mutex
@@ -78,37 +79,22 @@ type Shares struct {
 func Follow(conn *dbus.Conn) (*Shares, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Shares{conn: conn, cancel: cancel}
-	signals := make(chan *dbus.Signal, 16)
-	conn.Signal(signals)
-	match := []dbus.MatchOption{dbus.WithMatchSender(BusName), dbus.WithMatchObjectPath(Path), dbus.WithMatchInterface(Interface)}
-	if err := conn.AddMatchSignalContext(ctx, match...); err != nil {
-		bussignal.Remove(conn, signals)
+	watch, err := dbusx.WatchSignals(ctx, conn, dbusx.FromOwner(BusName),
+		func(err error) { log.Printf("screen shares: %v", err) },
+		dbusx.On(Changed, Path, func(struct{}, dbus.Sequence) error {
+			s.refresh(ctx)
+			return nil
+		}),
+		dbusx.OnOwnerChange(BusName, func(_, _ string, _ dbus.Sequence) error {
+			s.refresh(ctx)
+			return nil
+		}))
+	if err != nil {
 		cancel()
-		return nil, fmt.Errorf("screen shares: watch %s: %w", Interface, err)
+		return nil, fmt.Errorf("screen shares: %w", err)
 	}
-	if err := conn.AddMatchSignalContext(ctx, dbusx.OwnerMatch(BusName)...); err != nil {
-		bussignal.Remove(conn, signals)
-		cancel()
-		return nil, fmt.Errorf("screen shares: watch %s: %w", BusName, err)
-	}
+	s.watch = watch
 	s.refresh(ctx)
-	go func() {
-		defer bussignal.Remove(conn, signals)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case sig, ok := <-signals:
-				if !ok {
-					return
-				}
-				if _, _, isOwner := dbusx.NameOwnerChange(sig, BusName); isOwner || sig.Name == Changed.Name() {
-					s.refresh(ctx)
-				}
-				bussignal.Discard(sig)
-			}
-		}
-	}()
 	return s, nil
 }
 
@@ -153,8 +139,12 @@ func (s *Shares) Stop(ctx context.Context, session dbus.ObjectPath) error {
 	return nil
 }
 
-// Close stops following.
+// Close stops following, once the watch has taken its match rules
+// off the bus.
 func (s *Shares) Close() {
 	s.cancel()
+	if err := s.watch.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+		log.Printf("screen shares: %v", err)
+	}
 	s.changes.Close()
 }

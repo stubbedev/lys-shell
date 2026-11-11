@@ -73,7 +73,7 @@ func TestSharesCloseTheDescriptorsOfTheSignalsTheyRead(t *testing.T) {
 	}
 	defer release()
 	fd, closed := bussignaltest.Descriptor(t)
-	if err := served.Emit(Path, Interface+".Handed", fd); err != nil {
+	if err := served.Emit(Path, Changed.Name(), fd); err != nil {
 		t.Fatal(err)
 	}
 	closed("the shares handled a signal carrying a descriptor")

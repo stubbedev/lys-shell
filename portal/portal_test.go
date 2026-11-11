@@ -16,6 +16,7 @@ import (
 	"github.com/stubbedev/lys-lib/xdg"
 	"github.com/stubbedev/lys-ui/gtksettings"
 
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 	"github.com/stubbedev/lys-shell/service/wallpaper"
 )
 
@@ -27,7 +28,7 @@ type rig struct {
 	backend *Backend
 	client  *dbus.Conn
 	obj     dbus.BusObject
-	signals chan *dbus.Signal
+	signals <-chan *dbus.Signal
 }
 
 // processDataHome is XDG_DATA_HOME as the test process started with
@@ -56,11 +57,7 @@ func newRig(t *testing.T, edit func(*Backend)) *rig {
 	bus := dbustest.Start(t)
 	cfg := config.Load(t.TempDir(), config.DiscardDiagnostics)
 	client := bus.Conn(t)
-	signals := make(chan *dbus.Signal, 64)
-	if err := client.AddMatchSignal(dbus.WithMatchObjectPath(ObjectPath)); err != nil {
-		t.Fatal(err)
-	}
-	client.Signal(signals)
+	signals, _ := bussignaltest.Signals(t, client, 64, dbus.WithMatchObjectPath(ObjectPath))
 	b := New(bus.Conn(t), cfg)
 	if edit != nil {
 		edit(b)
@@ -530,9 +527,7 @@ func TestSessionCloseRunsCleanupOnce(t *testing.T) {
 		}
 		s.onClose(func() { closes.Update(func(n int) int { return n + 1 }) })
 	}
-	signals := make(chan *dbus.Signal, 4)
-	_ = client.AddMatchSignal(dbus.WithMatchInterface(SessionIface))
-	client.Signal(signals)
+	signals, _ := bussignaltest.Signals(t, client, 4, dbus.WithMatchInterface(SessionIface))
 
 	obj := client.Object(server.Names()[0], first)
 	if v, err := obj.GetProperty(SessionIface + ".version"); err != nil || v.Value() != uint32(1) {

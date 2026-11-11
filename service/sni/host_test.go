@@ -536,3 +536,72 @@ func TestHostClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	}
 	closed("the host handled an item signal carrying a descriptor")
 }
+
+// fakeWatcher is a watcher another process serves: it lists items and
+// tells hosts registering of each.
+type fakeWatcher struct {
+	conn  *dbus.Conn
+	items []string
+	hosts chan string
+}
+
+func (w *fakeWatcher) RegisterStatusNotifierHost(service string) *dbus.Error {
+	w.hosts <- service
+	return nil
+}
+
+func (w *fakeWatcher) Get(_, _ string) (dbus.Variant, *dbus.Error) {
+	return dbus.MakeVariant(w.items), nil
+}
+
+func startExternalWatcher(t *testing.T, bus *dbustest.Bus, items ...string) *fakeWatcher {
+	t.Helper()
+	w := &fakeWatcher{conn: bus.Conn(t), items: append([]string{}, items...), hosts: make(chan string, 4)}
+	for _, iface := range []string{WatcherIface, PropsIface} {
+		if err := w.conn.Export(w, WatcherPath, iface); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ownName(t, w.conn, WatcherName, dbus.NameFlagDoNotQueue, dbus.RequestNameReplyPrimaryOwner)
+	return w
+}
+
+// A host against another process's watcher hears the registrations of
+// whichever connection owns the watcher name, closing the descriptors
+// they carry, and joins a watcher that takes the name over.
+func TestHostFollowsTheExternalWatcherFromOwnerToOwner(t *testing.T) {
+	bus := dbustest.Start(t)
+	first := startExternalWatcher(t, bus)
+	store := NewStore()
+	host, err := NewHostOn(bus.Conn(t), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer host.Close()
+	if host.watcher != nil {
+		t.Fatal("the host took the watcher role from the running watcher")
+	}
+	await(t, first.hosts, "the host registering with the first watcher")
+	one := startItem(t, bus, "one")
+	fd, closed := bussignaltest.Descriptor(t)
+	if err := first.conn.Emit(WatcherPath, WatcherIface+".StatusNotifierHostRegistered", fd); err != nil {
+		t.Fatal(err)
+	}
+	closed("the host handled a watcher signal carrying a descriptor")
+	if err := first.conn.Emit(WatcherPath, WatcherIface+".StatusNotifierItemRegistered", one.conn.Names()[0]+"/StatusNotifierItem"); err != nil {
+		t.Fatal(err)
+	}
+	waitItems(t, store, func(i []Item) bool { return len(i) == 1 && i[0].ID == "one" })
+
+	if err := first.conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	two := startItem(t, bus, "two")
+	next := startExternalWatcher(t, bus, two.conn.Names()[0]+"/StatusNotifierItem")
+	if got := await(t, next.hosts, "the host registering with the next watcher"); got != host.conn.Names()[0] {
+		t.Errorf("the next watcher was told of host %q, want %q", got, host.conn.Names()[0])
+	}
+	waitItems(t, store, func(i []Item) bool {
+		return slices.ContainsFunc(i, func(it Item) bool { return it.ID == "two" })
+	})
+}

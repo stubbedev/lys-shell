@@ -12,6 +12,7 @@ import (
 	"github.com/stubbedev/lys-desktop/portal/permissions/permstoretest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
@@ -161,11 +162,7 @@ func TestFrontendReminderRevokeDeletesTheToken(t *testing.T) {
 
 	p.starts.clock.Advance(31 * day)
 	session, done = p.share(t, token)
-	closed := make(chan *dbus.Signal, 4)
-	if err := p.front.conn.AddMatchSignal(dbus.WithMatchObjectPath(session), dbus.WithMatchMember("Closed")); err != nil {
-		t.Fatal(err)
-	}
-	p.front.conn.Signal(closed)
+	closed, _ := bussignaltest.Signals(t, p.front.conn, 4, dbus.WithMatchObjectPath(session), dbus.WithMatchMember("Closed"))
 	waitNotify(t, p.notify, 1)
 	_ = p.notify.conn.Emit(notifications.ObjPath, notifications.Interface+".ActionInvoked", p.notify.next.Load(), reminderRevoke)
 	if code, again := started(t, done); code != ResponseCancelled || again != "" {

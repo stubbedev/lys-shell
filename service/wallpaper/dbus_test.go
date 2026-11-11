@@ -11,6 +11,8 @@ import (
 	"github.com/stubbedev/lys-desktop/service/wallpaper/extract"
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 func dial(t *testing.T, addr string) *dbus.Conn {
@@ -131,11 +133,7 @@ func TestDaemonEmitsColorsExtracted(t *testing.T) {
 	}
 	defer release()
 	listener := dial(t, addr)
-	if err := listener.AddMatchSignal(dbus.WithMatchInterface(Interface), dbus.WithMatchMember("ColorsExtracted")); err != nil {
-		t.Fatal(err)
-	}
-	signals := make(chan *dbus.Signal, 4)
-	listener.Signal(signals)
+	signals, _ := bussignaltest.Signals(t, listener, 4, dbus.WithMatchInterface(Interface), dbus.WithMatchMember("ColorsExtracted"))
 	if err := NewClient(dial(t, addr)).ExtractColors(context.Background()); err != nil {
 		t.Fatal(err)
 	}

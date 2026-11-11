@@ -17,6 +17,8 @@ import (
 )
 
 // Monitor is a fake org.freedesktop.background.Monitor.
+const propertiesChanged = "org.freedesktop.DBus.Properties.PropertiesChanged"
+
 type Monitor struct {
 	conn *dbus.Conn
 	mu   sync.Mutex
@@ -189,4 +191,26 @@ func TestAppsCloseTheDescriptorsOfTheSignalsTheyRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	closed("the apps handled a property change carrying a descriptor")
+}
+
+// The apps follow the monitor's name from one connection to the next:
+// a monitor that went away lists nothing, and the connection that takes
+// the name over is heard.
+func TestAppsFollowTheMonitorToItsNextOwner(t *testing.T) {
+	bus := dbustest.Start(t)
+	first := bus.Conn(t)
+	serveMonitor(t, first, entry("org.gnome.Fractal", "1", ""))
+	apps, err := Follow(bus.Conn(t), describe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer apps.Close()
+	waitFor(t, apps, "the first monitor's app", func(l []App) bool { return len(l) == 1 })
+	if err := first.Close(); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, apps, "the monitor going away", func(l []App) bool { return len(l) == 0 })
+	next := serveMonitor(t, bus.Conn(t))
+	next.set(t, entry("com.example.Next", "2", ""))
+	waitFor(t, apps, "the next monitor's app", func(l []App) bool { return len(l) == 1 && l[0].ID == "com.example.Next" })
 }

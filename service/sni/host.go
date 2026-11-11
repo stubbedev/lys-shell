@@ -57,6 +57,9 @@ type Host struct {
 
 	owned   bool
 	watcher *watcher // non-nil: we serve the watcher role ourselves
+	// external is the watcher another process serves, which the signal
+	// loop follows when watcher is nil.
+	external externalWatcher
 	// ctx ends with Close, and with it every call under way and
 	// everything the host started, which work counts.
 	ctx    context.Context
@@ -71,6 +74,7 @@ type Host struct {
 	// the signal loop through vanished.
 	names    *dbusx.Watch
 	vanished chan nameLoss
+	feed     []dbusx.Route
 	// tracks hands the signal loop the items to read from the goroutines
 	// that find them, and results what was read of each: items are
 	// tracked and forgotten on the signal loop alone.
@@ -111,6 +115,7 @@ func newHost(conn *dbus.Conn, store *Store, timeout time.Duration, failed func(e
 		bussignal.Remove(conn, signals)
 		return nil, errors.Join(err, h.release())
 	}
+	h.feed = h.externalFeed()
 	h.work.Go(func() { h.run(signals) })
 	if h.watcher == nil {
 		h.work.Go(h.resync)
@@ -168,8 +173,9 @@ func (h *Host) Actions() *Actions { return &Actions{conn: h.conn} }
 // nobody owns it; h.watcher stays nil when a watcher already runs.
 func (h *Host) claimWatcher() error {
 	var owner string
-	err := h.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, WatcherName).Store(&owner)
-	if err == nil && owner != "" {
+	call := h.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, WatcherName)
+	if err := call.Store(&owner); err == nil && owner != "" {
+		h.external = externalWatcher{owner: owner, asOf: call.ResponseSequence}
 		return nil
 	}
 	w := newWatcher(h)
@@ -232,7 +238,8 @@ func (h *Host) subscribe() error {
 
 func hostMatches() [][]dbus.MatchOption {
 	return [][]dbus.MatchOption{
-		{dbus.WithMatchInterface(WatcherIface)},
+		{dbus.WithMatchSender(WatcherName), dbus.WithMatchObjectPath(WatcherPath), dbus.WithMatchInterface(WatcherIface)},
+		dbusx.OwnerMatch(WatcherName),
 		{dbus.WithMatchInterface(ItemIface)},
 		{dbus.WithMatchInterface(PropsIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, ItemIface)},
 		{dbus.WithMatchInterface(MenuIface)},
@@ -285,7 +292,6 @@ func (h *Host) run(signals chan *dbus.Signal) {
 				return
 			}
 			h.handle(sig)
-			bussignal.Discard(sig)
 		case loss := <-h.vanished:
 			h.nameLost(loss)
 		case reg := <-h.tracks:
@@ -349,29 +355,78 @@ func (h *Host) wantedPixmapSizes() []int {
 	return sizes
 }
 
-// handle routes one signal.
+// externalWatcher is the owner of the watcher name another process
+// serves, "" while nobody does, as of the bus's answer sequenced asOf.
+type externalWatcher struct {
+	owner string
+	asOf  dbus.Sequence
+}
+
+// externalFeed routes an external watcher's registrations, and its name
+// passing from one owner to the next: a watcher that takes the name
+// over is told of the host and asked for its items.
+func (h *Host) externalFeed() []dbusx.Route {
+	return []dbusx.Route{
+		dbusx.OnOthers(WatcherIface, WatcherPath, func(sig *dbus.Signal) error {
+			reg, _ := firstString(sig.Body)
+			switch sig.Name {
+			case WatcherIface + ".StatusNotifierItemRegistered":
+				h.track(reg)
+			case WatcherIface + ".StatusNotifierItemUnregistered":
+				bus, path := ParseAddress(reg)
+				h.forget(bus, path)
+			}
+			return sig.CloseFDs()
+		}),
+		dbusx.OnOwnerChange(WatcherName, func(_, owner string, announced dbus.Sequence) error {
+			if announced <= h.external.asOf {
+				return nil
+			}
+			h.external.owner = owner
+			if owner != "" {
+				h.work.Go(h.rejoin)
+			}
+			return nil
+		}),
+	}
+}
+
+// rejoin announces the host to a watcher that took the name over and
+// reads the items registered with it.
+func (h *Host) rejoin() {
+	if err := h.registerHost(); err != nil {
+		if h.ctx.Err() == nil {
+			h.failed(err)
+		}
+		return
+	}
+	h.resync()
+}
+
+// handle routes one signal and takes over the descriptors it carries.
+// An external watcher's feed comes from whichever connection owns the
+// watcher name; our own watcher tracks directly. The items' signals
+// come from any connection at any path, which no route names yet
+// (lys-lib#106).
 func (h *Host) handle(sig *dbus.Signal) {
 	member := sig.Name[strings.LastIndex(sig.Name, ".")+1:]
 	iface := strings.TrimSuffix(sig.Name, "."+member)
-	switch {
-	case iface == WatcherIface && h.watcher == nil:
-		// An external watcher's feed; our own watcher tracks directly.
-		reg, _ := firstString(sig.Body)
-		switch member {
-		case "StatusNotifierItemRegistered":
-			h.track(reg)
-		case "StatusNotifierItemUnregistered":
-			bus, path := ParseAddress(reg)
-			h.forget(bus, path)
+	if h.watcher == nil && (iface == WatcherIface || iface == busIface) {
+		if err := dbusx.Dispatch(sig, h.external.owner, h.feed); err != nil {
+			h.failed(err)
 		}
-	case iface == ItemIface, iface == PropsIface:
+		return
+	}
+	defer bussignal.Discard(sig)
+	switch iface {
+	case ItemIface, PropsIface:
 		// NewIcon, NewAttentionIcon, NewOverlayIcon, NewStatus, NewTitle,
 		// NewToolTip, NewMenu, ... and PropertiesChanged: re-read the
 		// item's snapshot.
 		for _, key := range h.itemsOf(sig.Sender, string(sig.Path)) {
 			h.track(key)
 		}
-	case iface == MenuIface:
+	case MenuIface:
 		// LayoutUpdated, ItemsPropertiesUpdated: open menus refetch.
 		for _, key := range h.menuItemsOf(sig.Sender, string(sig.Path)) {
 			h.notifyMenu(key)

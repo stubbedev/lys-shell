@@ -12,6 +12,8 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
+
+	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // fakeNM is a NetworkManager on a private bus: the settings tree,
@@ -575,9 +577,7 @@ func TestStoppingNMLetsTheCallsInFlightFinishAndRefusesNewOnes(t *testing.T) {
 	f.held = held
 	f.mu.Unlock()
 	client := f.client()
-	must(t, client.AddMatchSignal(dbus.WithMatchObjectPath(nmPath), dbus.WithMatchMember("PropertiesChanged")))
-	changes := make(chan *dbus.Signal, 16)
-	client.Signal(changes)
+	changes, _ := bussignaltest.Signals(t, client, 16, dbus.WithMatchObjectPath(nmPath), dbus.WithMatchMember("PropertiesChanged"))
 	manager := client.Object(BusName, nmPath)
 	activate := func() <-chan *dbus.Call {
 		out := make(chan *dbus.Call, 1)
