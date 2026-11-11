@@ -472,8 +472,27 @@ pkgs.testers.nixosTest {
         cols = [x for x in range(width) if any(a[(y * width + x) * 3 : (y * width + x) * 3 + 3] != b[(y * width + x) * 3 : (y * width + x) * 3 + 3] for y in range(rows[0], rows[-1] + 1, 4))]
         return cols[0], rows[0], cols[-1], rows[-1]
 
+    def layers_open(namespace):
+        still = set()
+        for e in events("layer"):
+            if e["namespace"] != namespace:
+                continue
+            if e["change"] == "open":
+                still.add(e["id"])
+            elif e["change"] == "close":
+                still.discard(e["id"])
+        return still
+
+    # A portal dialog answers its request first and plays its exit after,
+    # so the app has its answer while the dialog is still fading: the
+    # screen a later step compares against is captured once the dialog's
+    # surface is gone, not once the answer is in.
+    def calm_capture(name):
+        wait("the portal dialogs to leave the screen", lambda: not layers_open("lys-shell-portal-dialog"), tries=30)
+        return capture(name, out)
+
     def allow(mode, log, name):
-        calm = capture("before-" + name, out)
+        calm = calm_capture("before-" + name)
         machine.succeed(f"su - ${user} -c '{env} portal-client {mode} > /tmp/lys/{log} 2>&1 &'")
 
         def dialog_shown():
@@ -514,10 +533,11 @@ pkgs.testers.nixosTest {
     def shell_state():
         return run("systemctl --user show -P ActiveState lys-shell.service").strip()
 
-    calm = capture("before-chooser", out)
+    calm = calm_capture("before-chooser")
 
     def chooser_shown():
         box = changed_box(calm, capture("chooser", out))
+        print("changed against before-chooser:", box)
         return box is not None and box[2] - box[0] > 400 and box[3] - box[1] > 300
 
     run("systemctl --user stop lys-shell.service")
