@@ -68,5 +68,15 @@ func (q *Queue) Dismiss(handle string) (showing bool) {
 	return false
 }
 
+// CancelWaiting answers every waiting request cancelled, in arrival
+// order, without showing it: the surface is going away.
+func (q *Queue) CancelWaiting() {
+	waiting := q.waiting
+	q.waiting = nil
+	for _, e := range waiting {
+		e.cancel()
+	}
+}
+
 // Len is the number of requests waiting behind the one showing.
 func (q *Queue) Len() int { return len(q.waiting) }

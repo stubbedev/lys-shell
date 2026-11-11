@@ -474,3 +474,21 @@ func TestKeyedProvidersReadTheLocationsZone(t *testing.T) {
 		t.Errorf("visual crossing hourly %+v, want the location's 15:00 (22:00 UTC)", w.Hourly)
 	}
 }
+
+func TestCloseReturnsOnceEveryPollHasEnded(t *testing.T) {
+	var fetching, ended atomic.Int32
+	hang := func(ctx context.Context, _ Settings, _ time.Time) (*Weather, error) {
+		fetching.Add(1)
+		<-ctx.Done()
+		ended.Add(1)
+		return nil, ctx.Err()
+	}
+	svc := newService(Settings{Interval: time.Hour}, hang, retryDelay)
+	waitFor(t, "the first fetch", func() bool { return fetching.Load() == 1 })
+	svc.Refresh()
+	waitFor(t, "the restarted fetch", func() bool { return fetching.Load() == 2 })
+	svc.Close()
+	if got := ended.Load(); got != 2 {
+		t.Errorf("Close returned with %d of the 2 polls ended", got)
+	}
+}

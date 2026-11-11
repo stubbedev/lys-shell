@@ -168,7 +168,7 @@ type privacyView struct {
 func privacyDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &privacyView{ctx: ctx, font: font, px: px, signal: syscall.Kill}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "privacy-dropdown")
 	icon := ctx.Config.Privacy.Icon
@@ -202,11 +202,11 @@ func (v *privacyView) rebuild() {
 			label = "dropdown-privacy-unmute"
 		}
 		v.list.Append(v.row(u.Name, i18n.T("dropdown-privacy-mic", i18n.Str("source", u.Source)), cfg.Icon, i18n.T(label), func() {
-			go func() {
+			v.ctx.Go(func() {
 				if err := v.ctx.Pulse.SetStreamMute(context.Background(), key, !muted); err != nil {
 					log.Printf("privacy: mute %s: %v", u.Name, err)
 				}
-			}()
+			})
 		}))
 	}
 	for _, c := range s.cameras {
@@ -221,11 +221,11 @@ func (v *privacyView) rebuild() {
 		for _, sh := range v.ctx.ScreenShares.List() {
 			session := sh.Session
 			v.list.Append(v.row(shareApp(sh), shareTargets(sh), cfg.ScreenIcon, i18n.T("dropdown-screen-share-stop"), func() {
-				go func() {
+				v.ctx.Go(func() {
 					if err := v.ctx.ScreenShares.Stop(context.Background(), session); err != nil {
 						log.Printf("privacy: %v", err)
 					}
-				}()
+				})
 			}))
 		}
 	}

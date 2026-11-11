@@ -160,10 +160,10 @@ func (c *Chooser) startPreview() {
 	c.pv.cancel = cancel
 	u, req := c.ui, previewRequest{entry: c.pv.entry, mimeType: c.d.MIME.TypeByName(c.pv.entry.Name())}
 	load := c.previewLoader
-	go func() {
+	c.offLoop.Go(func() {
 		p, err := load(ctx, req)
 		c.d.Invoke(func() { c.landPreview(ctx, u, req.entry, p, err) })
-	}()
+	})
 }
 
 // landPreview shows a load that ended, unless it was superseded; a

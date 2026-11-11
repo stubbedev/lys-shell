@@ -209,7 +209,7 @@ func TestBitwardenGeneratorIconsAreBundled(t *testing.T) {
 func TestBitwardenGeneratorNeedsTheHost(t *testing.T) {
 	cfg := config.Defaults()
 	style := computeStyle(cfg, styling.Default())
-	broken := bitwardenDropdown(ModuleContext{Config: cfg, Font: testFont(t), Style: &style}).(*bitwardenView)
+	broken := bitwardenDropdown(ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)}).(*bitwardenView)
 	if broken.genBtn.Visible() {
 		t.Error("the generator is offered without a vault host")
 	}

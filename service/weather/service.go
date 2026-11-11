@@ -76,6 +76,7 @@ type Service struct {
 	cancel   context.CancelFunc
 	life     context.Context
 	stop     context.CancelFunc
+	polls    sync.WaitGroup
 	changes  *feed.Tick
 	fetch    FetchFunc
 	// retryDelay is the backoff; tests shorten it.
@@ -123,7 +124,7 @@ func (s *Service) restartLocked(next Settings) {
 	}
 	ctx, cancel := context.WithCancel(s.life)
 	s.cancel = cancel
-	go s.poll(ctx, next)
+	s.polls.Go(func() { s.poll(ctx, next) })
 	feed.Notify(s.changes)
 }
 
@@ -152,8 +153,13 @@ func (s *Service) Status() Status {
 // Subscribe ticks whenever Weather or Status changed.
 func (s *Service) Subscribe() (<-chan struct{}, func()) { return s.changes.Subscribe() }
 
-// Close stops polling.
-func (s *Service) Close() { s.stop() }
+// Close stops polling and returns once the polls have, their idle
+// connections closed.
+func (s *Service) Close() {
+	s.stop()
+	s.polls.Wait()
+	httpClient.CloseIdleConnections()
+}
 
 func (s *Service) poll(ctx context.Context, settings Settings) {
 	interval := settings.Interval

@@ -969,3 +969,31 @@ func restartedService(tb testing.TB) *Service {
 	tb.Cleanup(func() { settle(s) })
 	return s
 }
+
+func TestShutdownLandsTheWritesAndClosesTheStore(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	st, path := openTestStore(t)
+	svc := newStoredService(t, st)
+	svc.Notify("mail", 0, "", "Kept", "", nil, 0)
+	if err := svc.Shutdown(10 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Count(); err == nil {
+		t.Error("the store answers after Shutdown, want it closed")
+	}
+	svc.Notify("mail", 0, "", "Memory only", "", nil, 0)
+	if got := svc.Count(); got != 2 {
+		t.Errorf("the history holds %d after Shutdown, want both in memory", got)
+	}
+	reopened, err := OpenStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	if n, err := reopened.Count(); err != nil || n != 1 {
+		t.Errorf("the store kept %d (%v), want the one queued before Shutdown", n, err)
+	}
+	if err := NewService().Shutdown(time.Second); err != nil {
+		t.Errorf("a service without a store: %v", err)
+	}
+}

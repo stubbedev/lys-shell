@@ -95,7 +95,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 	}
 	style := computeStyle(cfg, styling.Default())
 	m := &volumeModule{
-		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
+		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)},
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
@@ -126,7 +126,7 @@ func TestVolumeModuleRendersAndRestyles(t *testing.T) {
 func newVolumeForTest(t *testing.T, cfg *config.Config, source *fakePulseSource) *volumeModule {
 	t.Helper()
 	style := computeStyle(cfg, styling.Default())
-	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)}
 	m := &volumeModule{ctx: ctx, source: source}
 	m.icon = moduleIcon(ctx, cfg.Volume.Icon())
 	m.btn = newBarButton(m.ctx, m.icon, "")

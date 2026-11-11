@@ -263,7 +263,7 @@ type audioView struct {
 func audioDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &audioView{ctx: ctx, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "audio-dropdown")
 	v.Append(dropdownHeader(font, "ld-volume-2-symbolic", i18n.T("dropdown-audio-title")), false)
@@ -325,7 +325,7 @@ func (v *audioView) showPage(name string) { v.pages.Show(name) }
 // futures do; the follow loop picks up the result.
 func (v *audioView) write(what string, fn func(context.Context, pulse.Source) error) {
 	if call := v.call(what, fn); call != nil {
-		go call()
+		v.ctx.Go(call)
 	}
 }
 

@@ -191,7 +191,7 @@ func fakeSwayInputs(t *testing.T, inputs string, events chan string) {
 		binary.LittleEndian.PutUint32(out[10:], msgType)
 		_, _ = conn.Write(append(out, body...))
 	}
-	path := serveUnix(t, "sway.sock", func(conn net.Conn) {
+	path := serveUnix(t, "sway.sock", func(conn net.Conn, stop <-chan struct{}) {
 		for {
 			head := make([]byte, 14)
 			if _, err := io.ReadFull(conn, head); err != nil {
@@ -213,13 +213,18 @@ func fakeSwayInputs(t *testing.T, inputs string, events chan string) {
 					return
 				}
 				frame(conn, msgType, `{"success": true}`)
-				for next := range events {
+				for {
+					var next string
+					select {
+					case <-stop:
+						return
+					case next = <-events:
+					}
 					mu.Lock()
 					inputs = next
 					mu.Unlock()
 					frame(conn, 0x80000015, `{"change":"xkb_layout"}`)
 				}
-				return
 			default:
 				frame(conn, msgType, "[]")
 			}
@@ -231,7 +236,6 @@ func fakeSwayInputs(t *testing.T, inputs string, events chan string) {
 
 func TestKeyboardLayoutFollowsSwayInputEvents(t *testing.T) {
 	events := make(chan string, 1)
-	t.Cleanup(func() { close(events) })
 	fakeSwayInputs(t, `[{"type":"pointer"},{"type":"keyboard","xkb_active_layout_name":"German"}]`, events)
 	cfg := config.Defaults()
 	cfg.KeyboardInput.LayoutAliasMap = map[string]string{"German": "DE"}
@@ -252,7 +256,6 @@ func TestKeyboardLayoutFollowsSwayInputEvents(t *testing.T) {
 // the format and alias map like any layout.
 func TestKeyboardLayoutStartsUnknownWithoutAKeyboard(t *testing.T) {
 	events := make(chan string, 1)
-	t.Cleanup(func() { close(events) })
 	fakeSwayInputs(t, `[{"type":"pointer"}]`, events)
 	cfg := config.Defaults()
 	cfg.KeyboardInput.Format = "KB {{ alias }}"
@@ -283,7 +286,7 @@ func fakeNiriLayouts(t *testing.T, names string, switches chan int) {
 	t.Helper()
 	var mu sync.Mutex
 	current := 0
-	path := serveUnix(t, "niri.sock", func(conn net.Conn) {
+	path := serveUnix(t, "niri.sock", func(conn net.Conn, stop <-chan struct{}) {
 		r := bufio.NewReader(conn)
 		for {
 			line, err := r.ReadString('\n')
@@ -298,13 +301,18 @@ func fakeNiriLayouts(t *testing.T, names string, switches chan int) {
 				_, _ = fmt.Fprintf(conn, `{"Ok":{"KeyboardLayouts":{"names":%s,"current_idx":%d}}}`+"\n", names, idx)
 			case "\"EventStream\"\n":
 				_, _ = conn.Write([]byte("{\"Ok\":\"Handled\"}\n"))
-				for idx := range switches {
+				for {
+					var idx int
+					select {
+					case <-stop:
+						return
+					case idx = <-switches:
+					}
 					mu.Lock()
 					current = idx
 					mu.Unlock()
 					_, _ = fmt.Fprintf(conn, `{"KeyboardLayoutSwitched":{"idx":%d}}`+"\n", idx)
 				}
-				return
 			}
 		}
 	})
@@ -314,7 +322,6 @@ func fakeNiriLayouts(t *testing.T, names string, switches chan int) {
 
 func TestKeyboardLayoutFollowsNiriLayoutSwitches(t *testing.T) {
 	switches := make(chan int, 1)
-	t.Cleanup(func() { close(switches) })
 	fakeNiriLayouts(t, `["English (US)","German"]`, switches)
 	label := newTestKeyboardLayout(t, config.Defaults())
 	if got := label.Text(); got != "English (US)" {
@@ -339,7 +346,6 @@ func TestKeyboardLayoutFollowsMangosActiveMonitor(t *testing.T) {
 
 func TestKeyboardLayoutHidesWithLabelShowOff(t *testing.T) {
 	events := make(chan string)
-	t.Cleanup(func() { close(events) })
 	fakeSwayInputs(t, `[{"type":"keyboard","xkb_active_layout_name":"German"}]`, events)
 	cfg := config.Defaults()
 	cfg.KeyboardInput.LabelShow = false

@@ -14,6 +14,7 @@ import (
 	"github.com/stubbedev/lys-desktop/swaytest"
 	"github.com/stubbedev/lys-lib/third_party/wayland/wl"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // settle is how long what must not happen gets to happen anyway before
@@ -48,6 +49,7 @@ func Loop(t *testing.T) *app.Application {
 		if err := <-done; err != nil && !errors.Is(err, app.ErrClosed) {
 			t.Errorf("the loop ended with %v", err)
 		}
+		widget.WaitAssetLoads()
 	})
 	return a
 }

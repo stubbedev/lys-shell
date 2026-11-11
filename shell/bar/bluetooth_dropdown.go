@@ -140,7 +140,7 @@ func bluetoothDropdown(ctx ModuleContext) widget.Widget {
 		return btNoAdapterDropdown(ctx)
 	}
 	d := newBtDropdown(ctx, ctx.Bluetooth)
-	d.openFollow = newOpenFollow(d.follow)
+	d.openFollow = newOpenFollow(ctx, d.follow)
 	d.stopped = func() { btDropdownClosed(d.src) }
 	d.startFollowing()
 	return d.root
@@ -205,7 +205,7 @@ func (d *btDropdown) follow(life context.Context) {
 	d.sync()
 	ticks, stop := d.src.Subscribe()
 	btDropdownOpened(d.src)
-	go func() {
+	d.ctx.Go(func() {
 		defer stop()
 		for {
 			select {
@@ -218,7 +218,7 @@ func (d *btDropdown) follow(life context.Context) {
 				d.ctx.Invoke(d.sync)
 			}
 		}
-	}()
+	})
 }
 
 // async runs work off the loop and then back on it; headless (no
@@ -231,12 +231,12 @@ func (d *btDropdown) async(work func(), then func()) {
 		}
 		return
 	}
-	go func() {
+	d.ctx.Go(func() {
 		work()
 		if then != nil {
 			d.ctx.Invoke(then)
 		}
-	}()
+	})
 }
 
 // sync folds the service state into the view (the update_cmd arms).

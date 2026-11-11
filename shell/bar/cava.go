@@ -377,11 +377,14 @@ func goEvery(every time.Duration, fn func()) func() {
 	return stop
 }
 
-func (a *cavaAnalyzer) join(life context.Context, slot *cavaBarSlot) {
+func (a *cavaAnalyzer) join(life context.Context, spawn func(func()), slot *cavaBarSlot) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.bars[slot] = struct{}{}
-	context.AfterFunc(life, func() { a.leave(slot) })
+	spawn(func() {
+		<-life.Done()
+		a.leave(slot)
+	})
 	a.resumeLocked()
 }
 
@@ -521,7 +524,7 @@ func newCava(ctx ModuleContext) (Module, error) {
 		return nil, err
 	}
 	module.analyzer = an
-	an.join(ctx.Life(), newCavaBarSlot(paint, ctx.Invoke))
+	an.join(ctx.Life(), ctx.Go, newCavaBarSlot(paint, ctx.Invoke))
 	return module, nil
 }
 

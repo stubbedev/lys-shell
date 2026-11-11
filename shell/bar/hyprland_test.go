@@ -246,24 +246,7 @@ func startFakeHypr(t *testing.T, replies map[string]string) (*fakeHypr, *hyprlan
 	dir := sockdir.Dir(t)
 	f := &fakeHypr{replies: replies, events: make(chan net.Conn, 1), held: map[string]chan struct{}{}, arrived: make(chan string, 16)}
 	cmdPath, evPath := filepath.Join(dir, ".socket.sock"), filepath.Join(dir, ".socket2.sock")
-	serve := func(path string, fn func(net.Conn)) {
-		ln, err := net.Listen("unix", path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = ln.Close() })
-		go func() {
-			for {
-				conn, err := ln.Accept()
-				if err != nil {
-					return
-				}
-				go fn(conn)
-			}
-		}()
-	}
-	serve(cmdPath, func(conn net.Conn) {
-		defer conn.Close()
+	serveUnixAt(t, cmdPath, func(conn net.Conn, stop <-chan struct{}) {
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		req := string(buf[:n])
@@ -280,12 +263,27 @@ func startFakeHypr(t *testing.T, replies map[string]string) (*fakeHypr, *hyprlan
 		held := f.held[req]
 		f.mu.Unlock()
 		if held != nil {
-			f.arrived <- req
-			<-held
+			select {
+			case f.arrived <- req:
+			case <-stop:
+				return
+			}
+			select {
+			case <-held:
+			case <-stop:
+				return
+			}
 		}
 		_, _ = conn.Write(append([]byte(reply), '\x04'))
 	})
-	serve(evPath, func(conn net.Conn) { f.events <- conn })
+	serveUnixAt(t, evPath, func(conn net.Conn, stop <-chan struct{}) {
+		select {
+		case f.events <- conn:
+		case <-stop:
+			return
+		}
+		<-stop
+	})
 	return f, hyprland.ConnectTo(cmdPath, evPath)
 }
 

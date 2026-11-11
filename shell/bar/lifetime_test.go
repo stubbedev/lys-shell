@@ -43,13 +43,9 @@ func TestRetiringAGenerationEndsItsModules(t *testing.T) {
 	}
 }
 
-// Outside a generation (headless tests, process-wide services) the
-// context never ends and a closed feed ends the follow.
-func TestFollowWithoutAGenerationEndsWithTheFeed(t *testing.T) {
-	ctx := ModuleContext{}
-	if ctx.Life().Err() != nil {
-		t.Fatal("a context outside a generation has ended")
-	}
+// A closed feed ends the follow while its generation lives on.
+func TestFollowEndsWithItsFeed(t *testing.T) {
+	ctx := ModuleContext{gen: testGen(t)}
 	ticks := make(chan struct{})
 	stopped := make(chan struct{})
 	follow(ctx, ticks, func() { close(stopped) }, func(struct{}) {})
@@ -58,5 +54,9 @@ func TestFollowWithoutAGenerationEndsWithTheFeed(t *testing.T) {
 	case <-stopped:
 	case <-time.After(time.Second):
 		t.Fatal("a closed feed did not end the follow")
+	}
+	ctx.gen.waitWork()
+	if ctx.Life().Err() != nil {
+		t.Error("the follow's end ended its generation")
 	}
 }

@@ -9,7 +9,6 @@ import (
 
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/i18n"
-	"github.com/stubbedev/lys-lib/sockdir"
 
 	"github.com/stubbedev/lys-shell/service/hyprland"
 )
@@ -18,27 +17,15 @@ import (
 // connection open.
 func startFakeEventStream(t *testing.T, lines []string) string {
 	t.Helper()
-	path := filepath.Join(sockdir.Dir(t), ".socket2.sock")
-	ln, err := net.Listen("unix", path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { ln.Close() })
-	go func() {
-		conn, err := ln.Accept()
-		if err != nil {
-			return
-		}
-		defer conn.Close()
+	return serveUnix(t, ".socket2.sock", func(conn net.Conn, stop <-chan struct{}) {
 		time.Sleep(20 * time.Millisecond)
 		for _, line := range lines {
 			if _, err := conn.Write([]byte(line)); err != nil {
 				return
 			}
 		}
-		select {}
-	}()
-	return path
+		<-stop
+	})
 }
 
 func TestWindowTitleLabel(t *testing.T) {

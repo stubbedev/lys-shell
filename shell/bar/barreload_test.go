@@ -97,6 +97,7 @@ func TestBarReloadKeepsTheSurface(t *testing.T) {
 	cfg := config.Defaults()
 	ctx := styledContext(t, cfg)
 	ctx.App = application
+	ctx.Polls = testPollHub(t)
 	rt := &barRuntime{ctx: ctx, font: ctx.Font, style: *ctx.Style, moduleStyle: *ctx.Style}
 	rt.ctx.Dropdowns = newDropdownRegistry(application, cfg, rt.font, &rt.style, rt.ctx)
 	host := &barHost{app: application, rt: rt}
@@ -119,12 +120,6 @@ func TestBarReloadKeepsTheSurface(t *testing.T) {
 	set.plug(outputs[0], clockLayout, true)
 	done := make(chan error, 1)
 	go func() { done <- application.Run() }()
-	defer func() {
-		application.Invoke(application.Quit)
-		if err := <-done; err != nil && !errors.Is(err, app.ErrClosed) {
-			t.Errorf("the loop ended with %v", err)
-		}
-	}()
 	onLoop := func(fn func()) {
 		ran := make(chan struct{})
 		application.Invoke(func() {
@@ -133,6 +128,17 @@ func TestBarReloadKeepsTheSurface(t *testing.T) {
 		})
 		<-ran
 	}
+	defer func() {
+		onLoop(func() {
+			set.unplug(outputs[0])
+			rt.ctx.Dropdowns.release()
+		})
+		application.Invoke(application.Quit)
+		if err := <-done; err != nil && !errors.Is(err, app.ErrClosed) {
+			t.Errorf("the loop ended with %v", err)
+		}
+		widget.WaitAssetLoads()
+	}()
 	bar := opened[0]
 	thickness := func() int {
 		var h int

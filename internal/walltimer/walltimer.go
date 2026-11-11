@@ -17,10 +17,11 @@ import (
 // next is the first multiple of unit after t.
 func next(t time.Time, unit time.Duration) time.Time { return t.Truncate(unit).Add(unit) }
 
-// Start calls fire, off the caller's goroutine, on every multiple of
+// Start calls fire, on a goroutine spawn starts, on every multiple of
 // unit since the epoch until ctx ends, and at once when the system clock
 // is set. Several expiries missed in a suspend fire once on resume.
-func Start(ctx context.Context, unit time.Duration, fire func()) error {
+// Every goroutine spawn starts returns once ctx ends, the timer closed.
+func Start(ctx context.Context, spawn func(func()), unit time.Duration, fire func()) error {
 	fd, err := unix.TimerfdCreate(unix.CLOCK_REALTIME, unix.TFD_NONBLOCK|unix.TFD_CLOEXEC)
 	if err != nil {
 		return fmt.Errorf("walltimer: timerfd_create: %w", err)
@@ -30,11 +31,18 @@ func Start(ctx context.Context, unit time.Duration, fire func()) error {
 		return err
 	}
 	file := os.NewFile(uintptr(fd), "walltimer")
-	stop := context.AfterFunc(ctx, func() { _ = file.Close() })
-	go func() {
-		defer stop()
-		wait(file, fd, unit, fire)
-	}()
+	finished := make(chan struct{})
+	spawn(func() {
+		defer close(finished)
+		wait(file, unit, fire)
+	})
+	spawn(func() {
+		select {
+		case <-ctx.Done():
+		case <-finished:
+		}
+		_ = file.Close()
+	})
 	return nil
 }
 
@@ -49,16 +57,28 @@ func arm(fd int, unit time.Duration) error {
 	return nil
 }
 
+func rearm(file *os.File, unit time.Duration) error {
+	raw, err := file.SyscallConn()
+	if err != nil {
+		return fmt.Errorf("walltimer: rearm: %w", err)
+	}
+	var armed error
+	if err := raw.Control(func(fd uintptr) { armed = arm(int(fd), unit) }); err != nil {
+		return fmt.Errorf("walltimer: rearm: %w", err)
+	}
+	return armed
+}
+
 // wait reads expiries until the file closes. A clock set cancels the
 // armed timer, so it fires and arms again.
-func wait(file *os.File, fd int, unit time.Duration, fire func()) {
+func wait(file *os.File, unit time.Duration, fire func()) {
 	var expiries [8]byte
 	for {
 		_, err := file.Read(expiries[:])
 		switch {
 		case err == nil:
 		case errors.Is(err, unix.ECANCELED):
-			if err := arm(fd, unit); err != nil {
+			if err := rearm(file, unit); err != nil {
 				log.Printf("%v", err)
 				return
 			}

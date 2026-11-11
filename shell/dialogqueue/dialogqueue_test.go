@@ -39,3 +39,18 @@ func TestQueueOrdersAndDismisses(t *testing.T) {
 		t.Error("a request into an idle queue did not show at once")
 	}
 }
+
+func TestCancelWaitingAnswersEveryWaitingRequestInOrder(t *testing.T) {
+	var q Queue
+	var log []string
+	for _, h := range []string{"a", "b", "c"} {
+		q.Enqueue(h, func() { log = append(log, "show "+h) }, func() { log = append(log, "cancel "+h) })
+	}
+	q.CancelWaiting()
+	if want := []string{"show a", "cancel b", "cancel c"}; !slices.Equal(log, want) {
+		t.Errorf("log = %q, want %q", log, want)
+	}
+	if q.Len() != 0 || !q.Showing("a") {
+		t.Errorf("after CancelWaiting %d wait and a shows %v, want none waiting and a still showing", q.Len(), q.Showing("a"))
+	}
+}

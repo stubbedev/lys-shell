@@ -149,7 +149,7 @@ type weatherView struct {
 func weatherDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &weatherView{ctx: ctx, svc: ctx.Weather, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "weather-dropdown")
 	v.Append(v.header(), false)
@@ -460,7 +460,7 @@ func (v *weatherView) follow(life context.Context) {
 	}
 	changes, unsubscribe := v.svc.Subscribe()
 	v.refresh()
-	go func() {
+	v.ctx.Go(func() {
 		defer unsubscribe()
 		ticker := time.NewTicker(weatherUpdatedEvery)
 		defer ticker.Stop()
@@ -473,5 +473,5 @@ func (v *weatherView) follow(life context.Context) {
 			}
 			v.ctx.Invoke(v.refresh)
 		}
-	}()
+	})
 }

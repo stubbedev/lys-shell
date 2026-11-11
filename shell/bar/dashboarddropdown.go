@@ -100,7 +100,7 @@ func (v *dashboardView) read() dashboardReadings {
 func dashboardDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &dashboardView{ctx: ctx, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.root = widget.NewBox(widget.Column, 0, 0)
 	v.root.AddClass("dropdown", "dashboard-dropdown")
 	v.root.Append(v.header(), false)
@@ -241,17 +241,17 @@ func (v *dashboardView) quickActions() widget.Widget {
 		if !wifiDev() {
 			return
 		}
-		go func() {
+		v.ctx.Go(func() {
 			if err := v.ctx.Networking.Wifi.SetEnabled(bctx, on); err != nil {
 				log.Printf("dashboard: wifi toggle failed: %v", err)
 			}
-		}()
+		})
 	}
 	setBT := func(on bool) {
 		if v.ctx.Bluetooth == nil {
 			return
 		}
-		go func() {
+		v.ctx.Go(func() {
 			var err error
 			if on {
 				err = v.ctx.Bluetooth.Enable(bctx)
@@ -261,7 +261,7 @@ func (v *dashboardView) quickActions() widget.Widget {
 			if err != nil {
 				log.Printf("dashboard: bluetooth toggle failed: %v", err)
 			}
-		}()
+		})
 	}
 	wifi = make1(0, 0, "ld-wifi-symbolic", "dropdown-dashboard-wifi", func() { setWifi(!state.wifiOn) })
 	bt = make1(1, 0, "ld-bluetooth-symbolic", "dropdown-dashboard-bluetooth", func() { setBT(!state.btOn) })
@@ -312,11 +312,11 @@ func (v *dashboardView) quickActions() widget.Widget {
 		if state.saverOn {
 			target = powerprofiles.ProfileBalanced
 		}
-		go func() {
+		v.ctx.Go(func() {
 			if err := v.ctx.PowerProfiles.SetActive(bctx, target); err != nil {
 				log.Printf("dashboard: power profile toggle failed: %v", err)
 			}
-		}()
+		})
 	})
 
 	v.refreshers = append(v.refreshers, func(r dashboardReadings) {
@@ -373,11 +373,11 @@ func (v *dashboardView) controls() widget.Widget {
 	bctx := context.Background()
 	mute := dropdownButton(muteIcon, func() {
 		target := !muted
-		go func() {
+		v.ctx.Go(func() {
 			if err := v.ctx.Pulse.SetMuted(bctx, target); err != nil {
 				log.Printf("dashboard: mute toggle failed: %v", err)
 			}
-		}()
+		})
 	}, css.Ghost, css.Icon, css.Small)
 	mute.AddClass("dashboard-volume-icon")
 	row.AppendAligned(mute, false, widget.AlignCenter)
@@ -484,11 +484,11 @@ func (v *dashboardView) media() widget.Widget {
 			return
 		}
 		bus := current.BusName
-		go func() {
+		v.ctx.Go(func() {
 			if err := cmd(src, bctx, bus); err != nil {
 				log.Printf("dashboard: %s failed: %v", what, err)
 			}
-		}()
+		})
 	}
 	prev := dropdownButton(widget.NewThemeIcon("ld-skip-back-symbolic", itemIconPx), func() { fire("previous", mpris.Source.Previous) }, css.Ghost, css.Icon, css.Small)
 	prev.AddClass("media-btn")
@@ -520,13 +520,13 @@ func (v *dashboardView) media() widget.Widget {
 		}
 		target := time.Duration(pct / 100 * float64(current.Length))
 		bus := current.BusName
-		go func() {
+		v.ctx.Go(func() {
 			if src := v.ctx.Media; src != nil {
 				if err := src.SetPosition(bctx, bus, target); err != nil {
 					log.Printf("dashboard: seek failed: %v", err)
 				}
 			}
-		}()
+		})
 	}
 	times := widget.NewBox(widget.Row, 0, 0)
 	times.AddClass("media-progress-times")
@@ -955,7 +955,7 @@ func (v *dashboardView) refreshAll() {
 	if v.refreshes.Add(1) > 1 {
 		return
 	}
-	go func() {
+	v.ctx.Go(func() {
 		for {
 			asked := v.refreshes.Load()
 			readings := v.read()
@@ -964,7 +964,7 @@ func (v *dashboardView) refreshAll() {
 				return
 			}
 		}
-	}()
+	})
 }
 
 func (v *dashboardView) apply(readings dashboardReadings) {
@@ -998,7 +998,7 @@ func (v *dashboardView) poll() {
 }
 
 func (v *dashboardView) startPolling(life context.Context) {
-	go func() {
+	v.ctx.Go(func() {
 		v.pollMu.Lock()
 		v.diskIn = 0
 		v.pollMu.Unlock()
@@ -1011,7 +1011,7 @@ func (v *dashboardView) startPolling(life context.Context) {
 			case <-ticker.C:
 			}
 		}
-	}()
+	})
 }
 
 func (v *dashboardView) follow(life context.Context) {
@@ -1023,7 +1023,7 @@ func (v *dashboardView) follow(life context.Context) {
 	v.startPolling(life)
 	merged := make(chan struct{}, 1)
 	add := func(ch <-chan struct{}, stop func()) {
-		go func() {
+		v.ctx.Go(func() {
 			defer stop()
 			for {
 				select {
@@ -1039,7 +1039,7 @@ func (v *dashboardView) follow(life context.Context) {
 					}
 				}
 			}
-		}()
+		})
 	}
 	if v.ctx.Media != nil {
 		add(v.ctx.Media.Subscribe())
@@ -1053,14 +1053,14 @@ func (v *dashboardView) follow(life context.Context) {
 	if v.ctx.Notifications != nil {
 		events, stop := v.ctx.Notifications.Subscribe()
 		ticks := make(chan struct{}, 1)
-		go func() {
+		v.ctx.Go(func() {
 			for range events {
 				select {
 				case ticks <- struct{}{}:
 				default:
 				}
 			}
-		}()
+		})
 		add(ticks, stop)
 	}
 	for _, sub := range []func(context.Context) (<-chan struct{}, func(), error){
@@ -1069,16 +1069,16 @@ func (v *dashboardView) follow(life context.Context) {
 		if sub == nil {
 			continue
 		}
-		go func() {
+		v.ctx.Go(func() {
 			ch, stop, err := sub(life)
 			if err != nil {
 				log.Printf("dashboard: subscribe: %v", err)
 				return
 			}
 			add(ch, stop)
-		}()
+		})
 	}
-	go func() {
+	v.ctx.Go(func() {
 		for {
 			select {
 			case <-life.Done():
@@ -1087,7 +1087,7 @@ func (v *dashboardView) follow(life context.Context) {
 				v.refreshAll()
 			}
 		}
-	}()
+	})
 }
 
 func (v *dashboardView) dropdownFocus() widget.Widget { return v.firstControl() }
@@ -1228,13 +1228,13 @@ func (v *dashboardView) dropdownClosed() {
 	v.openFollow.dropdownClosed()
 	closers := v.closers
 	v.closers = nil
-	go func() {
+	v.ctx.Go(func() {
 		v.pollMu.Lock()
 		defer v.pollMu.Unlock()
 		for _, closeReader := range closers {
 			closeReader()
 		}
-	}()
+	})
 }
 
 type dashboardStat struct {

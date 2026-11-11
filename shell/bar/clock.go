@@ -31,10 +31,10 @@ func newClock(ctx ModuleContext) (Module, error) {
 	spec := samplerSpec[string]{
 		key:   configKey("clock", ctx.Config),
 		pause: pauseLocked,
-		source: func(life context.Context, fire func()) error {
+		source: func(life context.Context, spawn func(func()), fire func()) error {
 			if store != nil && strings.Contains(cfg.Format.String(), nextEventPlaceholder) {
 				changes, stop := store.Changes()
-				go func() {
+				spawn(func() {
 					defer stop()
 					for {
 						select {
@@ -44,9 +44,9 @@ func newClock(ctx ModuleContext) (Module, error) {
 							fire()
 						}
 					}
-				}()
+				})
 			}
-			return walltimer.Start(life, layout.Resolution(), fire)
+			return walltimer.Start(life, spawn, layout.Resolution(), fire)
 		},
 		sample: func() (string, bool) { return clockLabel(cfg, store, time.Now(), shellClockNames()), true },
 		same:   func(a, b string) bool { return a == b },

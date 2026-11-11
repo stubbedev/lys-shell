@@ -36,7 +36,7 @@ func mountOffLoop(ctx ModuleContext, start func()) {
 		start()
 		return
 	}
-	go start()
+	ctx.Go(start)
 }
 
 func returnToLoop(ctx ModuleContext, fn func()) {
@@ -70,7 +70,7 @@ func (r *offLoopRead[T]) request() {
 		return
 	}
 	r.busy = true
-	go r.run()
+	r.ctx.Go(r.run)
 }
 
 func (r *offLoopRead[T]) first() {
@@ -114,7 +114,7 @@ func (r *offLoopRead[T]) settle() {
 		return
 	}
 	r.again = false
-	go r.run()
+	r.ctx.Go(r.run)
 }
 
 func followReads[T any](ctx ModuleContext, module string, gate *firstRead, subscribe func(context.Context) (<-chan struct{}, func(), error), read func(context.Context) (T, error), apply func(T)) *offLoopRead[T] {

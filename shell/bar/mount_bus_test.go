@@ -2,6 +2,8 @@ package bar
 
 import (
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"strconv"
 	"sync/atomic"
@@ -13,6 +15,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
+	"github.com/stubbedev/lys-shell/service/weather"
 )
 
 func goroutineID() int64 {
@@ -58,6 +61,7 @@ func deref(p *[]string) []string {
 func TestMountMakesNoBlockingBusCallOnTheLoop(t *testing.T) {
 	isolateConfigDir(t)
 	clearCompositorEnv(t)
+	keepWeatherLocal(t)
 	rem := widget.RootFontSize()
 	t.Cleanup(func() {
 		widget.SetRootFontSize(rem)
@@ -80,7 +84,13 @@ func TestMountMakesNoBlockingBusCallOnTheLoop(t *testing.T) {
 	s := newShellStart(a, a.Session(), config.Defaults(), nil, session)
 	apptest.On(a, func() bool { s.releaseHold = a.Hold(); return true })
 	s.startServices(system)
-	t.Cleanup(func() { apptest.On(a, func() bool { s.down.run(); return true }) })
+	t.Cleanup(func() {
+		apptest.On(a, func() bool { s.down.run(); return true })
+		awaitWork(t, "the shell's work outlives its teardown", func() {
+			s.ctx.gen.waitWork()
+			s.polls.waitWork()
+		})
+	})
 	apptest.On(a, func() bool {
 		counter.loop.Store(goroutineID())
 		defer counter.loop.Store(0)
@@ -100,5 +110,16 @@ func TestMountMakesNoBlockingBusCallOnTheLoop(t *testing.T) {
 	})
 	if n := counter.calls.Load(); n != 1 {
 		t.Errorf("a call on the loop counted %d times, want once: the counter proves nothing", n)
+	}
+}
+
+func keepWeatherLocal(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(server.Close)
+	endpoints := []*string{&weather.GeocodingURL, &weather.OpenMeteoURL, &weather.VisualCrossingURL, &weather.WeatherAPIURL}
+	for _, endpoint := range endpoints {
+		was := *endpoint
+		*endpoint = server.URL
+		t.Cleanup(func() { *endpoint = was })
 	}
 }

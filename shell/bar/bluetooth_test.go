@@ -51,7 +51,7 @@ func TestBluetoothModuleLabel(t *testing.T) {
 	style := computeStyle(cfg, styling.Default()).forModules()
 	source := newFakeBluetooth(btState("Headset"))
 	m := &bluetoothModule{
-		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
+		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)},
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
@@ -77,7 +77,7 @@ func TestBluetoothStateIcon(t *testing.T) {
 	cfg := config.Defaults()
 	style := computeStyle(cfg, styling.Default())
 	source := newFakeBluetooth(btState("Headset"))
-	m := &bluetoothModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
+	m := &bluetoothModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)}, source: source}
 	m.icon = moduleIcon(m.ctx, cfg.Bluetooth.Icon())
 	m.btn = newBarButton(m.ctx, m.icon, "")
 	if m.icon == nil {
@@ -114,7 +114,7 @@ func TestMicrophoneStateIcon(t *testing.T) {
 	cfg := config.Defaults()
 	style := computeStyle(cfg, styling.Default())
 	source := &fakePulseSource{dev: pulse.Device{Volume: pct(40)}}
-	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
+	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)}, source: source}
 	m.icon = moduleIcon(m.ctx, cfg.Microphone.Icon())
 	m.btn = newBarButton(m.ctx, m.icon, "")
 	if m.icon == nil {

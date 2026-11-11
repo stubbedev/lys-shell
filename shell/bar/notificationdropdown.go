@@ -75,7 +75,7 @@ type notificationView struct {
 func notificationDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &notificationView{ctx: ctx, svc: ctx.Notifications, font: font, px: px, now: time.Now, minter: notifyui.Minter(ctx.App)}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	if v.svc != nil {
 		v.pageOf = v.svc.Page
 	}
@@ -282,7 +282,7 @@ func (v *notificationView) follow(life context.Context) {
 			v.rebuild()
 		}
 	}}
-	go func() {
+	v.ctx.Go(func() {
 		defer stopHistory()
 		for {
 			select {
@@ -295,9 +295,9 @@ func (v *notificationView) follow(life context.Context) {
 				rebuilds.give(struct{}{})
 			}
 		}
-	}()
+	})
 	events, stop := v.svc.Subscribe()
-	go func() {
+	v.ctx.Go(func() {
 		defer stop()
 		tick := time.NewTicker(notifTimeTick)
 		defer tick.Stop()
@@ -316,7 +316,7 @@ func (v *notificationView) follow(life context.Context) {
 				}
 			}
 		}
-	}()
+	})
 }
 
 // notifGroup is NotificationGroup: lys-ui's card whose header Item

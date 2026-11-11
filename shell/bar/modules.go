@@ -191,12 +191,17 @@ type mountGen struct {
 	cancel  context.CancelFunc
 	// releases run when the generation retires, before retire returns.
 	releases []func()
+	work     *sync.WaitGroup
 }
 
-func newMountGen() *mountGen {
+func newMountGen() *mountGen { return newMountGenIn(&sync.WaitGroup{}) }
+
+func newMountGenIn(work *sync.WaitGroup) *mountGen {
 	life, cancel := context.WithCancel(context.Background())
-	return &mountGen{done: make(chan struct{}), life: life, cancel: cancel}
+	return &mountGen{done: make(chan struct{}), life: life, cancel: cancel, work: work}
 }
+
+func (g *mountGen) next() *mountGen { return newMountGenIn(g.work) }
 
 // Life is the module's lifetime: canceled when its generation
 // retires (a config reload), never for a context outside one. Module
@@ -207,6 +212,13 @@ func (c ModuleContext) Life() context.Context {
 	}
 	return c.gen.life
 }
+
+// Go runs fn on a goroutine of the module's generation, which must end
+// once the generation retires. The generations a runtime mounts share
+// what they run, which waitWork waits for.
+func (c ModuleContext) Go(fn func()) { c.gen.work.Go(fn) }
+
+func (g *mountGen) waitWork() { g.work.Wait() }
 
 func (g *mountGen) retiredNow() bool { return g != nil && g.retired.Load() }
 
@@ -242,7 +254,7 @@ func (g *mountGen) ended() <-chan struct{} {
 }
 
 func drain[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
-	go func() {
+	ctx.Go(func() {
 		if stop != nil {
 			defer stop()
 		}
@@ -257,7 +269,7 @@ func drain[T any](ctx ModuleContext, ch <-chan T, stop func(), fn func(T)) {
 				fn(v)
 			}
 		}
-	}()
+	})
 }
 
 // follow runs fn through Invoke with the values from ch until the module's

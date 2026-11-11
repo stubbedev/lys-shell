@@ -190,7 +190,7 @@ type batteryView struct {
 func batteryDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &batteryView{ctx: ctx, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "battery-dropdown")
 	v.Append(dropdownHeader(font, "ld-battery-full-symbolic", i18n.T("dropdown-battery-title")), false)
@@ -456,7 +456,7 @@ func (v *batteryView) chargeToggled(enabled bool) {
 		return
 	}
 	src := v.ctx.Battery
-	go func() {
+	v.ctx.Go(func() {
 		ctx := context.Background()
 		if err := src.EnableChargeThreshold(ctx, enabled); err != nil {
 			log.Printf("battery: charge threshold toggle: %v", err)
@@ -464,7 +464,7 @@ func (v *batteryView) chargeToggled(enabled bool) {
 		if v.device != nil {
 			v.device.request()
 		}
-	}()
+	})
 }
 
 // readProfiles reads the daemon; nil when it is absent, so every
@@ -517,7 +517,7 @@ func (v *batteryView) selectProfile(name string) {
 		v.markProfile(p.name, p.name == name)
 	}
 	v.activeProfile = name
-	go func() {
+	v.ctx.Go(func() {
 		ctx := context.Background()
 		if err := src.SetActive(ctx, name); err != nil {
 			log.Printf("battery: power profile switch: %v", err)
@@ -525,7 +525,7 @@ func (v *batteryView) selectProfile(name string) {
 		if v.profiles != nil {
 			v.profiles.request()
 		}
-	}()
+	})
 }
 
 // follow tracks both services until the dropdown closes.

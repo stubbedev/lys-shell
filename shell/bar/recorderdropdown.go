@@ -229,7 +229,7 @@ type recorderView struct {
 func recorderDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &recorderView{ctx: ctx, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.camReads = newRefresher(ctx, v.life, func(context.Context) []devicechoice.DeviceChoice { return recorderCameras() }, v.syncCams)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "recorder-dropdown")
@@ -340,11 +340,11 @@ func (v *recorderView) saveReplay() {
 	if r == nil {
 		return
 	}
-	go func() {
+	v.ctx.Go(func() {
 		if _, err := r.SaveReplay(); err != nil {
 			log.Printf("recorder: %v", err)
 		}
-	}()
+	})
 }
 
 // sectionHeader is the recorder's icon-led section label.
@@ -464,7 +464,7 @@ func (v *recorderView) follow(life context.Context) {
 	v.camReads.first()
 	if r := v.ctx.Recorder; r != nil {
 		changes, stop := r.Changes()
-		go func() {
+		v.ctx.Go(func() {
 			defer stop()
 			for {
 				select {
@@ -477,7 +477,7 @@ func (v *recorderView) follow(life context.Context) {
 					v.ctx.Invoke(func() { v.applyState(c) })
 				}
 			}
-		}()
+		})
 	}
 	if src := v.ctx.Pulse; src != nil {
 		if v.micReads == nil {

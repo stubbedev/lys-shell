@@ -189,6 +189,13 @@ func (b *surfaceSet[L]) unplug(output *app.Output) {
 	b.published()
 }
 
+func (b *surfaceSet[L]) close() {
+	for _, name := range slices.Clone(b.order) {
+		b.drop(name)
+	}
+	b.published()
+}
+
 func (b *surfaceSet[L]) drop(name string) {
 	if entry := b.bars[name]; entry.layer != nil {
 		entry.layer.Close()

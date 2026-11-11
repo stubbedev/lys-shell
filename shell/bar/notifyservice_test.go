@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-desktop/config"
 
 	"github.com/stubbedev/lys-shell/internal/notifytest"
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 func TestNotificationServiceRunsOnlyWhenEnabled(t *testing.T) {
@@ -27,6 +28,7 @@ func TestNotificationServiceRunsOnlyWhenEnabled(t *testing.T) {
 	if svc == nil {
 		t.Fatal("an enabled [modules.notification] has no service")
 	}
+	shutDownAtEnd(t, svc)
 	svc.Notify("noisy-app", 0, "", "spam", "", nil, 0)
 	if got := svc.Count(); got != 0 {
 		t.Fatalf("count = %d; the startup blocklist did not apply", got)
@@ -52,8 +54,12 @@ func TestNotificationHistorySurvivesARestart(t *testing.T) {
 	cfg.Enabled = true
 	first := startNotifications(cfg)
 	first.Notify("mail", 0, "", "Kept", "body", nil, 0)
-	first.FlushWrites(10 * time.Second)
-	if again := startNotifications(cfg); again.Count() != 1 || notifytest.History(t, again)[0].Summary != "Kept" {
+	if err := first.Shutdown(10 * time.Second); err != nil {
+		t.Fatal(err)
+	}
+	again := startNotifications(cfg)
+	shutDownAtEnd(t, again)
+	if again.Count() != 1 || notifytest.History(t, again)[0].Summary != "Kept" {
 		t.Fatalf("restarted history = %v, want the stored notification", notifytest.History(t, again))
 	}
 
@@ -63,4 +69,12 @@ func TestNotificationHistorySurvivesARestart(t *testing.T) {
 	if svc.Count() != 1 {
 		t.Error("a missing store stopped the history")
 	}
+}
+
+func shutDownAtEnd(t *testing.T, svc *notifications.Service) {
+	t.Cleanup(func() {
+		if err := svc.Shutdown(10 * time.Second); err != nil {
+			t.Error(err)
+		}
+	})
 }

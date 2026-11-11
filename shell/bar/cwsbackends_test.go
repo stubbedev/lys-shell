@@ -6,40 +6,73 @@ import (
 	"io"
 	"net"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-lib/sockdir"
 )
 
-// serveUnix accepts on a fresh socket and hands each connection to fn.
-func serveUnix(t *testing.T, name string, fn func(net.Conn)) string {
+// serveUnix accepts on a fresh socket and hands each connection to fn
+// until the test ends: then stop closes, the socket and every
+// connection close, and the test waits for fn to return.
+func serveUnix(t *testing.T, name string, fn func(conn net.Conn, stop <-chan struct{})) string {
 	t.Helper()
 	path := filepath.Join(sockdir.Dir(t), name)
+	serveUnixAt(t, path, fn)
+	return path
+}
+
+func serveUnixAt(t *testing.T, path string, fn func(conn net.Conn, stop <-chan struct{})) {
+	t.Helper()
 	ln, err := net.Listen("unix", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = ln.Close() })
-	go func() {
+	stop := make(chan struct{})
+	var (
+		mu     sync.Mutex
+		conns  []net.Conn
+		closed bool
+		work   sync.WaitGroup
+	)
+	t.Cleanup(func() {
+		close(stop)
+		_ = ln.Close()
+		mu.Lock()
+		closed = true
+		for _, conn := range conns {
+			_ = conn.Close()
+		}
+		mu.Unlock()
+		awaitWork(t, "the fake "+path+" outlives the test", work.Wait)
+	})
+	work.Go(func() {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				return
 			}
-			go func() {
+			mu.Lock()
+			if closed {
+				mu.Unlock()
+				_ = conn.Close()
+				return
+			}
+			conns = append(conns, conn)
+			mu.Unlock()
+			work.Go(func() {
 				defer conn.Close()
-				fn(conn)
-			}()
+				fn(conn, stop)
+			})
 		}
-	}()
-	return path
+	})
 }
 
 // fakeI3 answers GET_WORKSPACES (1) and GET_TREE (4) with canned JSON.
 func fakeI3(t *testing.T, workspaces, tree string) {
 	t.Helper()
-	path := serveUnix(t, "sway.sock", func(conn net.Conn) {
+	path := serveUnix(t, "sway.sock", func(conn net.Conn, _ <-chan struct{}) {
 		for {
 			head := make([]byte, 14)
 			if _, err := io.ReadFull(conn, head); err != nil {
@@ -112,7 +145,7 @@ func TestSwayBackendMapsTheSnapshot(t *testing.T) {
 // fakeNiriSocket answers Workspaces/Windows lines with canned JSON.
 func fakeNiriSocket(t *testing.T, workspaces, windows string) {
 	t.Helper()
-	path := serveUnix(t, "niri.sock", func(conn net.Conn) {
+	path := serveUnix(t, "niri.sock", func(conn net.Conn, _ <-chan struct{}) {
 		r := bufio.NewReader(conn)
 		for {
 			line, err := r.ReadString('\n')

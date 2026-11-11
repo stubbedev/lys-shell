@@ -85,7 +85,7 @@ type previewShown struct {
 // newWindowPreview is the preview of a module's or the dock's surface;
 // hold keeps that surface revealed while it shows (nil: none to keep).
 func newWindowPreview(ctx ModuleContext, hold func() func()) *windowPreview {
-	p := &windowPreview{ctx: ctx, spawn: func(fn func()) { go fn() }, hold: hold}
+	p := &windowPreview{ctx: ctx, spawn: ctx.Go, hold: hold}
 	if ctx.App != nil {
 		p.after, p.invoke = loopAfter(ctx.App), ctx.App.Invoke
 		p.open = func(host app.Host, anchor widget.Boundser, content widget.Widget, closed func()) (func(), error) {

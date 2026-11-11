@@ -108,7 +108,7 @@ func TestBrightnessModuleShowsAverageAndRestyles(t *testing.T) {
 	}
 	style := computeStyle(cfg, styling.Default())
 	m := &brightnessModule{
-		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
+		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)},
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
@@ -139,7 +139,7 @@ func TestBrightnessNoDevicesShowsDashes(t *testing.T) {
 	source := &fakeBrightnessSource{ticks: make(chan struct{}, 1)}
 	style := computeStyle(cfg, styling.Default())
 	m := &brightnessModule{
-		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
+		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)},
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")

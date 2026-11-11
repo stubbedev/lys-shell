@@ -6,6 +6,7 @@
 package popups
 
 import (
+	"context"
 	"log"
 	"slices"
 	"strconv"
@@ -191,12 +192,21 @@ func (p *Popups) SetConfig(cfg *config.Config) {
 	p.sync()
 }
 
-// Run follows the service's feed until the process exits; each change
+// Run follows the service's feed until life ends; each change
 // reconciles on the loop goroutine, which owns the widget tree, or,
 // headless, on Run's own.
-func (p *Popups) Run() {
-	events, _ := p.svc.Subscribe()
-	for range events {
+func (p *Popups) Run(life context.Context) {
+	events, stop := p.svc.Subscribe()
+	defer stop()
+	for {
+		select {
+		case <-life.Done():
+			return
+		case _, ok := <-events:
+			if !ok {
+				return
+			}
+		}
 		if p.app == nil {
 			p.sync()
 			continue

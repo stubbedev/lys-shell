@@ -16,6 +16,7 @@ type pollHub struct {
 	analyzers map[string]*cavaAnalyzer
 	idle      atomic.Bool
 	locked    atomic.Bool
+	work      sync.WaitGroup
 }
 
 type pollMember interface{ refreshStale() }
@@ -81,17 +82,20 @@ func (h *pollHub) resumed() {
 	}
 	h.mu.Unlock()
 	for _, m := range members {
-		go m.refreshStale()
+		h.work.Go(m.refreshStale)
 	}
 }
 
-// pollSource starts what fires a sampler until ctx ends.
-type pollSource func(ctx context.Context, fire func()) error
+func (h *pollHub) waitWork() { h.work.Wait() }
+
+// pollSource starts what fires a sampler until ctx ends, on goroutines
+// spawn starts, each returning once ctx has ended.
+type pollSource func(ctx context.Context, spawn func(func()), fire func()) error
 
 // pollGrid fires at once and then on the shared grid of every.
 func pollGrid(every time.Duration) pollSource {
-	return func(ctx context.Context, fire func()) error {
-		go func() {
+	return func(ctx context.Context, spawn func(func()), fire func()) error {
+		spawn(func() {
 			fire()
 			timer := time.NewTimer(untilPollGrid(time.Now(), every))
 			defer timer.Stop()
@@ -104,7 +108,7 @@ func pollGrid(every time.Duration) pollSource {
 				fire()
 				timer.Reset(untilPollGrid(time.Now(), every))
 			}
-		}()
+		})
 		return nil
 	}
 }
@@ -163,7 +167,10 @@ func joinSampler[T any](ctx context.Context, h *pollHub, spec samplerSpec[T], de
 	last, has := s.last, s.has
 	s.mu.Unlock()
 	h.mu.Unlock()
-	context.AfterFunc(ctx, func() { s.leave(&deliver) })
+	h.work.Go(func() {
+		<-ctx.Done()
+		s.leave(&deliver)
+	})
 	if running {
 		if spec.closeRead != nil {
 			spec.closeRead()
@@ -175,7 +182,7 @@ func joinSampler[T any](ctx context.Context, h *pollHub, spec samplerSpec[T], de
 	}
 	life, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-	if err := spec.source(life, s.fire); err != nil {
+	if err := spec.source(life, h.work.Go, s.fire); err != nil {
 		cancel()
 		s.leave(&deliver)
 		return err
@@ -201,7 +208,7 @@ func (s *sampler[T]) leave(deliver *func(T)) {
 	if s.cancel != nil {
 		s.cancel()
 	}
-	go func() {
+	h.work.Go(func() {
 		s.run.Lock()
 		defer s.run.Unlock()
 		s.mu.Lock()
@@ -210,7 +217,7 @@ func (s *sampler[T]) leave(deliver *func(T)) {
 		if s.end != nil {
 			s.end()
 		}
-	}()
+	})
 }
 
 func (s *sampler[T]) fire() {

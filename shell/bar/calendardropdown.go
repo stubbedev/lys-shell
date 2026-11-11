@@ -125,7 +125,7 @@ type calendarView struct {
 func calendarDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &calendarView{ctx: ctx, font: font, px: px, now: time.Now}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "calendar-dropdown")
 	v.Append(dropdownHeader(font, "ld-calendar-clock-symbolic", i18n.T("dropdown-calendar-title")), false)
@@ -248,7 +248,7 @@ func (v *calendarView) follow(life context.Context) {
 	}
 	if v.ctx.Calendar != nil {
 		changes, stop := v.ctx.Calendar.Changes()
-		go func() {
+		v.ctx.Go(func() {
 			defer stop()
 			for {
 				select {
@@ -258,9 +258,9 @@ func (v *calendarView) follow(life context.Context) {
 					v.ctx.Invoke(v.refreshEvents)
 				}
 			}
-		}()
+		})
 	}
-	go func() {
+	v.ctx.Go(func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		for {
@@ -271,7 +271,7 @@ func (v *calendarView) follow(life context.Context) {
 				v.ctx.Invoke(v.tick)
 			}
 		}
-	}()
+	})
 }
 
 func (v *calendarView) hasEvents() bool { return v.ctx.Calendar != nil && v.ctx.Calendar.Configured() }

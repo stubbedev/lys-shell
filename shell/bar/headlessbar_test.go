@@ -9,6 +9,7 @@ import (
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 )
 
 // headlessBar is one bar the shell opens on the first output of a
@@ -37,6 +38,7 @@ func openHeadlessBar(t *testing.T, cfg *config.Config, layout config.BarLayout) 
 	application := app.NewApplication(sess)
 	ctx := styledContext(t, cfg)
 	ctx.App = application
+	ctx.Polls = testPollHub(t)
 	rt := &barRuntime{ctx: ctx, font: ctx.Font, style: *ctx.Style, moduleStyle: *ctx.Style}
 	rt.ctx.Dropdowns = newDropdownRegistry(application, cfg, rt.font, &rt.style, rt.ctx)
 	host := &barHost{app: application, rt: rt}
@@ -58,10 +60,15 @@ func openHeadlessBar(t *testing.T, cfg *config.Config, layout config.BarLayout) 
 	done := make(chan error, 1)
 	go func() { done <- application.Run() }()
 	t.Cleanup(func() {
+		h.onLoop(func() {
+			h.set.unplug(h.output)
+			rt.ctx.Dropdowns.release()
+		})
 		application.Invoke(application.Quit)
 		if err := <-done; err != nil && !errors.Is(err, app.ErrClosed) {
 			t.Errorf("the loop ended with %v", err)
 		}
+		widget.WaitAssetLoads()
 	})
 	return h
 }

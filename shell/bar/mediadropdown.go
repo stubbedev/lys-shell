@@ -147,7 +147,7 @@ func mediaDropdown(ctx ModuleContext) widget.Widget {
 		return mediaEmptyState(ctx)
 	}
 	v := &mediaView{ctx: ctx, src: ctx.Media}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.lyrics = newLyricsPanel(ctx, font, px)
 	v.stopped = v.lyrics.stopTimer
 	v.Box = widget.NewBox(widget.Column, 0, 0)
@@ -287,13 +287,13 @@ func (v *mediaView) fire(what string, cmd func(context.Context, string) error) {
 		return
 	}
 	bus := v.current.BusName
-	go func() {
+	v.ctx.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := cmd(ctx, bus); err != nil {
 			log.Printf("media: %s failed: %v", what, err)
 		}
-	}()
+	})
 }
 
 // seekTo is SeekCommitted: the percent of the track length; nothing
@@ -483,7 +483,7 @@ func (v *mediaView) follow(life context.Context) {
 	v.refresh()
 	ticks, unsubscribe := v.src.Subscribe()
 	v.pollPosition()
-	go func() {
+	v.ctx.Go(func() {
 		defer unsubscribe()
 		ticker := time.NewTicker(mediaPositionPollEvery)
 		defer ticker.Stop()
@@ -497,7 +497,7 @@ func (v *mediaView) follow(life context.Context) {
 				v.pollPosition()
 			}
 		}
-	}()
+	})
 }
 
 // pollPosition reads the position off the loop and applies it on it.
@@ -506,7 +506,7 @@ func (v *mediaView) pollPosition() {
 		return
 	}
 	bus := v.current.BusName
-	go func() {
+	v.ctx.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		pos, err := v.src.Position(ctx, bus)
@@ -514,7 +514,7 @@ func (v *mediaView) pollPosition() {
 			return
 		}
 		v.ctx.Invoke(func() { v.setPosition(pos) })
-	}()
+	})
 }
 
 func (v *mediaView) lyricsEnabled() bool { return v.ctx.Config.Media.Lyrics }

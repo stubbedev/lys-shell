@@ -2,6 +2,7 @@ package popups
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -1297,5 +1298,21 @@ func TestStackKeepsItsWidth(t *testing.T) {
 	want := int(cardWidthPx * float64(p.cfg.Styling.Scale))
 	if sz.W != want {
 		t.Errorf("the stack of %d measures %dpx wide in a 1920px surface, want %d", id, sz.W, want)
+	}
+}
+
+func TestRunEndsWithItsLife(t *testing.T) {
+	p, _ := newTestPopups(t, config.Defaults().Notification)
+	life, end := context.WithCancel(t.Context())
+	ran := make(chan struct{})
+	go func() {
+		defer close(ran)
+		p.Run(life)
+	}()
+	end()
+	select {
+	case <-ran:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run outlived its life")
 	}
 }

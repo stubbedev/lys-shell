@@ -77,7 +77,7 @@ type backgroundAppsView struct {
 func backgroundAppsDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &backgroundAppsView{ctx: ctx, src: ctx.BackgroundApps, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "background-apps-dropdown")
 	icon := ctx.Config.BackgroundApps.Icon
@@ -125,11 +125,11 @@ func (v *backgroundAppsView) row(a backgroundapps.App) *widget.Item {
 	row.SetMedia(icon, false)
 	instance := a.Instance
 	stop := dropdownButton(widget.NewLabel(v.font, v.px, i18n.T("dropdown-background-apps-stop"), 0), func() {
-		go func() {
+		v.ctx.Go(func() {
 			if err := v.src.Stop(context.Background(), instance); err != nil {
 				log.Printf("background-apps: %v", err)
 			}
-		}()
+		})
 	}, "background-apps-stop", css.DestructiveAction, css.Small)
 	row.AddAction(stop)
 	return row

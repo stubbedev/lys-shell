@@ -350,7 +350,7 @@ func TestCavaModuleEndsWithItsGeneration(t *testing.T) {
 	ticking := true
 	a := newCavaAnalyzer(plan, in, 10, config.CavaStyleBars, nil, time.Second/60,
 		func(time.Duration, func()) func() { return func() { ticking = false } })
-	a.join(life, newCavaBarSlot(newSpectrum(config.DefaultsCava(), 10, 0, 1, false), func(fn func()) { fn() }))
+	a.join(life, testSpawn(t), newCavaBarSlot(newSpectrum(config.DefaultsCava(), 10, 0, 1, false), func(fn func()) { fn() }))
 	if !ticking {
 		t.Fatal("the ticker stopped before the generation retired")
 	}
@@ -388,7 +388,7 @@ func newLoopedCava(t *testing.T) (*cavaModule, *fakeCavaInput, *cavaLoop) {
 	loop := &cavaLoop{}
 	a := newCavaAnalyzer(plan, in, 10, config.CavaStyleBars, nil, time.Second/60, loop.every)
 	m := &cavaModule{paint: newSpectrum(config.DefaultsCava(), 10, 0, 1, false), analyzer: a}
-	a.join(t.Context(), newCavaBarSlot(m.paint, func(fn func()) { fn() }))
+	a.join(t.Context(), testSpawn(t), newCavaBarSlot(m.paint, func(fn func()) { fn() }))
 	return m, in, loop
 }
 
@@ -453,7 +453,7 @@ func TestCavaStaysStoppedWhenSoundFollowsItsGeneration(t *testing.T) {
 	loop := &cavaLoop{}
 	life, retire := context.WithCancel(context.Background())
 	a := newCavaAnalyzer(plan, in, 10, config.CavaStyleBars, nil, time.Second/60, loop.every)
-	a.join(life, newCavaBarSlot(newSpectrum(config.DefaultsCava(), 10, 0, 1, false), func(fn func()) { fn() }))
+	a.join(life, testSpawn(t), newCavaBarSlot(newSpectrum(config.DefaultsCava(), 10, 0, 1, false), func(fn func()) { fn() }))
 	loop.tick()
 	retire()
 	select {
@@ -495,7 +495,7 @@ func TestCavaOneCaptureAndAnalyzerForTwoBars(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hub := newPollHub()
+	hub := testPollHub(t)
 	in := &fakeCavaInput{stopped: make(chan struct{})}
 	loop := &cavaLoop{}
 	builds := 0
@@ -518,8 +518,8 @@ func TestCavaOneCaptureAndAnalyzerForTwoBars(t *testing.T) {
 	if first != second || builds != 1 {
 		t.Fatalf("%d captures for two bars, want one analyzer", builds)
 	}
-	first.join(t.Context(), newCavaBarSlot(bar1, post))
-	second.join(t.Context(), newCavaBarSlot(bar2, post))
+	first.join(t.Context(), testSpawn(t), newCavaBarSlot(bar1, post))
+	second.join(t.Context(), testSpawn(t), newCavaBarSlot(bar2, post))
 	if loop.started != 1 {
 		t.Errorf("%d frame timers for two bars, want 1", loop.started)
 	}

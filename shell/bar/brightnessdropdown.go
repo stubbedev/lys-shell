@@ -99,7 +99,7 @@ type brightnessView struct {
 func brightnessDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &brightnessView{ctx: ctx, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.reads = newRefresher(ctx, v.life, v.read, v.apply)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "brightness-dropdown")

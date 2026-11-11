@@ -30,7 +30,7 @@ type mailView struct {
 func mailDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &mailView{ctx: ctx, font: font, px: px}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	// The popover frame: the header strip full width over the content
 	// (mail/mod.rs:36-78).
 	v.Box = widget.NewBox(widget.Column, 0, 0)
@@ -94,7 +94,7 @@ func (v *mailView) follow(life context.Context) {
 		return
 	}
 	ticks, stop := v.ctx.Mail.Subscribe()
-	go func() {
+	v.ctx.Go(func() {
 		defer stop()
 		for {
 			select {
@@ -107,5 +107,5 @@ func (v *mailView) follow(life context.Context) {
 				v.ctx.Invoke(v.rebuild)
 			}
 		}
-	}()
+	})
 }

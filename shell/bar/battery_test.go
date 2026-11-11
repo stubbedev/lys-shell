@@ -170,7 +170,7 @@ func TestBatteryModuleRendersAndRestyles(t *testing.T) {
 
 	source := newFakeBattery(upower.Device{Percentage: 75, State: upower.StateDischarging, IsPresent: true})
 	style := computeStyle(cfg, styling.Default())
-	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source, gen: testGen(t)}
 	// App is required by the module; Invoke is what the subscription
 	// pumps through. Build with a nil App is refused, so run the module
 	// lifecycle by hand here: construct, read, restyle.
@@ -217,7 +217,7 @@ func TestBatteryStateIcon(t *testing.T) {
 	cfg := config.Defaults()
 	source := newFakeBattery(upower.Device{Percentage: 75, State: upower.StateDischarging, IsPresent: true})
 	style := computeStyle(cfg, styling.Default())
-	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source, gen: testGen(t)}
 	m := &battery{ctx: ctx, source: source}
 	m.icon = moduleIcon(ctx, cfg.Battery.Icon())
 	m.btn = newBarButton(m.ctx, m.icon, "")
@@ -255,7 +255,7 @@ func TestBatteryAbsentBatteryShowsNA(t *testing.T) {
 	cfg := config.Defaults()
 	source := newFakeBattery(upower.Device{})
 	style := computeStyle(cfg, styling.Default())
-	m := &battery{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source}, source: source}
+	m := &battery{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, Battery: source, gen: testGen(t)}, source: source}
 	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := readAndApply(m.source.Read, m.apply); err != nil {
 		t.Fatal(err)

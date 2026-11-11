@@ -66,7 +66,7 @@ type treemanView struct {
 func treemanDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &treemanView{ctx: ctx, font: font, px: px, collapsed: map[string]bool{}}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.reads = newRefresher(ctx, v.life, v.read, v.apply)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "treeman-dropdown")
@@ -314,14 +314,14 @@ func (v *treemanView) run(action treeman.Action, path string) {
 	if src == nil {
 		return
 	}
-	go func() {
+	v.ctx.Go(func() {
 		if err := src.RunAction(context.Background(), action, path); err != nil {
 			log.Printf("treeman: action failed: %v", err)
 			if v.ctx.Toast != nil {
 				v.ctx.Toast(i18n.T("dropdown-treeman-action-failed")+": "+err.Error(), "ld-alert-triangle-symbolic")
 			}
 		}
-	}()
+	})
 }
 
 // confirmReset is confirm_then_run for reset: a modal alert with the

@@ -2,6 +2,7 @@ package walltimer
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,7 +25,11 @@ func TestNextIsTheFollowingMultiple(t *testing.T) {
 
 func TestFiresOnTheBoundaryAndNowhereElse(t *testing.T) {
 	fired := make(chan time.Time, 8)
-	if err := Start(t.Context(), time.Second, func() { fired <- time.Now() }); err != nil {
+	ctx, cancel := context.WithCancel(t.Context())
+	var work sync.WaitGroup
+	defer work.Wait()
+	defer cancel()
+	if err := Start(ctx, work.Go, time.Second, func() { fired <- time.Now() }); err != nil {
 		t.Fatal(err)
 	}
 	for range 2 {
@@ -61,13 +66,24 @@ func TestArmsTheNextBoundaryAndRepeatsOnTheUnit(t *testing.T) {
 func TestStopsWithItsContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	fired := make(chan struct{}, 8)
-	if err := Start(ctx, time.Second, func() { fired <- struct{}{} }); err != nil {
+	var work sync.WaitGroup
+	if err := Start(ctx, work.Go, time.Second, func() { fired <- struct{}{} }); err != nil {
 		t.Fatal(err)
 	}
 	cancel()
+	stopped := make(chan struct{})
+	go func() {
+		work.Wait()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the timer's goroutines outlive its context")
+	}
 	select {
 	case <-fired:
 		t.Fatal("fired after its context ended")
-	case <-time.After(1200 * time.Millisecond):
+	default:
 	}
 }

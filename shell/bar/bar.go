@@ -241,6 +241,7 @@ type shellStart struct {
 	sounds       *sounds.Announcer
 	customUpd    *customUpdates
 	wall         *wallpapershell.Shell
+	polls        *pollHub
 	releaseHold  func()
 	down         teardown
 	err          error
@@ -251,9 +252,10 @@ func newShellStart(application *app.Application, sess shellSession, cfg *config.
 		application: application, sess: sess, cfg: cfg, svc: svc, session: session,
 		current: &atomic.Pointer[config.Config]{},
 		osdRef:  &atomic.Pointer[osd.Osd]{},
-		ctx:     ModuleContext{Config: cfg, App: application},
+		ctx:     ModuleContext{Config: cfg, App: application, gen: newMountGen()},
 	}
 	s.current.Store(cfg)
+	s.down.add(s.ctx.gen.retire)
 	return s
 }
 
@@ -386,7 +388,11 @@ func (s *shellStart) startServices(system *dbus.Conn) {
 	s.notifSvc = notifs
 	s.ctx.Notifications = s.notifSvc
 	if svc := s.notifSvc; svc != nil {
-		s.down.add(func() { svc.FlushWrites(configFlushTimeout) })
+		s.down.add(func() {
+			if err := svc.Shutdown(configFlushTimeout); err != nil {
+				log.Print(err)
+			}
+		})
 		announcer, stopSounds := startSounds(svc, audio, s.cfg.Notification)
 		s.sounds = announcer
 		s.down.add(stopSounds)
@@ -522,8 +528,9 @@ func (s *shellStart) mount() {
 	}
 	font := rt.font
 	baseCtx := s.ctx
-	baseCtx.Font, baseCtx.Style, baseCtx.Theme = font, &rt.moduleStyle, theme
+	baseCtx.Font, baseCtx.Style, baseCtx.Theme, baseCtx.gen = font, &rt.moduleStyle, theme, s.ctx.gen.next()
 	polls := newPollHub()
+	s.polls = polls
 	baseCtx.Polls = polls
 	if application.IdleNotifyAvailable() {
 		stopIdle, err := application.OnIdle(pollIdleAfter, func() { polls.setIdle(true) }, func() { polls.setIdle(false) })
@@ -580,11 +587,11 @@ func (s *shellStart) mount() {
 		holder = &idleHolder{state: s.inhibitState, inhibit: application.InhibitIdle}
 		changes, stop := s.inhibitState.Changes()
 		s.down.add(stop)
-		go func() {
+		s.ctx.Go(func() {
 			for range changes {
 				application.Invoke(holder.sync)
 			}
-		}()
+		})
 	}
 	osdSrv := osd.New(osd.Deps{
 		Open: func(lc app.LayerConfig) (osd.Window, error) {
@@ -641,11 +648,18 @@ func (s *shellStart) mount() {
 	var popupHost *popups.Popups
 	if s.notifSvc != nil {
 		popupHost = popups.New(application, s.notifSvc, cfg, font, theme.Sheet, sess.Outputs)
-		go popupHost.Run()
+		s.ctx.Go(func() { popupHost.Run(s.ctx.Life()) })
 		s.down.add(followFocusInputs(application, s.notifSvc, s.ctx.ScreenShares, s.ctx.Recorder))
 	}
 	host := &barHost{app: application, rt: rt, holder: holder}
 	bars := newSurfaceSet(host.open)
+	docks := newSurfaceSet((&dockHost{app: application, rt: rt}).open)
+	s.down.add(func() {
+		bars.close()
+		docks.close()
+		rt.ctx.Dropdowns.release()
+		rt.ctx.gen.retire()
+	})
 	// A bar that cannot open is logged, not fatal.
 	s.down.add(bars.followOutputs(sess, func(connector string) (config.BarLayout, bool) {
 		return barLayoutFor(current.Load(), connector)
@@ -656,7 +670,6 @@ func (s *shellStart) mount() {
 		}
 		rt.ctx.Dropdowns.detachHost(output.Name)
 	}))
-	docks := newSurfaceSet((&dockHost{app: application, rt: rt}).open)
 	s.down.add(docks.followOutputs(sess, func(connector string) (config.DockConfig, bool) {
 		return dockFor(current.Load(), connector)
 	}, func(*app.Output) {}))
@@ -740,7 +753,7 @@ func (s *shellStart) mount() {
 	if s.wall != nil {
 		ticks, stopTicks := s.wall.Service().Extracted()
 		s.down.add(stopTicks)
-		go func() {
+		s.ctx.Go(func() {
 			for range ticks {
 				compiled := apptheme.Compile(current.Load())
 				application.Invoke(func() {
@@ -753,15 +766,15 @@ func (s *shellStart) mount() {
 					}
 				})
 			}
-		}()
+		})
 	}
 	// The level and layout watchers run whether or not the OSD is enabled:
 	// the OSD drops their events while disabled, so a reload can turn it on
 	// or off (the Rust OsdEnabledChanged). The lock-key source, which opens
 	// input devices, follows the setting instead.
-	osdCtx, stopOsd := context.WithCancel(context.Background())
+	osdCtx, stopOsd := context.WithCancel(s.ctx.Life())
 	s.down.add(stopOsd)
-	go func() {
+	s.ctx.Go(func() {
 		var layouts osd.Layouts
 		if source, err := keyboardLayoutSource(baseCtx); err == nil {
 			defer source.close()
@@ -774,7 +787,7 @@ func (s *shellStart) mount() {
 			tracks = media
 		}
 		osdSrv.Watch(osdCtx, baseCtx.Pulse, baseCtx.Brightness, layouts, tracks, lockKeySource())
-	}()
+	})
 	// The lock triggers (logind, lock-on-start, and `lys-shell lock`
 	// through Shell1) start `lys-login lock`, the login screen in its
 	// lock mode, as a process of its own.
@@ -818,11 +831,11 @@ func (s *shellStart) mount() {
 	s.down.add(stopLauncher)
 	if sess.GlobalShortcutsManager() != nil {
 		s.down.add(registerShellShortcuts(application.RegisterGlobalShortcut, shellShortcuts(openLauncher, func() {
-			go func() {
+			s.ctx.Go(func() {
 				if err := toggleDashboardOnLoop(application, rt, "", focused); err != nil {
 					log.Printf("dashboard: %v", err)
 				}
-			}()
+			})
 		}, visibility)))
 	}
 	// The widget socket carries out-of-process pushes (`lys-shell toast`).
@@ -832,16 +845,27 @@ func (s *shellStart) mount() {
 	} else {
 		log.Printf("widget socket: %v", err)
 	}
-	go func() {
-		for req := range widgetSrv.Toasts() {
-			osdSrv.ShowToast(req)
+	life := s.ctx.Life()
+	s.ctx.Go(func() {
+		for {
+			select {
+			case <-life.Done():
+				return
+			case req := <-widgetSrv.Toasts():
+				osdSrv.ShowToast(req)
+			}
 		}
-	}()
-	go func() {
-		for update := range widgetSrv.Updates() {
-			s.customUpd.dispatch(update.ID, update.Output)
+	})
+	s.ctx.Go(func() {
+		for {
+			select {
+			case <-life.Done():
+				return
+			case update := <-widgetSrv.Updates():
+				s.customUpd.dispatch(update.ID, update.Output)
+			}
 		}
-	}()
+	})
 	s.releaseHold()
 }
 
@@ -965,13 +989,15 @@ func (r *barRuntime) paletteStale() bool { return *r.theme.RenderPalette() != *r
 // context carries the new snapshot. The dropdown registry made by the
 // first mount is remounted by every later one.
 func (r *barRuntime) mount(application *app.Application, cfg *config.Config) {
-	if r.ctx.gen != nil {
+	if r.ctx.gen == nil {
+		r.ctx.gen = newMountGen()
+	} else {
 		r.ctx.gen.retire()
+		r.ctx.gen = r.ctx.gen.next()
 	}
 	r.ctx.Config = cfg
 	r.ctx.Font = r.font
 	r.ctx.Style = &r.moduleStyle
-	r.ctx.gen = newMountGen()
 	if r.ctx.Dropdowns != nil {
 		r.ctx.Dropdowns.remount(r.ctx)
 		return
@@ -1001,7 +1027,7 @@ func (h *barHost) context(output *app.Output) ModuleContext {
 	ctx := h.rt.ctx
 	ctx.Connector = output.Name
 	ctx.Attachers = &[]interface{ Attach(app.Host) }{}
-	ctx.gen = newMountGen()
+	ctx.gen = ctx.gen.next()
 	return ctx
 }
 

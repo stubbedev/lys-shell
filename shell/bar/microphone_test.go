@@ -28,7 +28,7 @@ func TestMicrophoneModuleDimsWhenMuted(t *testing.T) {
 	style := computeStyle(cfg, styling.Default()).forModules()
 	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: pct(65)}, ticks: make(chan struct{}, 2)}
 	m := &microphoneModule{
-		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
+		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)},
 		source: source,
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")
@@ -88,7 +88,7 @@ func TestMicrophoneThresholds(t *testing.T) {
 	cfg.Microphone.Thresholds = []config.ThresholdEntry{{Above: &above, LabelColor: &warn, IconColor: &warn}}
 	style := computeStyle(cfg, styling.Default()).forModules()
 	source := &fakePulseSource{dev: pulse.Device{Name: "mic", Volume: pct(65)}, ticks: make(chan struct{}, 2)}
-	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style}, source: source}
+	m := &microphoneModule{ctx: ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)}, source: source}
 	m.btn = newBarButton(m.ctx, m.icon, "")
 	if err := readAndApply(m.read, m.apply); err != nil {
 		t.Fatal(err)

@@ -255,7 +255,7 @@ type bitwardenView struct {
 func bitwardenDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &bitwardenView{ctx: ctx, host: ctx.Bitwarden, font: font, px: px, now: time.Now, random: rand.Reader}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "bitwarden-dropdown")
 	v.spinner = widget.NewSpinner(int(px))
@@ -315,7 +315,7 @@ func (v *bitwardenView) follow(life context.Context) {
 func (v *bitwardenView) followVault(life context.Context, vt bwVault) {
 	ticks, stop := vt.Subscribe()
 	second := time.NewTicker(time.Second)
-	go func() {
+	v.ctx.Go(func() {
 		defer stop()
 		defer second.Stop()
 		for {
@@ -331,7 +331,7 @@ func (v *bitwardenView) followVault(life context.Context, vt bwVault) {
 				v.ctx.Invoke(v.refreshTOTP)
 			}
 		}
-	}()
+	})
 }
 
 // liveTOTPItem is the item the live code row follows, false when there
@@ -374,7 +374,7 @@ func (v *bitwardenView) readTOTP(id string) {
 		return
 	}
 	v.totpReading = true
-	go func() {
+	v.ctx.Go(func() {
 		code, err := v.vault.Field(v.life, id, vault.FieldTOTP, "")
 		v.ctx.Invoke(func() {
 			v.totpReading = false
@@ -388,7 +388,7 @@ func (v *bitwardenView) readTOTP(id string) {
 			v.totpCode = code
 			v.refreshTOTP()
 		})
-	}()
+	})
 }
 
 // copyLiveTOTP copies the live row's code.
@@ -721,7 +721,7 @@ func (v *bitwardenView) run(op func(context.Context) error, then func(error)) {
 	v.busy = true
 	v.setError(nil)
 	v.apply()
-	go func() {
+	v.ctx.Go(func() {
 		err := op(v.life)
 		v.ctx.Invoke(func() {
 			v.busy = false
@@ -733,7 +733,7 @@ func (v *bitwardenView) run(op func(context.Context) error, then func(error)) {
 				v.setError(err)
 			}
 		})
-	}()
+	})
 }
 
 func (v *bitwardenView) login() {

@@ -363,10 +363,12 @@ func (m *customModule) followCommand(command string) error {
 	}
 	if m.def.Mode == config.ExecutionModeWatch {
 		var latest atomic.Pointer[string]
-		spec.source = func(life context.Context, fire func()) error {
-			go m.supervise(life, command, func(line string) {
-				latest.Store(&line)
-				fire()
+		spec.source = func(life context.Context, spawn func(func()), fire func()) error {
+			spawn(func() {
+				m.supervise(life, command, func(line string) {
+					latest.Store(&line)
+					fire()
+				})
 			})
 			return nil
 		}
@@ -381,12 +383,12 @@ func (m *customModule) followCommand(command string) error {
 		var running context.Context
 		spec.sample = func() (string, bool) { return m.commandOutput(running, command) }
 		grid := pollGrid(intconv.Duration(m.def.IntervalMs, time.Millisecond))
-		spec.source = func(life context.Context, fire func()) error {
+		spec.source = func(life context.Context, spawn func(func()), fire func()) error {
 			running = life
 			if m.def.IntervalMs > 0 {
-				return grid(life, fire)
+				return grid(life, spawn, fire)
 			}
-			go fire()
+			spawn(fire)
 			return nil
 		}
 	}

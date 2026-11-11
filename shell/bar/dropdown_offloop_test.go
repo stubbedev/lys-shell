@@ -173,9 +173,13 @@ func TestRecorderCameraProbeFillsThePickerWhenItEnds(t *testing.T) {
 
 func TestFollowingEndsWithThePopover(t *testing.T) {
 	var starts, stops atomic.Int64
-	f := newOpenFollow(func(life context.Context) {
+	ctx := newTestContext(t, config.Defaults())
+	f := newOpenFollow(ctx, func(life context.Context) {
 		starts.Add(1)
-		context.AfterFunc(life, func() { stops.Add(1) })
+		ctx.Go(func() {
+			<-life.Done()
+			stops.Add(1)
+		})
 	})
 	f.startFollowing()
 	f.dropdownOpened()
@@ -197,6 +201,10 @@ func TestFollowingEndsWithThePopover(t *testing.T) {
 		t.Fatalf("a reopen started %d follows in all, want 2", got)
 	}
 	f.dropdownClosed()
+	ctx.gen.waitWork()
+	if got := stops.Load(); got != 2 {
+		t.Fatalf("closing ended %d of the 2 follows", got)
+	}
 	f.dropdownOpened()
 	if got := starts.Load(); got != 2 {
 		t.Fatalf("a released view followed again: %d follows", got)

@@ -55,7 +55,7 @@ func screenShareDropdown(ctx ModuleContext) widget.Widget {
 	font, px := dropdownFont(ctx)
 	v := &screenShareView{ctx: ctx, font: font, px: px}
 	v.src = ctx.ScreenShares
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.Box = widget.NewBox(widget.Column, 0, 0)
 	v.AddClass("dropdown", "screen-share-dropdown")
 	icon := ctx.Config.ScreenShare.Icon
@@ -99,11 +99,11 @@ func (v *screenShareView) row(s screenshare.Share) *widget.Item {
 	row.SetMedia(widget.NewThemeIcon(v.ctx.Config.ScreenShare.Icon, itemIconPx), false)
 	session := s.Session
 	stop := dropdownButton(widget.NewLabel(v.font, v.px, i18n.T("dropdown-screen-share-stop"), 0), func() {
-		go func() {
+		v.ctx.Go(func() {
 			if err := v.src.Stop(context.Background(), session); err != nil {
 				log.Printf("screen-share: %v", err)
 			}
-		}()
+		})
 	}, "screen-share-stop", css.DestructiveAction, css.Small)
 	row.AddAction(stop)
 	return row

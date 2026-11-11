@@ -172,7 +172,7 @@ func newDropdownRegistry(application *app.Application, cfg *config.Config, font 
 		instances:        make(map[string]widget.Widget),
 		dashboardAnchors: make(map[string]widget.Widget),
 	}
-	base.Style, base.Dropdowns, base.gen = style, r, newMountGen()
+	base.Style, base.Dropdowns, base.gen = style, r, base.gen.next()
 	r.ctx = base
 	return r
 }
@@ -278,7 +278,7 @@ func (r *dropdownRegistry) release() {
 	instances := r.instances
 	r.instances = make(map[string]widget.Widget)
 	retired := r.ctx.gen
-	r.ctx.gen = newMountGen()
+	r.ctx.gen = retired.next()
 	r.mu.Unlock()
 	for _, content := range instances {
 		if c, ok := content.(dropdownCloser); ok {

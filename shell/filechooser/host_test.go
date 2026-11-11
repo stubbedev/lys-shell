@@ -109,6 +109,7 @@ type harness struct {
 	qmu       sync.Mutex
 	stopped   bool
 	drained   chan struct{}
+	asks      sync.WaitGroup
 }
 
 func newHarness(t *testing.T, viewFile string) *harness {
@@ -126,8 +127,9 @@ func newHarness(t *testing.T, viewFile string) *harness {
 		}
 	}()
 	// The loop ends with the test: work already queued runs out before
-	// the next test touches the widget package's loop state.
-	t.Cleanup(hs.endLoop)
+	// the next test touches the widget package's loop state, and the
+	// chooser closes, answering what it was asked.
+	t.Cleanup(hs.end)
 	hs.c = New(Deps{
 		Config: func() *config.Config { return hs.conf },
 		Open: func(s dialogsurface.Spec) (Window, error) {
@@ -168,6 +170,21 @@ func (hs *harness) endLoop() {
 	}
 	hs.qmu.Unlock()
 	<-hs.drained
+}
+
+func (hs *harness) end() {
+	hs.endLoop()
+	hs.c.Close()
+	asked := make(chan struct{})
+	go func() {
+		hs.asks.Wait()
+		close(asked)
+	}()
+	select {
+	case <-asked:
+	case <-time.After(treetest.Liveness):
+		hs.t.Error("a request outlives the closed chooser")
+	}
 }
 
 // flush waits until the loop ran everything queued so far.
@@ -222,7 +239,7 @@ func (hs *harness) settle() {
 func (hs *harness) ask(t *testing.T, fn func() []string) chan []string {
 	t.Helper()
 	got := make(chan []string, 1)
-	go func() { got <- fn() }()
+	hs.asks.Go(func() { got <- fn() })
 	select {
 	case hs.cfg = <-hs.opened:
 	case <-time.After(treetest.Liveness):
@@ -1167,7 +1184,7 @@ func TestDismissTakesDownItsRequestOnly(t *testing.T) {
 func (hs *harness) askResult(t *testing.T, fn func() Result) chan Result {
 	t.Helper()
 	got := make(chan Result, 1)
-	go func() { got <- fn() }()
+	hs.asks.Go(func() { got <- fn() })
 	select {
 	case hs.cfg = <-hs.opened:
 	case <-time.After(treetest.Liveness):
@@ -2183,7 +2200,7 @@ func TestTheChooserMapsWhilePlacesAndLocationsHold(t *testing.T) {
 		return nil
 	}
 	got := make(chan []string, 1)
-	go func() { got <- hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}).URIs }()
+	hs.asks.Go(func() { got <- hs.c.Open(testCaller, OpenRequest{CurrentFolder: hs.root}).URIs })
 	select {
 	case <-hs.opened:
 	case <-time.After(treetest.Liveness):
@@ -2214,5 +2231,33 @@ func TestTheChooserIsOpenedForTheRequestWindow(t *testing.T) {
 	hs.do(spec.Failed)
 	if uris := answer(t, got); uris != nil {
 		t.Errorf("a chooser nothing shows answered %v", uris)
+	}
+}
+
+func TestCloseAnswersTheRequestShowingAndThoseWaiting(t *testing.T) {
+	hs := newHarness(t, "")
+	showing := hs.open(t, OpenRequest{})
+	waiting := make(chan []string, 1)
+	hs.asks.Go(func() {
+		waiting <- hs.c.Open(portaldialogs.Caller{Handle: "/r/second", AppID: "org.app"}, OpenRequest{CurrentFolder: hs.root}).URIs
+	})
+	for deadline := time.Now().Add(treetest.Liveness); ; time.Sleep(time.Millisecond) {
+		var queued int
+		hs.run(func() { queued = hs.c.queue.Len() })
+		if queued == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the second request never queued")
+		}
+	}
+	pending(t, showing)
+	hs.endLoop()
+	hs.c.Close()
+	if uris := answer(t, showing); len(uris) != 0 {
+		t.Errorf("closing answered the request showing with %v", uris)
+	}
+	if uris := answer(t, waiting); len(uris) != 0 {
+		t.Errorf("closing answered the waiting request with %v", uris)
 	}
 }

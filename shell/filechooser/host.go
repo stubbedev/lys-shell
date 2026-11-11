@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/fileuri"
@@ -193,6 +195,7 @@ type Chooser struct {
 	// thumbnailer makes the thumbnails; thumbs are the request's.
 	thumbnailer *thumbnailer
 	thumbs      *thumbSet
+	offLoop     sync.WaitGroup
 }
 
 type thumbKey struct {
@@ -276,7 +279,7 @@ func (c *Chooser) Dismiss(handle string) {
 func offLoopFor[T any](c *Chooser, check func() T, then func(T)) {
 	u := c.ui
 	c.checking++
-	go func() {
+	c.offLoop.Go(func() {
 		v := check()
 		c.d.Invoke(func() {
 			c.checking--
@@ -284,7 +287,7 @@ func offLoopFor[T any](c *Chooser, check func() T, then func(T)) {
 				then(v)
 			}
 		})
-	}()
+	})
 }
 
 type pathStat struct {
@@ -367,7 +370,7 @@ func (c *Chooser) begin(r request) {
 // the dialog moved on; it starts following dir on disk.
 func (c *Chooser) requestListing(dir string) {
 	s := c.s
-	go func() {
+	c.offLoop.Go(func() {
 		l := s.read(dir)
 		c.d.Invoke(func() {
 			if c.s != s || !s.setListing(dir, l) {
@@ -381,7 +384,7 @@ func (c *Chooser) requestListing(dir string) {
 			c.relist()
 			c.applySelectNext()
 		})
-	}()
+	})
 	c.watch(dir)
 }
 
@@ -404,7 +407,11 @@ func (c *Chooser) watch(dir string) {
 	}
 	c.watcher = w
 	s := c.s
-	go followDir(w, dir, s.mode, func(u dirUpdate) {
+	c.offLoop.Go(func() { c.followWatched(w, dir, s) })
+}
+
+func (c *Chooser) followWatched(w *fswatch.Watcher, dir string, s *session) {
+	followDir(w, dir, s.mode, func(u dirUpdate) {
 		c.d.Invoke(func() {
 			if c.s != s || c.watcher != w || s.dir != dir {
 				return
@@ -745,7 +752,7 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 	u.locations = section("Locations", nil)
 	u.unlock = c.newUnlockRow()
 	box.Append(u.unlock.box, false)
-	go func() {
+	c.offLoop.Go(func() {
 		places, locations := c.d.Places(), c.readLocations()
 		c.d.Invoke(func() {
 			if c.ui != u {
@@ -754,7 +761,7 @@ func (c *Chooser) sidebar(u *ui) widget.Widget {
 			c.fillPlaces(u.favorites, c.favorites(places, opening))
 			c.fillLocations(locations)
 		})
-	}()
+	})
 	box.Append(widget.NewSpacer(0, 0), true)
 	scroll := widget.NewScroll(box)
 	// Filled, so the sections pack at the top instead of floating mid-view.
@@ -1035,7 +1042,7 @@ func (c *Chooser) thumb(path, mimeType string, px int, fallback widget.Widget) w
 	}
 	if _, pending := set.waiting[key]; !pending {
 		th := c.thumbnailer
-		th.work.Go(func(fn func()) { go fn() }, func() {
+		th.work.Go(c.offLoop.Go, func() {
 			done, err := th.thumbnail(set.ctx, path, mimeType, 2*px)
 			if err != nil {
 				c.d.Invoke(func() { c.landThumb(set, key, thumbRaster{}, err) })
@@ -1103,14 +1110,47 @@ func (c *Chooser) freeThumbs() {
 	})
 }
 
-// Close ends the host once the loop has ended: the request's lookups
-// give up, the thumbnails it found are freed, and so is every one a
-// lookup still running makes.
+// Close ends the host once the loop has ended: the request showing and
+// every one waiting are answered with nothing, the search, the folder
+// watch, the mount watch and the lookups give up, the thumbnails found
+// are freed, and so is every one a lookup still running makes. It
+// returns once the work it ran off the loop has, or, for a check a hung
+// mount holds, after closeTimeout.
 func (c *Chooser) Close() {
+	c.cancelWalk()
+	c.unwatch()
+	if c.stopMounts != nil {
+		c.stopMounts()
+		c.stopMounts = nil
+	}
+	if c.pv.cancel != nil {
+		c.pv.cancel()
+	}
+	if c.reply != nil {
+		c.reply(Result{})
+		c.reply = nil
+	}
+	c.queue.CancelWaiting()
 	c.freeThumbs()
 	c.thumbnailer.work.Close()
+	c.awaitOffLoop()
 	c.viewFile.Wait()
 	c.folders.file.Wait()
+}
+
+const closeTimeout = 5 * time.Second
+
+func (c *Chooser) awaitOffLoop() {
+	done := make(chan struct{})
+	go func() {
+		c.offLoop.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(closeTimeout):
+		log.Printf("file chooser: work off the loop outlived the chooser by %v", closeTimeout)
+	}
 }
 
 // --- surface --------------------------------------------------------
@@ -1533,12 +1573,14 @@ func (c *Chooser) setSearch(query string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.stopWalk = cancel
 	s, root, hidden := c.s, c.s.dir, c.s.hidden
-	go WalkSearch(ctx, root, query, hidden, func(batch []string) {
-		found := searchEntries(batch, s.mode)
-		c.d.Invoke(func() {
-			if ctx.Err() == nil && c.s == s && s.addFound(query, found) {
-				c.relist()
-			}
+	c.offLoop.Go(func() {
+		WalkSearch(ctx, root, query, hidden, func(batch []string) {
+			found := searchEntries(batch, s.mode)
+			c.d.Invoke(func() {
+				if ctx.Err() == nil && c.s == s && s.addFound(query, found) {
+					c.relist()
+				}
+			})
 		})
 	})
 }

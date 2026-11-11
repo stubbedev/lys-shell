@@ -2,8 +2,11 @@ package bar
 
 import (
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/shell/apptheme"
@@ -54,19 +57,52 @@ func isolateConfigDir(t *testing.T) string {
 }
 
 // newTestContext is a headless module context whose generation
-// retires when the test ends, under headlessLoop: a module's
-// goroutines never touch widgets once the next test runs.
+// retires when the test ends, under headlessLoop, and whose modules'
+// goroutines have all returned before the next test runs.
 func newTestContext(t *testing.T, cfg *config.Config) ModuleContext {
 	t.Helper()
 	style := computeStyle(cfg, styling.Default()).forModules()
 	face := treetest.Font(t)
+	return ModuleContext{Config: cfg, Font: face, Style: &style, gen: testGen(t)}
+}
+
+func testGen(t *testing.T) *mountGen {
 	gen := newMountGen()
-	t.Cleanup(func() {
-		headlessLoop.Lock()
-		defer headlessLoop.Unlock()
-		gen.retire()
-	})
-	return ModuleContext{Config: cfg, Font: face, Style: &style, gen: gen}
+	t.Cleanup(func() { retireAndWait(t, gen) })
+	return gen
+}
+
+func retireAndWait(t *testing.T, gen *mountGen) {
+	t.Helper()
+	onHeadlessLoop(func() bool { gen.retire(); return true })
+	awaitWork(t, "the modules' work outlives their generations", gen.waitWork)
+}
+
+func testPollHub(t *testing.T) *pollHub {
+	h := newPollHub()
+	t.Cleanup(func() { awaitWork(t, "the samplers outlive the test", h.waitWork) })
+	return h
+}
+
+func testSpawn(t *testing.T) func(func()) {
+	var work sync.WaitGroup
+	t.Cleanup(func() { awaitWork(t, "the test's goroutines outlive it", work.Wait) })
+	return work.Go
+}
+
+func awaitWork(t *testing.T, what string, wait func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		stacks := make([]byte, 1<<20)
+		t.Errorf("%s:\n%s", what, stacks[:runtime.Stack(stacks, true)])
+	}
 }
 
 // styledContext is newTestContext with the bar stylesheet attached, as

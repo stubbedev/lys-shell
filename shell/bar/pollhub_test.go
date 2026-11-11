@@ -14,7 +14,7 @@ type firedByHand struct {
 	fire func()
 }
 
-func (f *firedByHand) source(_ context.Context, fire func()) error {
+func (f *firedByHand) source(_ context.Context, _ func(func()), fire func()) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.fire = fire
@@ -40,7 +40,7 @@ func countingSpec(key string, pause pollPause, source pollSource, reads *atomic.
 }
 
 func TestSamplerReadsOncePerTickForEveryBar(t *testing.T) {
-	h := newPollHub()
+	h := testPollHub(t)
 	src := &firedByHand{}
 	var reads, closes atomic.Int32
 	var first, second atomic.Int32
@@ -96,7 +96,7 @@ func TestSamplerReadsNothingWhilePausedAndCatchesUpOnce(t *testing.T) {
 		{"idle leaves the time running", pauseLocked, (*pollHub).setIdle, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := newPollHub()
+			h := testPollHub(t)
 			src := &firedByHand{}
 			var reads, closes atomic.Int32
 			delivered := make(chan int32, 16)
@@ -127,7 +127,7 @@ func TestSamplerReadsNothingWhilePausedAndCatchesUpOnce(t *testing.T) {
 }
 
 func TestSamplerSameReadingPostsNothing(t *testing.T) {
-	h := newPollHub()
+	h := testPollHub(t)
 	src := &firedByHand{}
 	spec := samplerSpec[string]{
 		key: "same", source: src.source,

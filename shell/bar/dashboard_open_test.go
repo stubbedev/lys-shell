@@ -116,7 +116,7 @@ func newDashboardRig(t *testing.T) *dashboardRig {
 	restore := widget.SetAnimationsInstant(true)
 	t.Cleanup(restore)
 	ctx.App = a
-	warmDashboard()
+	warmDashboard(t)
 	rig := &dashboardRig{
 		t: t, a: a,
 		network:  newCountedNetwork(),
@@ -194,9 +194,13 @@ func (r *dashboardRig) close() {
 	apptest.Dispatched(r.t, r.a)
 }
 
-func warmDashboard() {
+func warmDashboard(t *testing.T) {
+	t.Helper()
 	widget.ThemeIconExists("ld-layout-dashboard-symbolic")
 	i18n.T("dropdown-dashboard-title")
+	if _, err := app.Font("sans-serif", 12); err != nil {
+		t.Fatalf("the system fonts: %v", err)
+	}
 }
 
 func (r *dashboardRig) awaitReads(n int64) {

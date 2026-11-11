@@ -3,6 +3,7 @@ package bar
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"reflect"
 	"strings"
@@ -32,18 +33,19 @@ func nineTags(active, occupied int) string {
 func fakeMangoSocket(t *testing.T, monitors, clients string) chan string {
 	t.Helper()
 	dispatched := make(chan string, 8)
-	path := serveUnix(t, "mango.sock", func(conn net.Conn) {
-		line, err := bufio.NewReader(conn).ReadString('\n')
+	path := serveUnix(t, "mango.sock", func(conn net.Conn, _ <-chan struct{}) {
+		r := bufio.NewReader(conn)
+		line, err := r.ReadString('\n')
 		if err != nil {
 			return
 		}
 		switch line {
 		case "watch all-monitors\n":
 			_, _ = conn.Write([]byte(`{"monitors":` + monitors + "}\n"))
-			time.Sleep(2 * time.Second)
+			_, _ = io.Copy(io.Discard, r)
 		case "watch all-clients\n":
 			_, _ = conn.Write([]byte(`{"clients":` + clients + "}\n"))
-			time.Sleep(2 * time.Second)
+			_, _ = io.Copy(io.Discard, r)
 		default:
 			dispatched <- strings.TrimSuffix(line, "\n")
 			_, _ = conn.Write([]byte("{}\n"))

@@ -95,13 +95,13 @@ func newWorldClock(ctx ModuleContext) (Module, error) {
 	spec := samplerSpec[string]{
 		key:   configKey("world-clock", ctx.Config),
 		pause: pauseLocked,
-		source: func(life context.Context, fire func()) error {
-			go func() {
+		source: func(life context.Context, spawn func(func()), fire func()) error {
+			spawn(func() {
 				fire()
-				if err := walltimer.Start(life, template.finest, fire); err != nil {
+				if err := walltimer.Start(life, spawn, template.finest, fire); err != nil {
 					log.Printf("world-clock: %v", err)
 				}
-			}()
+			})
 			return nil
 		},
 		sample: func() (string, bool) { return template.render(time.Now()), true },

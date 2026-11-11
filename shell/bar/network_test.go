@@ -65,7 +65,7 @@ func newTestNetworkModule(t *testing.T, cfg *config.Config, snap network.Snapsho
 	t.Helper()
 	style := computeStyle(cfg, styling.Default()).forModules()
 	m := &networkModule{
-		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style},
+		ctx:    ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)},
 		source: &fakeNetworkSource{snap: snap, ticks: make(chan struct{}, 2)},
 	}
 	m.btn = newBarButton(m.ctx, m.icon, "")

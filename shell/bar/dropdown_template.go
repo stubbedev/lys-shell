@@ -267,7 +267,7 @@ func (r *refresher[T]) requestThen(then func()) {
 	}
 	r.running = true
 	r.mu.Unlock()
-	go r.loop()
+	r.mc.Go(r.loop)
 }
 
 func (r *refresher[T]) first() {
@@ -316,7 +316,7 @@ func followInto[T any](life context.Context, what string, subscribe func(context
 			log.Printf("%s: subscribe: %v", what, err)
 			return
 		}
-		go func() {
+		r.mc.Go(func() {
 			defer stop()
 			for {
 				select {
@@ -329,13 +329,13 @@ func followInto[T any](life context.Context, what string, subscribe func(context
 				}
 				r.request()
 			}
-		}()
+		})
 	}
 	if r.mc.App == nil {
 		follow()
 		return
 	}
-	go follow()
+	r.mc.Go(follow)
 }
 
 type openFollow struct {
@@ -347,8 +347,8 @@ type openFollow struct {
 	stopped func()
 }
 
-func newOpenFollow(follow func(context.Context)) *openFollow {
-	life, end := context.WithCancel(context.Background())
+func newOpenFollow(ctx ModuleContext, follow func(context.Context)) *openFollow {
+	life, end := context.WithCancel(ctx.Life())
 	return &openFollow{follow: follow, life: life, end: end}
 }
 

@@ -1087,6 +1087,24 @@ func (s *Service) FlushWrites(timeout time.Duration) {
 	}
 }
 
+// Shutdown ends the history's persistence: the store is let go, the
+// changes and writes queued so far land as FlushWrites waits for them,
+// and the store closes. The history carries on in memory.
+func (s *Service) Shutdown(timeout time.Duration) error {
+	s.mu.Lock()
+	st := s.store
+	s.store = nil
+	s.mu.Unlock()
+	s.FlushWrites(timeout)
+	if st == nil {
+		return nil
+	}
+	if err := st.Close(); err != nil {
+		return fmt.Errorf("notifications: close the store: %w", err)
+	}
+	return nil
+}
+
 // writeQueue runs jobs in order on one goroutine, there only while it has work:
 // the callers never wait on the disk.
 type writeQueue struct {

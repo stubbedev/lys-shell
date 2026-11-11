@@ -51,7 +51,7 @@ func TestSysinfoThresholdColors(t *testing.T) {
 	}
 	style := computeStyle(cfg, styling.Default())
 	cfg.CPU.Thresholds = []config.ThresholdEntry{{Above: ptrF(90), LabelColor: &cv, IconColor: &cv}}
-	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style}
+	ctx := ModuleContext{Config: cfg, Font: testFont(t), Style: &style, gen: testGen(t)}
 	c := cfg.CPU
 	m := &pollModule{ctx: ctx, cfg: pollConfig{c.Format, c.Thresholds, c.Icon(), c.PollIntervalMs}}
 	m.icon = moduleIcon(ctx, cfg.CPU.Icon())

@@ -167,7 +167,7 @@ func networkDropdown(ctx ModuleContext) widget.Widget {
 func newNetworkView(ctx ModuleContext, deps netDeps) *networkView {
 	font, px := dropdownFont(ctx)
 	v := &networkView{ctx: ctx, font: font, px: px, netDeps: deps}
-	v.openFollow = newOpenFollow(v.follow)
+	v.openFollow = newOpenFollow(ctx, v.follow)
 	v.reads = newRefresher(ctx, v.life, v.read, v.apply)
 	// The popover frame: the header strip full width over the content
 	// (network/mod.rs:63-183).
@@ -401,7 +401,7 @@ func (v *networkView) connect(password string) {
 	v.active.apply(v.cur.snap, v.progress)
 	v.rebuildList()
 	path := sel.path
-	go func() {
+	v.ctx.Go(func() {
 		err := w.ConnectAndWait(context.Background(), path, password, func(state network.DeviceState) {
 			if step := connectionStep(state); step != "" {
 				v.ctx.Invoke(func() {
@@ -411,7 +411,7 @@ func (v *networkView) connect(password string) {
 			}
 		})
 		v.ctx.Invoke(func() { v.connectDone(err) })
-	}()
+	})
 }
 
 // connectDone is the connection watcher's verdict.
@@ -470,10 +470,10 @@ func (v *networkView) startScan() {
 	}
 	v.state = netScanning
 	v.apply(v.cur)
-	go func() {
+	v.ctx.Go(func() {
 		w.ScanAndWait(v.life, netScanTimeout)
 		v.reads.requestThen(v.scanDone)
-	}()
+	})
 }
 
 // scanDone is ScanComplete, after the read that followed the scan was
@@ -504,10 +504,10 @@ func (v *networkView) forget(ssid string) {
 	if w == nil {
 		return
 	}
-	go func() {
+	v.ctx.Go(func() {
 		w.Forget(context.Background(), ssid)
 		v.refresh()
-	}()
+	})
 }
 
 // refresh re-reads off the loop and applies, through the view's reader.
@@ -523,12 +523,12 @@ func (v *networkView) wifiToggled(on bool) {
 		v.cache, v.pendingSSID, v.selection = nil, "", nil
 		v.state = netNormal
 	}
-	go func() {
+	v.ctx.Go(func() {
 		if err := w.SetEnabled(context.Background(), on); err != nil {
 			log.Printf("network: wifi toggle: %v", err)
 		}
 		v.refresh()
-	}()
+	})
 }
 
 // follow re-reads on NetworkManager, saved-profile, and agent changes
@@ -542,11 +542,11 @@ func (v *networkView) follow(life context.Context) {
 	}
 	for _, feed := range v.changes {
 		ch := feed(life)
-		go func() {
+		v.ctx.Go(func() {
 			for range ch {
 				v.reads.request()
 			}
-		}()
+		})
 	}
 }
 
@@ -753,11 +753,11 @@ func (a *netActive) disconnect() {
 	if w == nil {
 		return
 	}
-	go func() {
+	a.v.ctx.Go(func() {
 		if err := w.Disconnect(context.Background()); err != nil {
 			log.Printf("network: wifi disconnect: %v", err)
 		}
-	}()
+	})
 }
 
 // forget is forget_wifi: the saved profiles go, then the link.
@@ -766,12 +766,12 @@ func (a *netActive) forget() {
 	if w == nil || ssid == "" {
 		return
 	}
-	go func() {
+	a.v.ctx.Go(func() {
 		w.Forget(context.Background(), ssid)
 		if err := w.Disconnect(context.Background()); err != nil {
 			log.Printf("network: wifi disconnect after forget: %v", err)
 		}
-	}()
+	})
 }
 
 // dismiss is DismissError.
