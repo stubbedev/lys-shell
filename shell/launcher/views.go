@@ -113,7 +113,7 @@ func (s *Surface) makeRow(a *active, pos int, st rowStyle) widget.Widget {
 		return true
 	})
 	if path := thumbnailPending(it.Icon); path != "" && st.showIcons {
-		generateThumbnail(a.ctx, a.thumbs, path, func(made string) {
+		generateThumbnail(a.ctx, s.work.Go, a.thumbs, path, func(made string) {
 			s.d.Invoke(func() {
 				if s.cur != a || a.views.list.rows[pos] != widget.Widget(row) {
 					return

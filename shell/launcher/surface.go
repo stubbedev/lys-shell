@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
@@ -165,7 +166,12 @@ type Surface struct {
 	model        matchModel
 	multi        multiSelect
 	sel          int
-	// spawn runs work off the loop (the picker's thumbnails).
+	// work counts what the surface runs off the loop, each on its own
+	// goroutine: the engines, the loads of icons, thumbnails and
+	// previews, the typing of a pick and the closing of a history. All
+	// of it ends once the sessions that started it have.
+	work sync.WaitGroup
+	// spawn runs the picker's thumbnail work, in work.
 	spawn func(func())
 }
 
@@ -177,7 +183,8 @@ func New(d Deps) *Surface {
 	if d.Emoji == nil {
 		d.Emoji = modes.AvailableEmoji
 	}
-	s := &Surface{d: d, sel: -1, sources: search.NewSources(d.WatchFiles, time.Now), spawn: func(fn func()) { go fn() }}
+	s := &Surface{d: d, sel: -1, sources: search.NewSources(d.WatchFiles, time.Now)}
+	s.spawn = s.work.Go
 	s.openFrecency = s.sources.Frecency(func() (*search.Frecency, error) { return s.d.OpenFrecency() })
 	return s
 }
@@ -275,7 +282,7 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 		// asked for a menu it cannot build.
 		s.d.FireHook(setup.ui.hooks.MenuError, engine.HookContext{Error: "no usable modes"})
 		sess.Reply(launcheripc.ServerFrame{Type: launcheripc.FrameCancelled, Code: 1})
-		closeHistory(setup.history)
+		s.closeHistory(setup.history)
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -284,7 +291,7 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 		thumbs: engine.NewThumbnailer(setup.ui.previewCmd), ctx: ctx, cancel: cancel,
 		keys: compileKeys(setup.ui.keybindings), mouse: compileMouse(setup.ui.mouseBindings),
 	}
-	a.preview = newPreviewLoader(s.d, a.thumbs)
+	a.preview = newPreviewLoader(s.d, s.work.Go, a.thumbs)
 	s.multi = multiSelect{picked: map[uint32]bool{}, ballotSelected: setup.ui.ballotSelected, ballotUnselected: setup.ui.ballotUnselected}
 	s.model.update(nil, nil)
 	s.sel = -1
@@ -298,7 +305,7 @@ func (s *Surface) openSession(sess *launcheripc.Session) {
 			return
 		}
 		esess.SetCompleter(setup.ui.completer)
-		a.act = startActor(esess, setup.initialMode, &sessionSink{s: s, a: a}, s.d.Invoke)
+		a.act = startActor(s.work.Go, esess, setup.initialMode, &sessionSink{s: s, a: a}, s.d.Invoke)
 	}
 	if a.dump {
 		if a.ui.filter != nil && a.act != nil {
@@ -801,7 +808,7 @@ func (s *Surface) end(frame *launcheripc.ServerFrame) {
 	} else {
 		a.sess.Release()
 	}
-	closeHistory(a.history)
+	s.closeHistory(a.history)
 	if a.win != nil {
 		// The panel plays its exit, then the surface goes; a new session
 		// meanwhile opens its own.
@@ -824,7 +831,7 @@ func (s *Surface) typeOnceClosed(text string) {
 		return
 	}
 	s.d.After(typeSettle, func() {
-		go func() {
+		s.work.Go(func() {
 			err := s.d.Type(text)
 			if err == nil {
 				return
@@ -835,7 +842,7 @@ func (s *Surface) typeOnceClosed(text string) {
 					s.d.Copy(text)
 				}
 			})
-		}()
+		})
 	})
 }
 
@@ -950,13 +957,13 @@ func messageMarkup(markup string) string {
 
 // closeHistory closes off the loop, behind whatever the session's actor is
 // still doing with the database.
-func closeHistory(h *engine.History) {
+func (s *Surface) closeHistory(h *engine.History) {
 	if h == nil {
 		return
 	}
-	go func() {
+	s.work.Go(func() {
 		if err := h.Close(); err != nil {
 			log.Printf("launcher: close the history: %v", err)
 		}
-	}()
+	})
 }

@@ -163,14 +163,15 @@ type Engine struct {
 	emptyCand []ranked
 }
 
-// Start runs the engine over root. openFrecency runs on its goroutine,
-// as it reads the disk; nil learns nothing. deliver hops onto the UI
-// loop.
-func Start(root *Level, openFrecency func() (*Frecency, error), sink Sink, deliver func(func())) *Engine {
+// Start runs the engine over root on a goroutine spawn starts, which
+// ends once the engine and its providers have all returned.
+// openFrecency runs on that goroutine, as it reads the disk; nil learns
+// nothing. deliver hops onto the UI loop.
+func Start(spawn func(func()), root *Level, openFrecency func() (*Frecency, error), sink Sink, deliver func(func())) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
 	e := newEngine()
 	e.sink, e.deliver, e.cancel = sink, deliver, cancel
-	go e.run(ctx, root, openFrecency)
+	spawn(func() { e.run(ctx, root, openFrecency) })
 	return e
 }
 

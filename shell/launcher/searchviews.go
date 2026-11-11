@@ -78,9 +78,9 @@ func newPanelViews(d Deps, cfg *config.Config) *panelViews {
 
 // bind hands the views to p, showing nothing yet: what the last panel
 // left is cleared, and the size lands on an empty field.
-func (v *panelViews) bind(p *panel, invoke func(func())) {
+func (v *panelViews) bind(p *panel, spawn, invoke func(func())) {
 	v.p = p
-	v.list.loader = newIconLoader(p.ctx, invoke, v.list.iconReady)
+	v.list.loader = newIconLoader(p.ctx, spawn, invoke, v.list.iconReady)
 	v.list.waiting = v.list.waiting[:0]
 	v.list.setRows(nil, -1)
 	v.hl.Set("")

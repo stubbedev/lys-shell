@@ -162,10 +162,11 @@ func thumbnailPending(icon engine.Icon) string {
 	return ""
 }
 
-// generateThumbnail finds or makes path's thumbnail off the loop and hands the
-// file to done (nothing when none could be made).
-func generateThumbnail(ctx context.Context, t engine.Thumbnailer, path string, done func(string)) {
-	go func() {
+// generateThumbnail finds or makes path's thumbnail off the loop, on a
+// goroutine spawn starts, and hands the file to done (nothing when none
+// could be made).
+func generateThumbnail(ctx context.Context, spawn func(func()), t engine.Thumbnailer, path string, done func(string)) {
+	spawn(func() {
 		if cached, ok := engine.CachedThumbnail(path); ok {
 			done(cached)
 			return
@@ -173,5 +174,5 @@ func generateThumbnail(ctx context.Context, t engine.Thumbnailer, path string, d
 		if made, ok := t.Generate(ctx, path); ok {
 			done(made)
 		}
-	}()
+	})
 }

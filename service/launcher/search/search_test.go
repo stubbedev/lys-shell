@@ -107,7 +107,7 @@ func start(t *testing.T, s *sink, freq *Frecency, providers ...Provider) *Engine
 
 func startLevel(t *testing.T, s *sink, level *Level, open func() (*Frecency, error)) *Engine {
 	t.Helper()
-	e := Start(level, open, s, func(fn func()) { fn() })
+	e := Start(func(run func()) { go run() }, level, open, s, func(fn func()) { fn() })
 	t.Cleanup(func() { stopped(t, e) })
 	return e
 }
@@ -470,7 +470,7 @@ func TestStopCancelsProvidersAndLeavesNothingRunning(t *testing.T) {
 	s := &sink{}
 	gate := make(chan struct{})
 	defer close(gate)
-	e := Start(&Level{Providers: []Provider{&fakeProvider{spec: Spec{Section: SectionApps}, gate: gate}}}, nil, s, func(fn func()) { fn() })
+	e := Start(func(run func()) { go run() }, &Level{Providers: []Provider{&fakeProvider{spec: Spec{Section: SectionApps}, gate: gate}}}, nil, s, func(fn func()) { fn() })
 	e.Stop()
 	select {
 	case <-e.Done():

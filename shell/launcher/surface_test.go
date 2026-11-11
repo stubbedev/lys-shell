@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -155,7 +156,38 @@ func newHarness(t *testing.T) *harness {
 			}
 		},
 	})
+	t.Cleanup(h.stop)
 	return h
+}
+
+// stop ends the session the test left open, as its client going away
+// does, and waits for everything the surface ran off the loop: the next
+// test starts with nothing of this one still running.
+func (h *harness) stop() {
+	h.loop.pump()
+	s := h.s
+	switch {
+	case s.cur != nil:
+		s.ClientGone(s.cur.sess.ID)
+	case s.panel != nil:
+		s.ClientGone(s.panel.sess.ID)
+	case s.picker != nil:
+		s.ClientGone(s.picker.sess.ID)
+	case s.emojiGrid != nil:
+		s.ClientGone(s.emojiGrid.sess.ID)
+	}
+	h.loop.pump()
+	done := make(chan struct{})
+	go func() {
+		s.work.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		stacks := make([]byte, 1<<20)
+		h.t.Errorf("the surface's work outlives its sessions:\n%s", stacks[:runtime.Stack(stacks, true)])
+	}
 }
 
 // open starts a session and returns its reply channel.

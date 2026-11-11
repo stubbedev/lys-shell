@@ -107,11 +107,12 @@ type actor struct {
 	cancel context.CancelFunc
 }
 
-// startActor runs the session's engine; deliver hops onto the UI loop.
-func startActor(sess *engine.Session, initial int, sink engineSink, deliver func(func())) *actor {
+// startActor runs the session's engine on a goroutine spawn starts;
+// deliver hops onto the UI loop.
+func startActor(spawn func(func()), sess *engine.Session, initial int, sink engineSink, deliver func(func())) *actor {
 	ctx, cancel := context.WithCancel(context.Background())
 	a := &actor{wake: make(chan struct{}, 1), cancel: cancel}
-	go a.run(ctx, sess, initial, sink, deliver)
+	spawn(func() { a.run(ctx, sess, initial, sink, deliver) })
 	return a
 }
 

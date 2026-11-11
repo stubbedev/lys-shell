@@ -79,7 +79,7 @@ type panel struct {
 func (s *Surface) openPanel(sess *launcheripc.Session) {
 	cfg := s.d.Config()
 	ctx, cancel := context.WithCancel(context.Background())
-	p := &panel{s: s, sess: sess, ctx: ctx, cancel: cancel, sel: -1, preview: newPreviewLoader(s.d, engine.NewThumbnailer(previewCmd(sess.Options, cfg.Launcher)))}
+	p := &panel{s: s, sess: sess, ctx: ctx, cancel: cancel, sel: -1, preview: newPreviewLoader(s.d, s.work.Go, engine.NewThumbnailer(previewCmd(sess.Options, cfg.Launcher)))}
 	s.panel = p
 	p.v = s.panelViewsFor(p, cfg)
 	win, err := s.d.Open(panelLayer(cfg.Styling.Translucent(), s.outputFor(cfg.Launcher.Monitor), p.v.panelFrame, p.keyCaptured,
@@ -123,7 +123,7 @@ func (s *Surface) openPanel(sess *launcheripc.Session) {
 		openFrecency = s.openFrecency
 	}
 	p.v.entry.SetPlaceholder(root.Placeholder)
-	p.eng = search.Start(root, openFrecency, panelSink{p}, s.d.Invoke)
+	p.eng = search.Start(s.work.Go, root, openFrecency, panelSink{p}, s.d.Invoke)
 	p.v.motion.open(cfg.Animations)
 }
 
@@ -133,7 +133,7 @@ func (s *Surface) panelViewsFor(p *panel, cfg *config.Config) *panelViews {
 	if s.views == nil || s.views.cfg != cfg || s.views.p != nil {
 		s.views = newPanelViews(s.d, cfg)
 	}
-	s.views.bind(p, s.d.Invoke)
+	s.views.bind(p, s.work.Go, s.d.Invoke)
 	return s.views
 }
 

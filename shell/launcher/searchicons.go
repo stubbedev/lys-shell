@@ -17,9 +17,11 @@ type iconRequest struct {
 
 // iconLoader decodes a panel's icons on one goroutine, off the UI loop:
 // newest first, since typing makes the older ones moot, and only while
-// the panel is open. The goroutine exists only while there is work.
+// the panel is open. The goroutine, which spawn starts, exists only
+// while there is work.
 type iconLoader struct {
 	ctx    context.Context
+	spawn  func(func())
 	invoke func(func())
 	ready  func(iconRequest)
 	decode func(iconRequest)
@@ -29,8 +31,8 @@ type iconLoader struct {
 	running bool
 }
 
-func newIconLoader(ctx context.Context, invoke func(func()), ready func(iconRequest)) *iconLoader {
-	return &iconLoader{ctx: ctx, invoke: invoke, ready: ready, decode: func(r iconRequest) {
+func newIconLoader(ctx context.Context, spawn, invoke func(func()), ready func(iconRequest)) *iconLoader {
+	return &iconLoader{ctx: ctx, spawn: spawn, invoke: invoke, ready: ready, decode: func(r iconRequest) {
 		_ = widget.PreloadThemeIcon(r.name, r.size, r.num, r.denom)
 	}}
 }
@@ -44,7 +46,7 @@ func (l *iconLoader) request(r iconRequest) {
 	l.queue = append(l.queue, r)
 	if !l.running {
 		l.running = true
-		go l.run()
+		l.spawn(l.run)
 	}
 }
 

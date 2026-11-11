@@ -6,6 +6,7 @@ import (
 	"image"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -850,7 +851,9 @@ func TestLoaderStopsWithThePanel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var ready []iconRequest
 	loop := &fakeLoop{}
-	l := newIconLoader(ctx, loop.invoke, func(r iconRequest) { ready = append(ready, r) })
+	var work sync.WaitGroup
+	defer work.Wait()
+	l := newIconLoader(ctx, work.Go, loop.invoke, func(r iconRequest) { ready = append(ready, r) })
 	gate := make(chan struct{})
 	l.setDecode(func(iconRequest) { <-gate })
 	l.request(iconRequest{name: "a"})

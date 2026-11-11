@@ -197,6 +197,7 @@ func (s *rowSummary) show(bind func(*asyncIcon, string), icon, glyph, title, sub
 // one's wait and load, so only the row the selection rests on loads.
 type previewLoader struct {
 	after  func(time.Duration, func()) func()
+	spawn  func(func())
 	invoke func(func())
 	thumbs engine.Thumbnailing
 	// stopWait and stopLoad end the current row's wait and load.
@@ -206,8 +207,8 @@ type previewLoader struct {
 	loads int
 }
 
-func newPreviewLoader(d Deps, thumbs engine.Thumbnailing) *previewLoader {
-	return &previewLoader{after: d.After, invoke: d.Invoke, thumbs: thumbs}
+func newPreviewLoader(d Deps, spawn func(func()), thumbs engine.Thumbnailing) *previewLoader {
+	return &previewLoader{after: d.After, spawn: spawn, invoke: d.Invoke, thumbs: thumbs}
 }
 
 // start drops the last row's wait and load, and returns the context the
@@ -234,12 +235,12 @@ func (l *previewLoader) stop() {
 // settle runs fn once the selection has rested.
 func (l *previewLoader) settle(fn func()) { l.stopWait = l.after(previewSettle, fn) }
 
-// fetch loads p off the loop and hands it to done on the loop, unless ctx
-// ended first. Nothing to load is no failure; anything else is logged
+// fetch loads p off the loop, on a goroutine spawn starts, and hands it
+// to done on the loop, unless ctx ended first. Nothing to load is no failure; anything else is logged
 // and handed on, so the pane shows what it still can.
 func (l *previewLoader) fetch(ctx context.Context, p engine.Preview, done func(engine.PreviewContent, error)) {
 	l.loads++
-	go func() {
+	l.spawn(func() {
 		content, err := engine.LoadPreview(ctx, p, l.thumbs)
 		l.invoke(func() {
 			if ctx.Err() != nil {
@@ -250,5 +251,5 @@ func (l *previewLoader) fetch(ctx context.Context, p engine.Preview, done func(e
 			}
 			done(content, err)
 		})
-	}()
+	})
 }

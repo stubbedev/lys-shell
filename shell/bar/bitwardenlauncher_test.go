@@ -200,8 +200,15 @@ func startVaultSearch(t *testing.T, v *fakeVault) (*search.Engine, *searchSink, 
 	m, copies := vaultModeOver(v)
 	pickers := search.NewPickers(nil, search.PickerLevels{Vault: func() *search.Level { return search.ModeLevel(m, "Vault") }}, false)
 	s := &searchSink{}
-	e := search.Start(&search.Level{Providers: []search.Provider{pickers}}, nil, s, func(fn func()) { fn() })
-	t.Cleanup(e.Stop)
+	e := search.Start(func(run func()) { go run() }, &search.Level{Providers: []search.Provider{pickers}}, nil, s, func(fn func()) { fn() })
+	t.Cleanup(func() {
+		e.Stop()
+		select {
+		case <-e.Done():
+		case <-time.After(5 * time.Second):
+			t.Error("the search engine outlives the test")
+		}
+	})
 	e.SetQuery("bitwarden", 1)
 	searchUntil(t, "the picker row", func() bool { return len(s.last().Rows) > 0 && s.last().Query == "bitwarden" })
 	return e, s, copies
