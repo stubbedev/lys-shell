@@ -9,6 +9,9 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
+
+	"github.com/stubbedev/lys-shell/internal/notifytest"
+	"github.com/stubbedev/lys-shell/service/notifications"
 )
 
 // askDaemon answers Notify with id 9 and then plays its script of
@@ -160,5 +163,52 @@ func TestAskReportsASignalItCannotRead(t *testing.T) {
 	bus, _ := startAskDaemon(t, []any{"ActionInvoked", "nine", "allow"})
 	if key, ok, err := NewSender(bus.Conn(t)).Ask(context.Background(), "lys-shell", "s", "b", "", yesNoActions, time.Minute); err == nil {
 		t.Fatalf("Ask = %q %v, want an error for the malformed ActionInvoked", key, ok)
+	}
+}
+
+// The shell asks its own notification server on the connection that
+// owns the server's name: the press the server announces there is the
+// answer.
+func TestAskHearsTheShellsOwnServerOnItsOwnConnection(t *testing.T) {
+	bus := dbustest.Start(t)
+	conn := bus.Conn(t)
+	svc := notifytest.NewService(t)
+	server, err := notifications.Serve(conn, svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := server.Release(); err != nil {
+			t.Errorf("release the notification server: %v", err)
+		}
+	})
+	type answer struct {
+		key string
+		ok  bool
+		err error
+	}
+	answered := make(chan answer, 1)
+	go func() {
+		key, ok, err := NewSender(conn).Ask(t.Context(), "lys-shell", "s", "b", "", yesNoActions, time.Minute)
+		answered <- answer{key, ok, err}
+	}()
+	var id uint32
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+		if popups := svc.Popups(); len(popups) == 1 {
+			id = popups[0].ID
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the server never showed the question")
+		}
+	}
+	svc.InvokeAction(id, "allow", "")
+	select {
+	case a := <-answered:
+		if a.err != nil || !a.ok || a.key != "allow" {
+			t.Fatalf("Ask = %q %v %v, want allow", a.key, a.ok, a.err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Ask never heard the press its own server announced")
 	}
 }

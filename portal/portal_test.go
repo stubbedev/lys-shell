@@ -265,24 +265,7 @@ func TestColorScheme(t *testing.T) {
 // moved.
 func TestSettingsFollowTheWallpaperPalette(t *testing.T) {
 	r := settingsRig(t, gtksettings.Settings{}, nil)
-	palette := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "lys-shell", "wallpaper-colors.json")
-	write := func(primary string) {
-		t.Helper()
-		data := `{"colors": {` +
-			`"background": {"dark": "#101418", "light": "#f8f9ff"},` +
-			`"on_background": {"dark": "#e0e2e8", "light": "#191c20"},` +
-			`"on_surface_variant": {"dark": "#c2c7cf", "light": "#42474e"},` +
-			`"primary": {"dark": "` + primary + `", "light": "#2060cc"},` +
-			`"secondary": {"dark": "#b9c8da", "light": "#526070"},` +
-			`"tertiary": {"dark": "#d3bfe6", "light": "#6a5778"},` +
-			`"error": {"dark": "#ffb4ab", "light": "#ba1a1a"}}}`
-		if err := os.MkdirAll(filepath.Dir(palette), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(palette, []byte(data), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
+	write := func(primary string) { writeWallpaperPalette(t, primary) }
 	write("#4090ff")
 	if err := r.cfg.SetByPath("styling.theme-provider", "wallpaper"); err != nil {
 		t.Fatal(err)
