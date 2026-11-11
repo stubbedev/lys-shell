@@ -31,14 +31,17 @@ var nameOwnerChanged = dbusx.NewSignal[ownerChange](busName, "NameOwnerChanged")
 
 // OnNameLost routes the bus's announcement that a name lost its owner
 // to lost, in a watch of dbusx.FromBus: a well-known name released, or
-// the unique name of a peer that left the bus. WithArg0 narrows it to
-// one name.
-func OnNameLost(lost func(name string) error) dbusx.Route {
-	return dbusx.On(nameOwnerChanged, busPath, func(change ownerChange, _ dbus.Sequence) error {
+// the unique name of a peer that left the bus. lost also gets the
+// announcement's sequence on the connection, which orders the loss
+// against a reply the name's owner sent (dbus.Call.ResponseSequence):
+// an answer sequenced before it came from an owner that has left since.
+// WithArg0 narrows the route to one name.
+func OnNameLost(lost func(name string, announced dbus.Sequence) error) dbusx.Route {
+	return dbusx.On(nameOwnerChanged, busPath, func(change ownerChange, announced dbus.Sequence) error {
 		if change.NewOwner != "" {
 			return nil
 		}
-		return lost(change.Name)
+		return lost(change.Name, announced)
 	})
 }
 

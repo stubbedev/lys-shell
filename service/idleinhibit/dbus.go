@@ -32,7 +32,7 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 	d.conn = conn
 	departed, err := dbusx.WatchSignals(context.Background(), conn, dbusx.FromBus(),
 		func(err error) { log.Printf("idle inhibit: %v", err) },
-		bussignal.OnNameLost(func(name string) error {
+		bussignal.OnNameLost(func(name string, _ dbus.Sequence) error {
 			d.state.ReleaseOwner(name)
 			return nil
 		}))

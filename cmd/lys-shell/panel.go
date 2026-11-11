@@ -132,7 +132,7 @@ func watchRelease(conn *dbus.Conn, released chan<- struct{}, failed chan<- error
 			default:
 			}
 		},
-		bussignal.OnNameLost(func(string) error {
+		bussignal.OnNameLost(func(string, dbus.Sequence) error {
 			select {
 			case released <- struct{}{}:
 			default:

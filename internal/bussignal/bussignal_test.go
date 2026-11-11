@@ -46,7 +46,7 @@ func TestANameLosingItsOwnerIsRoutedAndOneGainingItIsNot(t *testing.T) {
 	lost := make(chan string, 4)
 	watch, err := dbusx.WatchSignals(t.Context(), bus.Conn(t), dbusx.FromBus(),
 		func(err error) { t.Errorf("the watch failed: %v", err) },
-		bussignal.OnNameLost(func(name string) error {
+		bussignal.OnNameLost(func(name string, _ dbus.Sequence) error {
 			lost <- name
 			return nil
 		}))
@@ -78,12 +78,54 @@ func TestANameLosingItsOwnerIsRoutedAndOneGainingItIsNot(t *testing.T) {
 	}
 }
 
+func busID(t *testing.T, conn *dbus.Conn) dbus.Sequence {
+	t.Helper()
+	call := conn.BusObject().Call("org.freedesktop.DBus.GetId", 0)
+	if call.Err != nil {
+		t.Fatal(call.Err)
+	}
+	return call.ResponseSequence
+}
+
+// A loss carries its place among what the connection read: after the
+// reply to a call answered before the peer left, before the reply to
+// one made once the loss was known.
+func TestANameLossIsSequencedAmongTheRepliesOfItsConnection(t *testing.T) {
+	bus := dbustest.Start(t)
+	conn := bus.Conn(t)
+	lost := make(chan dbus.Sequence, 4)
+	watch, err := dbusx.WatchSignals(t.Context(), conn, dbusx.FromBus(),
+		func(err error) { t.Errorf("the watch failed: %v", err) },
+		bussignal.OnNameLost(func(_ string, announced dbus.Sequence) error {
+			lost <- announced
+			return nil
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := watch.Stop(); err != nil {
+			t.Errorf("stop the watch: %v", err)
+		}
+	})
+	peer := bus.Conn(t)
+	before := busID(t, conn)
+	if err := peer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	announced := await(t, lost, "word of the peer leaving")
+	after := busID(t, conn)
+	if before >= announced || announced >= after {
+		t.Errorf("the loss is sequenced %d, want it between the replies sequenced %d and %d", announced, before, after)
+	}
+}
+
 func TestOnNameLostNarrowsToOneName(t *testing.T) {
 	bus := dbustest.Start(t)
 	lost := make(chan string, 4)
 	watch, err := dbusx.WatchSignals(t.Context(), bus.Conn(t), dbusx.FromBus(),
 		func(err error) { t.Errorf("the watch failed: %v", err) },
-		bussignal.OnNameLost(func(name string) error {
+		bussignal.OnNameLost(func(name string, _ dbus.Sequence) error {
 			lost <- name
 			return nil
 		}).WithArg0(wellKnown))

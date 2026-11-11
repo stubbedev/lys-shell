@@ -65,7 +65,7 @@ type Host struct {
 	// names follows the bus names that lose their owner, each handed to
 	// the signal loop through vanished.
 	names    *dbusx.Watch
-	vanished chan string
+	vanished chan nameLoss
 	// tracks hands the signal loop the items to read from the goroutines
 	// that find them, and results what was read of each: items are
 	// tracked and forgotten on the signal loop alone.
@@ -98,27 +98,11 @@ func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 }
 
 func newHost(conn *dbus.Conn, store *Store, timeout time.Duration, failed func(error)) (*Host, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	h := &Host{
-		conn:        conn,
-		store:       store,
-		ctx:         ctx,
-		cancel:      cancel,
-		timeout:     timeout,
-		failed:      failed,
-		vanished:    make(chan string),
-		tracks:      make(chan string),
-		results:     make(chan reading),
-		reads:       make(map[string]*read),
-		owners:      make(map[string]string),
-		menus:       make(map[string][]chan struct{}),
-		pixmapSizes: make(map[int]int),
-		retrack:     make(chan struct{}, 1),
-	}
+	h := idleHost(conn, store, timeout, failed)
 	signals := make(chan *dbus.Signal, 64)
 	conn.Signal(signals)
 	if err := h.claim(); err != nil {
-		cancel()
+		h.cancel()
 		bussignal.Remove(conn, signals)
 		return nil, errors.Join(err, h.release())
 	}
@@ -129,6 +113,28 @@ func newHost(conn *dbus.Conn, store *Store, timeout time.Duration, failed func(e
 		h.work.Go(h.orphanScan)
 	}
 	return h, nil
+}
+
+// idleHost is a host that has claimed no role and runs no signal loop
+// yet.
+func idleHost(conn *dbus.Conn, store *Store, timeout time.Duration, failed func(error)) *Host {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Host{
+		conn:        conn,
+		store:       store,
+		ctx:         ctx,
+		cancel:      cancel,
+		timeout:     timeout,
+		failed:      failed,
+		vanished:    make(chan nameLoss),
+		tracks:      make(chan string),
+		results:     make(chan reading),
+		reads:       make(map[string]*read),
+		owners:      make(map[string]string),
+		menus:       make(map[string][]chan struct{}),
+		pixmapSizes: make(map[int]int),
+		retrack:     make(chan struct{}, 1),
+	}
 }
 
 // answer is the context of the calls of one exchange with a peer: it
@@ -205,9 +211,9 @@ func (h *Host) subscribe() error {
 	}
 	names, err := dbusx.WatchSignals(context.Background(), h.conn, dbusx.FromBus(),
 		func(err error) { log.Printf("sni: %v", err) },
-		bussignal.OnNameLost(func(name string) error {
+		bussignal.OnNameLost(func(name string, announced dbus.Sequence) error {
 			select {
-			case h.vanished <- name:
+			case h.vanished <- nameLoss{name: name, announced: announced}:
 			case <-h.ctx.Done():
 			}
 			return nil
@@ -275,8 +281,8 @@ func (h *Host) run(signals chan *dbus.Signal) {
 			}
 			h.handle(sig)
 			bussignal.Discard(sig)
-		case name := <-h.vanished:
-			h.nameVanished(name)
+		case loss := <-h.vanished:
+			h.nameLost(loss)
 		case reg := <-h.tracks:
 			h.track(reg)
 		case res := <-h.results:
@@ -368,13 +374,25 @@ func (h *Host) handle(sig *dbus.Signal) {
 	}
 }
 
-// nameVanished drops what a connection that left the bus registered.
-func (h *Host) nameVanished(name string) {
+// nameLoss is the bus announcing that a name lost its owner, and the
+// announcement's sequence on the host's connection.
+type nameLoss struct {
+	name      string
+	announced dbus.Sequence
+}
+
+// nameLost drops what a connection that left the bus registered, and
+// has each read under way know of the loss: the item it brings may
+// have answered before its name was lost.
+func (h *Host) nameLost(loss nameLoss) {
+	for _, r := range h.reads {
+		r.lost = append(r.lost, loss)
+	}
 	if h.watcher != nil {
-		h.watcher.nameVanished(name)
+		h.watcher.nameVanished(loss.name)
 		return
 	}
-	h.forgetName(name)
+	h.forgetName(loss.name)
 }
 
 // firstString is a one-string signal body.
@@ -470,16 +488,29 @@ func (h *Host) probe(name string) bool {
 
 // read is one read of an item under way. again says the item was to be
 // read once more meanwhile: what this read brings may predate that.
+// lost are the names that lost their owner meanwhile.
 type read struct {
 	again bool
+	lost  []nameLoss
 }
 
-// reading is what a read brought back: the item and the unique name of
-// the connection serving it, or why it could not be read.
+// lostSince reports whether one of names lost its owner after the
+// message sequenced answered: a sequence orders what the host's
+// connection read, replies and announcements alike.
+func (r *read) lostSince(answered dbus.Sequence, names ...string) bool {
+	return slices.ContainsFunc(r.lost, func(loss nameLoss) bool {
+		return loss.announced > answered && slices.Contains(names, loss.name)
+	})
+}
+
+// reading is what a read brought back: the item, the sequence of its
+// answer and the unique name of the connection serving it, or why it
+// could not be read.
 type reading struct {
 	of        *read
 	bus, path string
 	item      *Item
+	answered  dbus.Sequence
 	owner     string
 	err       error
 }
@@ -521,7 +552,7 @@ func (h *Host) read(bus, path string, sizes []int) reading {
 	res := reading{bus: bus, path: path, owner: bus}
 	ctx, cancel := h.answer()
 	defer cancel()
-	if res.item, res.err = readItem(ctx, h.conn, bus, path, sizes); res.err == nil && !strings.HasPrefix(bus, ":") {
+	if res.item, res.answered, res.err = readItem(ctx, h.conn, bus, path, sizes); res.err == nil && !strings.HasPrefix(bus, ":") {
 		res.owner, res.err = dbusx.NameOwner(ctx, h.conn, bus)
 	}
 	if res.err != nil {
@@ -531,17 +562,20 @@ func (h *Host) read(bus, path string, sizes []int) reading {
 }
 
 // finish stores what a read brought back and remembers the item's
-// owner, unless the item was forgotten while it was read. A read that
-// failed is reported and leaves the item as it was.
+// owner, unless the item was forgotten while it was read, or its bus
+// name or its owner left the bus after it answered: that loss is
+// handled, and nothing would forget the item again. A read that failed
+// is reported and leaves the item as it was.
 func (h *Host) finish(res reading) {
 	key := res.bus + res.path
 	if h.reads[key] != res.of {
 		return
 	}
 	delete(h.reads, key)
-	if res.err != nil {
+	switch {
+	case res.err != nil:
 		h.failed(res.err)
-	} else {
+	case !res.of.lostSince(res.answered, res.bus, res.owner):
 		h.owners[key] = res.owner
 		h.store.Put(res.item)
 	}
@@ -625,14 +659,15 @@ func (h *Host) notifyMenu(key string) {
 }
 
 // readItem fetches the SNI property set, keeping of each pixmap
-// property the pixmaps picked for sizes.
-func readItem(ctx context.Context, conn *dbus.Conn, bus, path string, sizes []int) (*Item, error) {
-	obj := conn.Object(bus, dbus.ObjectPath(path))
+// property the pixmaps picked for sizes; answered is the sequence of
+// the item's answer on conn.
+func readItem(ctx context.Context, conn *dbus.Conn, bus, path string, sizes []int) (it *Item, answered dbus.Sequence, err error) {
+	call := conn.Object(bus, dbus.ObjectPath(path)).CallWithContext(ctx, PropsIface+".GetAll", 0, ItemIface)
 	var props map[string]dbus.Variant
-	if err := obj.CallWithContext(ctx, PropsIface+".GetAll", 0, ItemIface).Store(&props); err != nil {
-		return nil, fmt.Errorf("%s.GetAll: %w", PropsIface, err)
+	if err := call.Store(&props); err != nil {
+		return nil, dbus.NoSequence, fmt.Errorf("%s.GetAll: %w", PropsIface, err)
 	}
-	it := &Item{Bus: bus, Path: path}
+	it = &Item{Bus: bus, Path: path}
 	str := func(name string) string {
 		if v, ok := props[name]; ok {
 			switch s := v.Value().(type) {
@@ -669,7 +704,7 @@ func readItem(ctx context.Context, conn *dbus.Conn, bus, path string, sizes []in
 	if tooltip, ok := props["ToolTip"]; ok {
 		it.Tooltip = parseTooltip(tooltip.Value())
 	}
-	return it, nil
+	return it, call.ResponseSequence, nil
 }
 
 // parsePixmaps converts the spec's a(iiay) list, dropping a pixmap
