@@ -39,6 +39,11 @@ var (
 	menuDebounce = 100 * time.Millisecond
 )
 
+const (
+	busIface          = "org.freedesktop.DBus"
+	errNameHasNoOwner = busIface + ".Error.NameHasNoOwner"
+)
+
 // answerTimeout is how long a peer, a tray item or an external watcher,
 // has to answer a call of the host's: the D-Bus default.
 const answerTimeout = 25 * time.Second
@@ -167,7 +172,7 @@ func (h *Host) claimWatcher() error {
 	if err == nil && owner != "" {
 		return nil
 	}
-	w := &watcher{host: h, hosts: []string{h.conn.Names()[0]}}
+	w := newWatcher(h)
 	h.exported = true
 	if err := h.conn.Export(w, WatcherPath, WatcherIface); err != nil {
 		return fmt.Errorf("sni: export watcher: %w", err)
@@ -389,7 +394,7 @@ func (h *Host) nameLost(loss nameLoss) {
 		r.lost = append(r.lost, loss)
 	}
 	if h.watcher != nil {
-		h.watcher.nameVanished(loss.name)
+		h.watcher.nameVanished(loss)
 		return
 	}
 	h.forgetName(loss.name)
@@ -759,12 +764,33 @@ func (h *Host) Close() error {
 }
 
 // watcher is the exported StatusNotifierWatcher (watcher/mod.rs).
+// A registration asks the bus whether its name still has an owner
+// before the item is recorded: checking counts the registrations of a
+// name under way, and lost is when the bus announced, during one, that
+// the name lost its owner.
 type watcher struct {
-	host *Host
+	host    *Host
+	ownerOf func(name string) (answered dbus.Sequence, err error)
 
-	mu    sync.Mutex
-	items []string
-	hosts []string
+	mu       sync.Mutex
+	items    []string
+	hosts    []string
+	checking map[string]int
+	lost     map[string]dbus.Sequence
+}
+
+func newWatcher(h *Host) *watcher {
+	w := &watcher{host: h, hosts: []string{h.conn.Names()[0]}, checking: map[string]int{}, lost: map[string]dbus.Sequence{}}
+	w.ownerOf = w.askOwner
+	return w
+}
+
+func (w *watcher) askOwner(name string) (dbus.Sequence, error) {
+	ctx, cancel := w.host.answer()
+	defer cancel()
+	var owner string
+	call := w.host.conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetNameOwner", 0, name)
+	return call.ResponseSequence, call.Store(&owner)
 }
 
 // RegisterStatusNotifierItem accepts an item. A bare object path is
@@ -778,24 +804,48 @@ func (w *watcher) RegisterStatusNotifierItem(sender dbus.Sender, service string)
 	return nil
 }
 
-// register records an item, announces it, and tracks it. A bus name
-// alone and that name at the default path are one item: the orphan
-// scan registers the bare name while the item itself may register
-// name/StatusNotifierItem, and either order must leave one entry.
+// register records an item, announces it, and tracks it, unless its
+// bus name has no owner by the time the bus answers whether it has, or
+// the bus announced its loss after that answer while the name was
+// checked: that loss has been handled, and nothing would drop the item
+// again. A bus name alone and that name at the default path are one
+// item: the orphan scan registers the bare name while the item itself
+// may register name/StatusNotifierItem, and either order must leave
+// one entry.
 func (w *watcher) register(service string) {
 	bus, path := ParseAddress(service)
 	w.mu.Lock()
-	if slices.ContainsFunc(w.items, func(s string) bool {
-		b, p := ParseAddress(s)
-		return b == bus && p == path
-	}) {
+	if w.knowsLocked(bus, path) {
 		w.mu.Unlock()
+		return
+	}
+	w.checking[bus]++
+	w.mu.Unlock()
+	answered, err := w.ownerOf(bus)
+	w.mu.Lock()
+	lost, wasLost := w.lost[bus]
+	if w.checking[bus]--; w.checking[bus] == 0 {
+		delete(w.checking, bus)
+		delete(w.lost, bus)
+	}
+	if err != nil || wasLost && lost > answered || w.knowsLocked(bus, path) {
+		w.mu.Unlock()
+		if derr, ok := errors.AsType[dbus.Error](err); err != nil && (!ok || derr.Name != errNameHasNoOwner) {
+			w.host.failed(fmt.Errorf("register %s: the owner of %s: %w", service, bus, err))
+		}
 		return
 	}
 	w.items = append(w.items, service)
 	w.mu.Unlock()
 	_ = w.host.conn.Emit(WatcherPath, WatcherIface+".StatusNotifierItemRegistered", service)
 	w.host.requestTrack(service)
+}
+
+func (w *watcher) knowsLocked(bus, path string) bool {
+	return slices.ContainsFunc(w.items, func(s string) bool {
+		b, p := ParseAddress(s)
+		return b == bus && p == path
+	})
 }
 
 // registered reports whether a bus name has any item registered.
@@ -812,8 +862,12 @@ func (w *watcher) registered(name string) bool {
 
 // nameVanished is unregister_item + unregister_host for a connection
 // that left the bus.
-func (w *watcher) nameVanished(name string) {
+func (w *watcher) nameVanished(loss nameLoss) {
+	name := loss.name
 	w.mu.Lock()
+	if w.checking[name] > 0 {
+		w.lost[name] = max(w.lost[name], loss.announced)
+	}
 	var removed []string
 	kept := w.items[:0]
 	for _, s := range w.items {

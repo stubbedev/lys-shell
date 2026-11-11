@@ -1,6 +1,7 @@
 package sni
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
@@ -159,6 +160,112 @@ func TestAnAnswerIsOrderedAgainstTheLossOfItsName(t *testing.T) {
 		h.finish(answer)
 		if items := store.Items(); len(items) != 1 || items[0].ID != "staying" {
 			t.Errorf("the host tracks %+v, want the item that stayed", items)
+		}
+	})
+}
+
+// playedWatcher is playedHost serving the watcher role: the test calls
+// the registrations and hands the losses to the loop's handler itself.
+func playedWatcher(t *testing.T, bus *dbustest.Bus) (*Host, *watcher) {
+	t.Helper()
+	h := playedHost(t, bus, NewStore())
+	h.watcher = newWatcher(h)
+	return h, h.watcher
+}
+
+func dropped(t *testing.T, h *Host, w *watcher, service string) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		w.register(service)
+	}()
+	select {
+	case <-done:
+	case got := <-h.tracks:
+		t.Errorf("the registration of %s tracks %q, an item that left the bus", service, got)
+		<-done
+	}
+	if items := w.registeredItems(); len(items) != 0 {
+		t.Errorf("the watcher lists %q, an item that left the bus", items)
+	}
+}
+
+func (w *watcher) registeredItems() []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return slices.Clone(w.items)
+}
+
+// A registration is ordered against the loss of its bus name: one
+// handled after the loss is dropped whether the bus answered before or
+// after it, and a loss announced before the bus answered, of the name's
+// previous owner, leaves the registration of its new owner.
+func TestARegistrationIsOrderedAgainstTheLossOfItsName(t *testing.T) {
+	t.Run("the item left the bus while its registration was checked", func(t *testing.T) {
+		bus := dbustest.Start(t)
+		h, w := playedWatcher(t, bus)
+		item := startItem(t, bus, "gone")
+		unique := item.conn.Names()[0]
+		w.ownerOf = func(name string) (dbus.Sequence, error) {
+			answered, err := w.askOwner(name)
+			if err != nil {
+				t.Fatalf("the owner of %s: %v", name, err)
+			}
+			if err := item.conn.Close(); err != nil {
+				t.Fatal(err)
+			}
+			loss := h.lossOf(t, unique)
+			if loss.announced <= answered {
+				t.Fatalf("the loss is sequenced %d, the answer before it %d", loss.announced, answered)
+			}
+			h.nameLost(loss)
+			return answered, nil
+		}
+		dropped(t, h, w, unique+"/StatusNotifierItem")
+	})
+	t.Run("the item left the bus before its registration was handled", func(t *testing.T) {
+		bus := dbustest.Start(t)
+		h, w := playedWatcher(t, bus)
+		item := startItem(t, bus, "gone first")
+		unique := item.conn.Names()[0]
+		if err := item.conn.Close(); err != nil {
+			t.Fatal(err)
+		}
+		h.nameLost(h.lossOf(t, unique))
+		dropped(t, h, w, unique+"/StatusNotifierItem")
+	})
+	t.Run("the name's previous owner left before the bus answered", func(t *testing.T) {
+		bus := dbustest.Start(t)
+		h, w := playedWatcher(t, bus)
+		previous := bus.Conn(t)
+		ownName(t, previous, itemName, dbus.NameFlagDoNotQueue, dbus.RequestNameReplyPrimaryOwner)
+		if err := previous.Close(); err != nil {
+			t.Fatal(err)
+		}
+		loss := h.lossOf(t, itemName)
+		item := startItem(t, bus, "taken over")
+		ownName(t, item.conn, itemName, dbus.NameFlagDoNotQueue, dbus.RequestNameReplyPrimaryOwner)
+		w.ownerOf = func(name string) (dbus.Sequence, error) {
+			answered, err := w.askOwner(name)
+			if loss.announced >= answered {
+				t.Fatalf("the loss is sequenced %d, the answer after it %d", loss.announced, answered)
+			}
+			h.nameLost(loss)
+			return answered, err
+		}
+		service := itemName + "/StatusNotifierItem"
+		registered := make(chan struct{})
+		go func() {
+			defer close(registered)
+			w.register(service)
+		}()
+		if got := await(t, h.tracks, "the registered item to track"); got != service {
+			t.Errorf("tracking %q, want %q", got, service)
+		}
+		<-registered
+		if items := w.registeredItems(); !slices.Equal(items, []string{service}) {
+			t.Errorf("the watcher lists %q, want the item of the name's new owner", items)
 		}
 	})
 }
