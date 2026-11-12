@@ -165,3 +165,28 @@ func TestReplayPath(t *testing.T) {
 		t.Error("two saves a millisecond apart share a name")
 	}
 }
+
+func TestSessionCloseFailureOfTheReplayIsReported(t *testing.T) {
+	closeErr := errors.New("recorder: close the compositor connection capturing DP-1: broken pipe")
+	startErr := errors.New("recorder: a 64x48 H.264 encoder: out of memory")
+	engine := &recordertest.Engine{StartErr: startErr, CloseErr: closeErr}
+	s, log := newState(t, engine, nil)
+	s.StartReplay()
+	waitFor(t, "the failure report", func() bool { toasts, _ := log.snapshot(); return len(toasts) > 0 })
+	if toasts, _ := log.snapshot(); !strings.Contains(toasts[0], startErr.Error()) || !strings.Contains(toasts[0], closeErr.Error()) {
+		t.Errorf("toasts %q, want both the start and the close error", toasts)
+	}
+
+	logged := recorder.TeeLog(t)
+	engine = &recordertest.Engine{CloseErr: closeErr}
+	s, _ = newState(t, engine, nil)
+	s.StartReplay()
+	armedReplay(t, engine, s)
+	s.StopReplay()
+	if got := logged.String(); !strings.Contains(got, "stop the instant replay: "+closeErr.Error()) {
+		t.Errorf("log = %q, want the close error of the disarmed replay", got)
+	}
+	if got := engine.Sessions()[0].Closed(); got != 1 {
+		t.Errorf("session closes %d, want 1", got)
+	}
+}

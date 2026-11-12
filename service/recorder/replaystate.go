@@ -81,8 +81,7 @@ func (s *State) runReplay(gen uint64) {
 	}
 	rep, err := session.StartReplay(opts, cfg.Replay.Seconds.Span(), func(reason string) { s.replayEnded(gen, reason) }, s.notify)
 	if err != nil {
-		session.Close()
-		s.replayFailed(gen, err.Error())
+		s.replayFailed(gen, errors.Join(err, session.Close()).Error())
 		return
 	}
 	s.mu.Lock()
@@ -125,10 +124,9 @@ func (s *State) takeReplayLocked() (Replay, Session) {
 }
 
 func stopReplay(rep Replay, session Session) {
-	if err := rep.Stop(); err != nil {
+	if err := endCapture(rep, session); err != nil {
 		log.Printf("recorder: stop the instant replay: %v", err)
 	}
-	session.Close()
 }
 
 // SaveReplay writes the replay's last seconds to a new file in the

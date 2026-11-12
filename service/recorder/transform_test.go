@@ -58,7 +58,7 @@ func TestRecordsTransformedOutputsAndRegionsUpright(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer closeOrFail(t, "the capture connection", c)
 	mode := image.Pt(1280, 720)
 	for _, transform := range []string{"normal", "90", "180", "270", "flipped", "flipped-90", "flipped-180", "flipped-270"} {
 		upright := mode
@@ -90,7 +90,7 @@ func TestRecordsTransformedOutputsAndRegionsUpright(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				defer s.Close()
+				defer closeOrFail(t, "the session", s)
 				path := filepath.Join(t.TempDir(), "rec.mkv")
 				rec, err := s.Start(Options{OutputPath: path, Format: config.RecorderFormatMkv, Framerate: 30}, func(r string) { t.Errorf("reported %q", r) })
 				if err != nil {

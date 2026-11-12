@@ -125,7 +125,7 @@ type sampleSink interface {
 	// close finishes the sink after the last sample.
 	close() error
 	// discard drops a sink whose recording failed to start.
-	discard()
+	discard() error
 }
 
 // fileSink muxes the samples into a new file.
@@ -146,8 +146,7 @@ func openFileSink(path string, format config.RecorderFormat, tracks []mux.Track)
 	}
 	s := &fileSink{path: path, file: file}
 	if s.mux, err = newMuxer(format, file, tracks...); err != nil {
-		s.discard()
-		return nil, fmt.Errorf("recorder: %s: %w", path, err)
+		return nil, errors.Join(fmt.Errorf("recorder: %s: %w", path, err), s.discard())
 	}
 	return s, nil
 }
@@ -177,9 +176,15 @@ func (s *fileSink) close() error {
 	return errors.Join(errs...)
 }
 
-func (s *fileSink) discard() {
-	_ = s.file.Close()
-	_ = os.Remove(s.path)
+func (s *fileSink) discard() error {
+	var errs []error
+	if err := s.file.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("recorder: close the discarded %s: %w", s.path, err))
+	}
+	if err := os.Remove(s.path); err != nil {
+		errs = append(errs, fmt.Errorf("recorder: remove the discarded %s: %w", s.path, err))
+	}
+	return errors.Join(errs...)
 }
 
 // startRecording opens opts.OutputPath and starts recording parts into
@@ -245,7 +250,7 @@ func (r *recording) release() error {
 	}
 	err := r.p.video.Close()
 	if r.sink != nil {
-		r.sink.discard()
+		err = errors.Join(err, r.sink.discard())
 	}
 	return err
 }

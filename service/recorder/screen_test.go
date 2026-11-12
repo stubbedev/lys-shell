@@ -53,7 +53,7 @@ func gpuSway(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer closeOrFail(t, "the capture connection", c)
 	outs := c.Outputs()
 	if len(outs) == 0 {
 		t.Fatal("the headless sway has no output")
@@ -74,7 +74,7 @@ func audioServer(t *testing.T) (*pulsetest.Server, *pulse.Service) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = s.Close() })
+	t.Cleanup(func() { closeOrFail(t, "the audio service", s) })
 	return srv, s
 }
 
@@ -120,7 +120,7 @@ func TestRecordsAnOutputOnTheGPU(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer s.Close()
+			defer closeOrFail(t, "the session", s)
 			path := filepath.Join(t.TempDir(), "screen."+string(format))
 			terms := &termLog{}
 			rec, err := s.Start(Options{OutputPath: path, Format: format, Framerate: 30, ShowCursor: true, SystemAudio: true, Microphone: true}, terms.term)
@@ -184,7 +184,7 @@ func TestReplayOnTheGPU(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer closeOrFail(t, "the session", s)
 	span := 2 * time.Second
 	terms := &termLog{}
 	rp, err := s.StartReplay(Options{Format: config.RecorderFormatMkv, Framerate: fps, ShowCursor: true}, span, terms.term, func() {})
@@ -278,7 +278,7 @@ func TestWebcamOverlayIsEncodedIntoTheFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer closeOrFail(t, "the screen", s)
 	video, err := newGPUVideo(s, 30)
 	if err != nil {
 		t.Fatal(err)

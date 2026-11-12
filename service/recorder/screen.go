@@ -56,17 +56,16 @@ func openScreen(target sharepicker.Target, cursor bool, logical LogicalSize, ope
 	if err != nil {
 		return nil, fmt.Errorf("recorder: connect to the compositor: %w", err)
 	}
-	s := &screen{client: c, cursor: cursor}
-	defer func() {
-		if err != nil {
-			s.Close()
-		}
-	}()
 	o, ok := c.OutputByName(output)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", errOutputGone, output)
+		return nil, errors.Join(fmt.Errorf("%w: %s", errOutputGone, output), closeClient(c, output))
 	}
-	s.output = o
+	s := &screen{client: c, output: o, cursor: cursor}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, s.Close())
+		}
+	}()
 	offered, err := c.DmabufFormat(o, cursor)
 	if err != nil {
 		return nil, fmt.Errorf("recorder: output %s offers no screencopy into GPU memory: %w", output, err)
@@ -161,7 +160,7 @@ func (s *screen) frameSize() image.Point {
 }
 
 // Close releases the buffer, the device and the connection.
-func (s *screen) Close() {
+func (s *screen) Close() error {
 	if s.frame != nil {
 		s.frame.Destroy()
 	}
@@ -171,7 +170,14 @@ func (s *screen) Close() {
 	if s.dev != nil {
 		s.dev.Close()
 	}
-	_ = s.client.Close()
+	return closeClient(s.client, s.output.Name)
+}
+
+func closeClient(c *capture.Client, output string) error {
+	if err := c.Close(); err != nil {
+		return fmt.Errorf("recorder: close the compositor connection capturing %s: %w", output, err)
+	}
+	return nil
 }
 
 // gpuVideo encodes the screen's buffer after each copy: the production

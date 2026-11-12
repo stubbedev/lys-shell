@@ -133,7 +133,7 @@ func TestRegionSourceMatchesTheCompositor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer closeOrFail(t, "the capture connection", c)
 	name := c.Outputs()[0].Name
 	seen := map[capture.Transform]bool{}
 	for _, scale := range []string{"1", "2", "1.5"} {

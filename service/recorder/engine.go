@@ -250,7 +250,7 @@ func (g *gpuSession) parts(opts Options) (recordingParts, error) {
 }
 
 // Close releases the screen.
-func (g *gpuSession) Close() { g.screen.Close() }
+func (g *gpuSession) Close() error { return g.screen.Close() }
 
 // audioSources are the captures opts asks for: the desktop (the
 // default sink's monitor) and the microphone.

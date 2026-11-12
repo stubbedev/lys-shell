@@ -361,3 +361,10 @@ func lastAudioPacket(recorded time.Duration) time.Duration {
 	preSkip := time.Duration(opus.PreSkip) * time.Second / audioRate
 	return time.Duration(int(recorded/audioFrameTime)-1)*audioFrameTime - preSkip
 }
+
+func closeOrFail(t *testing.T, what string, c interface{ Close() error }) {
+	t.Helper()
+	if err := c.Close(); err != nil {
+		t.Errorf("close %s: %v", what, err)
+	}
+}

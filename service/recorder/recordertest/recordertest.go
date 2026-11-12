@@ -6,6 +6,7 @@ package recordertest
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -18,8 +19,9 @@ import (
 // Engine is a fake recorder.Engine.
 type Engine struct {
 	// OpenErr and StartErr fail the respective step; StopErr is what
-	// every recording's Stop returns.
-	OpenErr, StartErr, StopErr error
+	// every recording's Stop returns, CloseErr what every session's
+	// Close returns.
+	OpenErr, StartErr, StopErr, CloseErr error
 	// Gate, when set, holds OpenSession until it closes or ctx ends.
 	Gate chan struct{}
 	// WriteOutput makes a stopped recording leave a non-empty file at
@@ -127,10 +129,11 @@ func (s *Session) StartReplay(opts recorder.Options, span time.Duration, term fu
 }
 
 // Close implements recorder.Session.
-func (s *Session) Close() {
+func (s *Session) Close() error {
 	s.mu.Lock()
 	s.closed++
 	s.mu.Unlock()
+	return s.e.CloseErr
 }
 
 // Closed counts Close calls.
@@ -172,7 +175,9 @@ func (r *Recording) Stop() error {
 		<-hold
 	}
 	if write {
-		_ = os.WriteFile(r.Opts.OutputPath, []byte("video"), 0o600)
+		if err := os.WriteFile(r.Opts.OutputPath, []byte("video"), 0o600); err != nil {
+			return fmt.Errorf("recordertest: write the output %s: %w", r.Opts.OutputPath, err)
+		}
 	}
 	return r.stopErr
 }

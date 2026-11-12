@@ -323,3 +323,56 @@ func TestBuildOptionsWithoutWebcam(t *testing.T) {
 		t.Error("webcam disabled still overlays")
 	}
 }
+
+func TestSessionCloseFailureFailsTheStoppedRecording(t *testing.T) {
+	closeErr := errors.New("recorder: close the compositor connection capturing DP-1: broken pipe")
+	engine := &recordertest.Engine{WriteOutput: true, CloseErr: closeErr}
+	s, log := newState(t, engine, nil)
+	s.Start()
+	waitFor(t, "recording", func() bool { return s.Snapshot().Active })
+	s.Stop()
+	waitFor(t, "the failure notice", func() bool { _, n := log.snapshot(); return len(n) == 1 })
+	toasts, notices := log.snapshot()
+	if !strings.HasPrefix(notices[0], i18n.T("recorder-notification-failed")) || !strings.Contains(notices[0], closeErr.Error()) {
+		t.Errorf("notice = %q, want the failure with the close error", notices[0])
+	}
+	if slices.Contains(toasts, i18n.T("recorder-toast-stopped")) {
+		t.Errorf("toasts = %q: a recording whose session failed to close was reported saved", toasts)
+	}
+	if snap := s.Snapshot(); snap.Status != recorder.StatusIdle || snap.Error != closeErr.Error() {
+		t.Errorf("after the failed close = %+v", snap)
+	}
+	if got := engine.Sessions()[0].Closed(); got != 1 {
+		t.Errorf("session closes %d, want 1", got)
+	}
+}
+
+func TestSessionCloseFailureJoinsTheFailedStart(t *testing.T) {
+	startErr := errors.New("recorder: a 64x48 H.264 encoder: out of memory")
+	closeErr := errors.New("recorder: close the compositor connection capturing DP-1: broken pipe")
+	engine := &recordertest.Engine{StartErr: startErr, CloseErr: closeErr}
+	s, log := newState(t, engine, nil)
+	s.Start()
+	waitFor(t, "the failure notice", func() bool { _, n := log.snapshot(); return len(n) == 1 })
+	snap := s.Snapshot()
+	if snap.Status != recorder.StatusIdle || !strings.Contains(snap.Error, startErr.Error()) || !strings.Contains(snap.Error, closeErr.Error()) {
+		t.Errorf("after the failed start = %+v, want both the start and the close error", snap)
+	}
+}
+
+func TestSessionCloseFailureOfATerminatedRecordingIsLogged(t *testing.T) {
+	logged := recorder.TeeLog(t)
+	closeErr := errors.New("recorder: close the compositor connection capturing DP-1: broken pipe")
+	engine := &recordertest.Engine{CloseErr: closeErr}
+	s, _ := newState(t, engine, nil)
+	s.Start()
+	waitFor(t, "recording", func() bool { return s.Snapshot().Active })
+	engine.Recordings()[0].Fail("disk full")
+	waitFor(t, "idle", func() bool { return s.Snapshot().Status == recorder.StatusIdle })
+	if got := logged.String(); !strings.Contains(got, "end the terminated recording: "+closeErr.Error()) {
+		t.Errorf("log = %q, want the close error of the terminated recording", got)
+	}
+	if got := s.Snapshot().Error; got != "disk full" {
+		t.Errorf("error state %q, want the termination reason", got)
+	}
+}

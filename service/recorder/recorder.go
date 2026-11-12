@@ -10,6 +10,7 @@ package recorder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -68,7 +69,7 @@ type Session interface {
 	// StartReplay records the source with opts into a ring holding the
 	// last span; onKey runs after each keyframe enters it.
 	StartReplay(opts Options, span time.Duration, term func(reason string), onKey func()) (Replay, error)
-	Close()
+	Close() error
 }
 
 // Recording is one running capture.
@@ -253,7 +254,7 @@ func (s *State) runStart(ctx context.Context, gen uint64) {
 	session, err := s.engine.OpenSession(ctx, opts.ShowCursor)
 	if ctx.Err() != nil {
 		if session != nil {
-			session.Close()
+			closeCancelled(session)
 		}
 		s.resetIdle()
 		return
@@ -265,15 +266,14 @@ func (s *State) runStart(ctx context.Context, gen uint64) {
 	s.toast(i18n.T("recorder-toast-starting"), toastIcon, startToastMS)
 	select {
 	case <-ctx.Done():
-		session.Close()
+		closeCancelled(session)
 		s.resetIdle()
 		return
 	case <-time.After(time.Duration(cfg.StartDelayMs) * time.Millisecond):
 	}
 	rec, err := session.Start(opts, func(reason string) { s.unexpectedStop(gen, reason) })
 	if err != nil {
-		session.Close()
-		s.failStart(err)
+		s.failStart(errors.Join(err, session.Close()))
 		return
 	}
 	s.commit(ctx, rec, session, opts.OutputPath)
@@ -285,10 +285,9 @@ func (s *State) commit(ctx context.Context, rec Recording, session Session, path
 	s.mu.Lock()
 	if s.status != StatusStarting || ctx.Err() != nil {
 		s.mu.Unlock()
-		if err := rec.Stop(); err != nil {
-			log.Printf("recorder: finalize a recording cancelled while starting: %v", err)
+		if err := endCapture(rec, session); err != nil {
+			log.Printf("recorder: end a recording cancelled while starting: %v", err)
 		}
-		session.Close()
 		s.resetIdle()
 		return
 	}
@@ -302,6 +301,16 @@ func (s *State) commit(ctx context.Context, rec Recording, session Session, path
 	s.startTimerLocked()
 	s.mu.Unlock()
 	s.notify()
+}
+
+func closeCancelled(session Session) {
+	if err := session.Close(); err != nil {
+		log.Printf("recorder: close the session of a cancelled start: %v", err)
+	}
+}
+
+func endCapture(c interface{ Stop() error }, session Session) error {
+	return errors.Join(c.Stop(), session.Close())
 }
 
 // failStart is fail_start.
@@ -331,10 +340,9 @@ func (s *State) unexpectedStop(gen uint64, reason string) {
 	rec, session := s.recording, s.session
 	s.mu.Unlock()
 	log.Printf("recorder: recording terminated unexpectedly: %s", reason)
-	if err := rec.Stop(); err != nil {
-		log.Printf("recorder: finalize the terminated recording: %v", err)
+	if err := endCapture(rec, session); err != nil {
+		log.Printf("recorder: end the terminated recording: %v", err)
 	}
-	session.Close()
 	s.fail(reason)
 }
 
@@ -366,10 +374,8 @@ func (s *State) Stop() {
 	s.mu.Unlock()
 	s.notify()
 	go func() {
-		err := rec.Stop()
-		session.Close()
-		if err != nil {
-			log.Printf("recorder: finalize %s: %v", path, err)
+		if err := endCapture(rec, session); err != nil {
+			log.Printf("recorder: end the recording to %s: %v", path, err)
 			s.fail(err.Error())
 			return
 		}

@@ -177,7 +177,7 @@ func (r *replayRing) close() error {
 	return nil
 }
 
-func (r *replayRing) discard() { _ = r.close() }
+func (r *replayRing) discard() error { return r.close() }
 
 // ringView is what a save reads: the entries from the oldest keyframe,
 // and the chunks holding them, which stay unrecycled until it is done.

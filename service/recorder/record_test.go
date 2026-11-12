@@ -140,7 +140,11 @@ func TestPauseDropsAudioDeliveredWhilePaused(t *testing.T) {
 	fx := loadFixture(t)
 	src := &fakeAudio{}
 	r, _, _ := startTest(t, recordingParts{video: &fakeVideo{fx: fx}, audio: []startAudio{src.start}}, config.RecorderFormatMkv)
-	defer func() { _ = r.Stop() }()
+	defer func() {
+		if err := r.Stop(); err != nil {
+			t.Errorf("stop the recording: %v", err)
+		}
+	}()
 	queued := func() int {
 		r.mu.Lock()
 		defer r.mu.Unlock()
@@ -166,7 +170,9 @@ func TestFailuresOfBothTracksAreReportedOnce(t *testing.T) {
 	stopTone := make(chan struct{})
 	defer close(stopTone)
 	go src.tone(100, stopTone)
-	_ = r.sink.(*fileSink).file.Close()
+	if err := r.sink.(*fileSink).file.Close(); err != nil {
+		t.Fatalf("close the recording's file under it: %v", err)
+	}
 	ended := make(chan struct{})
 	go func() { r.loops.Wait(); close(ended) }()
 	select {
