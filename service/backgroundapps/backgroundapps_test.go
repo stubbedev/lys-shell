@@ -12,8 +12,6 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // Monitor is a fake org.freedesktop.background.Monitor.
@@ -186,11 +184,11 @@ func TestAppsCloseTheDescriptorsOfTheSignalsTheyRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer apps.Close()
-	fd, closed := bussignaltest.Descriptor(t)
-	if err := m.conn.Emit(Path, propertiesChanged, Interface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)}, []string{}); err != nil {
+	pipe := dbustest.NewPipe(t)
+	if err := m.conn.Emit(Path, propertiesChanged, Interface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(pipe.Write)}, []string{}); err != nil {
 		t.Fatal(err)
 	}
-	closed("the apps handled a property change carrying a descriptor")
+	pipe.RequireEveryCopyClosed(t)
 }
 
 // The apps follow the monitor's name from one connection to the next:

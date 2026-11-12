@@ -345,7 +345,7 @@ func (v *audioView) call(what string, fn func(context.Context, pulse.Source) err
 
 func (v *audioView) follow(life context.Context) {
 	if src := v.ctx.Pulse; src != nil {
-		followInto(life, "audio", src.Subscribe, v.reads)
+		followInto(life, "audio", infallibleStop(src.Subscribe), v.reads)
 	}
 }
 

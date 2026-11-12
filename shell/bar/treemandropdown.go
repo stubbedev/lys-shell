@@ -385,5 +385,5 @@ func (v *treemanView) follow(life context.Context) {
 	if v.ctx.Treeman == nil {
 		return
 	}
-	followInto(life, "treeman", v.ctx.Treeman.Subscribe, v.reads)
+	followInto(life, "treeman", infallibleStop(v.ctx.Treeman.Subscribe), v.reads)
 }

@@ -123,8 +123,9 @@ type Snapshot struct {
 type Source interface {
 	Read(ctx context.Context) (Snapshot, error)
 	// Subscribe ticks on NM state changes. The channel closes when ctx
-	// completes; stop releases the match.
-	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
+	// completes; stop releases the match and reports what releasing it
+	// met.
+	Subscribe(ctx context.Context) (<-chan struct{}, func() error, error)
 }
 
 // System reads the real NetworkManager.
@@ -207,7 +208,7 @@ func (s *System) Read(ctx context.Context) (Snapshot, error) {
 
 // Subscribe ticks on NM's StateChanged and on property changes of the
 // manager object.
-func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
+func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func() error, error) {
 	ticks, stop, err := bussignal.Ticks(ctx, s.conn, dbusx.FromOwner(BusName), "network", managerRoutes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("network: %w", err)

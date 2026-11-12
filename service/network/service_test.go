@@ -8,8 +8,6 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // leftOn is what the service holds on conn as the bus and NM see it:
@@ -73,13 +71,16 @@ func TestAStoppedServiceLeavesTheSharedConnectionAsItWas(t *testing.T) {
 
 // Every reader of the service's connection is handed its own copy of
 // the descriptors a signal carries and keeps none of them: each copy is
-// closed once the signal is handled.
+// closed once the signal is handled, whether NM sent it or another
+// connection did in its name.
 func TestTheServiceClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	fx := startService(t, nil)
-	sender := fx.nm.client()
-	fd, closed := bussignaltest.Descriptor(t)
-	must(t, sender.Emit(settingPath(1), connectionIface+".Updated", fd))
-	must(t, sender.Emit(fakePrimaryPath, activeIface+".StateChanged", fd, uint32(0)))
-	must(t, sender.Emit(nmPath, properties+".PropertiesChanged", nmIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)}, []string{}))
-	closed("the settings and VPN readers handled signals carrying a descriptor")
+	pipe := dbustest.NewPipe(t)
+	for _, sender := range []*dbus.Conn{fx.nm.conn, fx.nm.client()} {
+		must(t, sender.Emit(settingPath(1), connectionIface+".Updated", pipe.Write))
+		must(t, sender.Emit(fakePrimaryPath, activeIface+".StateChanged", uint32(ActiveActivated), uint32(0), pipe.Write))
+		must(t, sender.Emit(fakePrimaryPath, activeIface+".StateChanged", pipe.Write, uint32(0)))
+		must(t, sender.Emit(nmPath, properties+".PropertiesChanged", nmIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(pipe.Write)}, []string{}))
+	}
+	pipe.RequireEveryCopyClosed(t)
 }

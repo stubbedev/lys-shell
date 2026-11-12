@@ -7,8 +7,6 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 type portal struct{ shares []Share }
@@ -72,9 +70,9 @@ func TestSharesCloseTheDescriptorsOfTheSignalsTheyRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer release()
-	fd, closed := bussignaltest.Descriptor(t)
-	if err := served.Emit(Path, Changed.Name(), fd); err != nil {
+	pipe := dbustest.NewPipe(t)
+	if err := served.Emit(Path, Changed.Name(), pipe.Write); err != nil {
 		t.Fatal(err)
 	}
-	closed("the shares handled a signal carrying a descriptor")
+	pipe.RequireEveryCopyClosed(t)
 }

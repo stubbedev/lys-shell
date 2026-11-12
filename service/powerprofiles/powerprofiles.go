@@ -75,8 +75,9 @@ type Source interface {
 	// SetActive switches the profile.
 	SetActive(ctx context.Context, profile string) error
 	// Subscribe ticks on daemon property changes. The channel closes
-	// when ctx completes; stop terminates the listener.
-	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
+	// when ctx completes; stop terminates the listener and reports what
+	// releasing its match met.
+	Subscribe(ctx context.Context) (<-chan struct{}, func() error, error)
 }
 
 // System reads the real daemon over the system bus.
@@ -128,7 +129,7 @@ func (s *System) SetActive(ctx context.Context, profile string) error {
 }
 
 // Subscribe ticks on the daemon's PropertiesChanged.
-func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
+func (s *System) Subscribe(ctx context.Context) (<-chan struct{}, func() error, error) {
 	ticks, stop, err := bussignal.Ticks(ctx, s.conn, dbusx.FromOwner(BusName), "powerprofiles", daemonRoutes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("powerprofiles: %w", err)

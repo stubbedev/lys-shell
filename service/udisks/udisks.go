@@ -9,13 +9,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"slices"
 	"strconv"
 	"unsafe"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // The UDisks2 names a client talks to.
@@ -200,7 +200,9 @@ func (c *Client) Watch(changed func()) (stop func(), err error) {
 					(sig.Name == propertiesIface+".PropertiesChanged" && udisksObject(sig.Path)) {
 					changed()
 				}
-				bussignal.Discard(sig)
+				if err := sig.CloseFDs(); err != nil {
+					log.Printf("udisks: close the descriptors of %s from %s: %v", sig.Name, sig.Sender, err)
+				}
 			}
 		}
 	}()
@@ -208,7 +210,9 @@ func (c *Client) Watch(changed func()) (stop func(), err error) {
 		for _, rule := range rules {
 			_ = c.conn.RemoveMatchSignal(rule...)
 		}
-		bussignal.Remove(c.conn, signals)
+		if err := dbusx.RemoveSignal(c.conn, signals); err != nil {
+			log.Printf("udisks: stop watching objects: %v", err)
+		}
 		close(done)
 	}, nil
 }

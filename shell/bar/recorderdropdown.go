@@ -483,6 +483,6 @@ func (v *recorderView) follow(life context.Context) {
 		if v.micReads == nil {
 			v.micReads = newRefresher(v.ctx, v.life, func(context.Context) []devicechoice.DeviceChoice { return microphoneSources(src) }, v.syncMics)
 		}
-		followInto(life, "recorder microphones", src.Subscribe, v.micReads)
+		followInto(life, "recorder microphones", infallibleStop(src.Subscribe), v.micReads)
 	}
 }

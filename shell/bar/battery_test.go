@@ -119,8 +119,8 @@ func (f *fakeBattery) update(edit func(*upower.Device)) {
 	f.mu.Unlock()
 }
 
-func (f *fakeBattery) Subscribe(ctx context.Context) (<-chan struct{}, func(), error) {
-	return f.ticks, func() {}, nil
+func (f *fakeBattery) Subscribe(ctx context.Context) (<-chan struct{}, func() error, error) {
+	return f.ticks, func() error { return nil }, nil
 }
 
 func (f *fakeBattery) EnableChargeThreshold(_ context.Context, enabled bool) error {
@@ -145,8 +145,8 @@ func (f *fakeBattery) Peripherals(context.Context) ([]upower.Peripheral, error) 
 	return slices.Clone(f.peripherals), nil
 }
 
-func (f *fakeBattery) SubscribePeripherals(context.Context) (<-chan struct{}, func(), error) {
-	return f.pticks, func() {}, nil
+func (f *fakeBattery) SubscribePeripherals(context.Context) (<-chan struct{}, func() error, error) {
+	return f.pticks, func() error { return nil }, nil
 }
 
 // setPeripherals replaces the scripted peripherals and ticks their

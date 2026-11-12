@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
@@ -73,4 +74,18 @@ func start(ctx context.Context, conn *dbus.Conn, signIn SignIn, vault Vault, tim
 		}
 	})
 	return svc, nil
+}
+
+// unwind is what a started service holds on the shared connection, taken
+// back last first.
+type unwind []func() error
+
+func (u *unwind) push(stop func() error) { *u = append(*u, stop) }
+
+func (u unwind) run() error {
+	errs := make([]error, 0, len(u))
+	for _, stop := range slices.Backward(u) {
+		errs = append(errs, stop())
+	}
+	return errors.Join(errs...)
 }

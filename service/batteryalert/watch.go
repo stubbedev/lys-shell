@@ -2,6 +2,7 @@ package batteryalert
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -56,13 +57,12 @@ func Watch(ctx context.Context, battery upower.Source, profiles powerprofiles.So
 	}
 	peripheralTicks, stopPeripherals, err := battery.SubscribePeripherals(ctx)
 	if err != nil {
-		stopDisplay()
-		return fmt.Errorf("battery alerts: follow the peripherals: %w", err)
+		return errors.Join(fmt.Errorf("battery alerts: follow the peripherals: %w", err), stopDisplay())
 	}
 	w := &watcher{battery: battery, profiles: profiles, notifier: notifier, config: config, peripherals: map[dbus.ObjectPath]Reading{}}
 	go func() {
-		defer stopDisplay()
-		defer stopPeripherals()
+		defer stopping("the battery", stopDisplay)
+		defer stopping("the peripherals", stopPeripherals)
 		w.readDisplay(ctx)
 		w.readPeripherals(ctx)
 		for {
@@ -83,6 +83,12 @@ func Watch(ctx context.Context, battery upower.Source, profiles powerprofiles.So
 		}
 	}()
 	return nil
+}
+
+func stopping(what string, stop func() error) {
+	if err := stop(); err != nil {
+		log.Printf("battery alerts: stop following %s: %v", what, err)
+	}
 }
 
 func (w *watcher) readDisplay(ctx context.Context) {

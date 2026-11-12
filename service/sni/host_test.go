@@ -10,8 +10,6 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/third_party/godbus/prop"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // fakeMenu is a DBusMenu with one check row, a submenu, and a
@@ -521,20 +519,81 @@ func TestHostForgetsTheItemsOfAConnectionThatLeft(t *testing.T) {
 	}
 }
 
-// The host reads every item's signals and takes over none of the
-// descriptors one carries: each is closed once the signal is handled.
+// The host reads every signal of a tracked item, from the item and
+// from its menu, and takes over none of the descriptors one carries:
+// each is closed once the signal is handled.
 func TestHostClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	bus := dbustest.Start(t)
-	host, err := NewHostOn(bus.Conn(t), NewStore())
+	store := NewStore()
+	host, err := NewHostOn(bus.Conn(t), store)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer host.Close()
-	fd, closed := bussignaltest.Descriptor(t)
-	if err := bus.Conn(t).Emit("/StatusNotifierItem", ItemIface+".NewIcon", fd); err != nil {
+	item := startItem(t, bus, "handing")
+	item.register(t)
+	waitItems(t, store, func(i []Item) bool { return len(i) == 1 })
+	pipe := dbustest.NewPipe(t)
+	for _, emit := range []func() error{
+		func() error { return item.conn.Emit("/StatusNotifierItem", ItemIface+".NewIcon", pipe.Write) },
+		func() error {
+			return item.conn.Emit("/StatusNotifierItem", PropsIface+".PropertiesChanged", ItemIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(pipe.Write)}, []string{})
+		},
+		func() error {
+			return item.conn.Emit("/MenuBar", MenuIface+".LayoutUpdated", uint32(9), int32(0), pipe.Write)
+		},
+	} {
+		if err := emit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pipe.RequireEveryCopyClosed(t)
+}
+
+// The host hears an item's signals from the item alone, and only while
+// it tracks the item: another connection's word at the item's path
+// reads nothing, and an item that left takes the host's follow of its
+// signals with it.
+func TestHostFollowsTheSignalsOfTheItemsItTracksAlone(t *testing.T) {
+	bus := dbustest.Start(t)
+	conn := bus.Conn(t)
+	store := NewStore()
+	host, err := NewHostOn(conn, store)
+	if err != nil {
 		t.Fatal(err)
 	}
-	closed("the host handled an item signal carrying a descriptor")
+	defer host.Close()
+	untracked := dbustest.MatchRules(t, conn)
+	item := startItem(t, bus, "app")
+	item.register(t)
+	waitItems(t, store, func(i []Item) bool { return len(i) == 1 })
+
+	item.props.SetMust(ItemIface, "IconName", "second-icon")
+	if err := bus.Conn(t).Emit("/StatusNotifierItem", ItemIface+".NewIcon"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(150 * time.Millisecond)
+	if items := store.Items(); len(items) != 1 || items[0].IconName != "first-icon" {
+		t.Fatalf("items = %+v after another connection's NewIcon, want the first icon", items)
+	}
+	if err := item.conn.Emit("/StatusNotifierItem", ItemIface+".NewIcon"); err != nil {
+		t.Fatal(err)
+	}
+	waitItems(t, store, func(i []Item) bool { return len(i) == 1 && i[0].IconName == "second-icon" })
+
+	if err := item.conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	waitItems(t, store, func(i []Item) bool { return len(i) == 0 })
+	for deadline := time.Now().Add(liveness); ; time.Sleep(5 * time.Millisecond) {
+		rules := dbustest.MatchRules(t, conn)
+		if slices.Equal(rules, untracked) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the host holds the match rules %q once the item left, want %q", rules, untracked)
+		}
+	}
 }
 
 // fakeWatcher is a watcher another process serves: it lists items and
@@ -583,11 +642,11 @@ func TestHostFollowsTheExternalWatcherFromOwnerToOwner(t *testing.T) {
 	}
 	await(t, first.hosts, "the host registering with the first watcher")
 	one := startItem(t, bus, "one")
-	fd, closed := bussignaltest.Descriptor(t)
-	if err := first.conn.Emit(WatcherPath, WatcherIface+".StatusNotifierHostRegistered", fd); err != nil {
+	pipe := dbustest.NewPipe(t)
+	if err := first.conn.Emit(WatcherPath, WatcherIface+".StatusNotifierHostRegistered", pipe.Write); err != nil {
 		t.Fatal(err)
 	}
-	closed("the host handled a watcher signal carrying a descriptor")
+	pipe.RequireEveryCopyClosed(t)
 	if err := first.conn.Emit(WatcherPath, WatcherIface+".StatusNotifierItemRegistered", one.conn.Names()[0]+"/StatusNotifierItem"); err != nil {
 		t.Fatal(err)
 	}

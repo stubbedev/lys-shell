@@ -117,7 +117,33 @@ func (r *offLoopRead[T]) settle() {
 	r.ctx.Go(r.run)
 }
 
-func followReads[T any](ctx ModuleContext, module string, gate *firstRead, subscribe func(context.Context) (<-chan struct{}, func(), error), read func(context.Context) (T, error), apply func(T)) *offLoopRead[T] {
+// sourceSubscription follows a source until ctx ends or stop, which reports
+// what ending it met.
+type sourceSubscription func(ctx context.Context) (ticks <-chan struct{}, stop func() error, err error)
+
+// infallibleStop is subscribe as a sourceSubscription, for a source whose
+// stop cannot fail.
+func infallibleStop(subscribe func(context.Context) (<-chan struct{}, func(), error)) sourceSubscription {
+	return func(ctx context.Context) (<-chan struct{}, func() error, error) {
+		ticks, stop, err := subscribe(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return ticks, func() error {
+			stop()
+			return nil
+		}, nil
+	}
+}
+
+// stopFollowing runs stop and logs what it met under what.
+func stopFollowing(what string, stop func() error) {
+	if err := stop(); err != nil {
+		log.Printf("%s: stop following: %v", what, err)
+	}
+}
+
+func followReads[T any](ctx ModuleContext, module string, gate *firstRead, subscribe sourceSubscription, read func(context.Context) (T, error), apply func(T)) *offLoopRead[T] {
 	reads := newOffLoopRead(ctx, module, read, func(v T) {
 		apply(v)
 		gate.reveal()
@@ -129,7 +155,7 @@ func followReads[T any](ctx ModuleContext, module string, gate *firstRead, subsc
 			log.Printf("%s: subscribe: %v", module, err)
 			return
 		}
-		reads.on(ticks, stop)
+		reads.on(ticks, func() { stopFollowing(module, stop) })
 	})
 	return reads
 }

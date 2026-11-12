@@ -13,8 +13,10 @@ import (
 	"github.com/stubbedev/lys-ui/widget"
 )
 
-func tickSource(ticks chan struct{}) func(context.Context) (<-chan struct{}, func(), error) {
-	return func(context.Context) (<-chan struct{}, func(), error) { return ticks, func() {}, nil }
+func tickSource(ticks chan struct{}) sourceSubscription {
+	return func(context.Context) (<-chan struct{}, func() error, error) {
+		return ticks, func() error { return nil }, nil
+	}
 }
 
 func TestFollowReadsFailedFirstReadStaysHiddenAndNamesTheModule(t *testing.T) {
@@ -83,4 +85,34 @@ func TestFollowReadsLogsALaterFailure(t *testing.T) {
 	fail.Store(nil)
 	ticks <- struct{}{}
 	waitHeadless(t, "the module keeps following after a failure", func() bool { return renders == 3 })
+}
+
+func TestFollowReadsLogsWhatStoppingMetAndNothingElse(t *testing.T) {
+	var buf bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	ctx := newTestContext(t, config.Defaults())
+	read := func(context.Context) (int, error) { return 1, nil }
+	var stops atomic.Int32
+	follow := func(module string, stopErr error) chan struct{} {
+		ticks := make(chan struct{})
+		subscribe := func(context.Context) (<-chan struct{}, func() error, error) {
+			return ticks, func() error {
+				stops.Add(1)
+				return stopErr
+			}, nil
+		}
+		followReads(ctx, module, &firstRead{}, subscribe, read, func(int) {})
+		return ticks
+	}
+	close(follow("clean", nil))
+	close(follow("probe", errors.New("match rule gone")))
+	waitHeadless(t, "both subscriptions to stop", func() bool { return stops.Load() == 2 })
+	waitHeadless(t, "the failed stop is logged", func() bool {
+		return strings.Contains(buf.String(), "probe: stop following: match rule gone")
+	})
+	if got := onHeadlessLoop(buf.String); strings.Contains(got, "clean:") {
+		t.Errorf("log = %q, want nothing of the clean stop", got)
+	}
 }

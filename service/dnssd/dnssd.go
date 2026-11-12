@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"maps"
 	"net"
 	"net/netip"
@@ -17,9 +18,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Avahi's names.
@@ -137,7 +137,9 @@ func (b *Browser) run(server dbus.BusObject, found func(Service), removed func(s
 				return
 			}
 			b.announce(sig, services, server, found, removed)
-			bussignal.Discard(sig)
+			if err := sig.CloseFDs(); err != nil {
+				log.Printf("dnssd: close the descriptors of %s from %s: %v", sig.Name, sig.Sender, err)
+			}
 		}
 	}
 }
@@ -270,7 +272,9 @@ func (b *Browser) Stop() error {
 		if err := b.conn.RemoveMatchSignal(browserMatch()...); err != nil {
 			errs = append(errs, fmt.Errorf("dnssd: unwatching browsers: %w", err))
 		}
-		bussignal.Remove(b.conn, b.signals)
+		if err := dbusx.RemoveSignal(b.conn, b.signals); err != nil {
+			errs = append(errs, fmt.Errorf("dnssd: stop following browsers: %w", err))
+		}
 	})
 	return errors.Join(errs...)
 }

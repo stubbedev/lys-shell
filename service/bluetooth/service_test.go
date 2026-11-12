@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 )
 
 // populated is a fake with an unpowered hci0, a powered hci1, one
@@ -512,7 +511,7 @@ func TestCloseEndsSubscriptions(t *testing.T) {
 func TestTheServiceClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	f := populated(t)
 	f.service()
-	fd, closed := bussignaltest.Descriptor(t)
-	f.update(dev1, deviceIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)})
-	closed("the service handled a property change carrying a descriptor")
+	pipe := dbustest.NewPipe(t)
+	f.update(dev1, deviceIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(pipe.Write)})
+	pipe.RequireEveryCopyClosed(t)
 }

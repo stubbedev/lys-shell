@@ -175,6 +175,26 @@ func TestConnectFollowsNetworkManagerUpAndDown(t *testing.T) {
 	must(t, fx.svc.VPN.Disconnect(ctx, "work"))
 }
 
+// Only NetworkManager moves a row: a transition another connection
+// sends in its name, on the object NM activated, is not heard.
+func TestOnlyNetworkManagerMovesARow(t *testing.T) {
+	fx := startService(t, withProfiles(gpConnection("work")))
+	must(t, fx.svc.VPN.Connect(t.Context(), "work"))
+	active := fx.activeFor(t, "work")
+	fx.waitRow(t, "work", "the resync to watch the new object", func(VPN) bool {
+		fx.svc.VPN.mu.Lock()
+		defer fx.svc.VPN.mu.Unlock()
+		return fx.svc.VPN.watched[active] != nil
+	})
+	must(t, fx.nm.client().Emit(active, activeIface+".StateChanged", uint32(ActiveActivated), uint32(ReasonNone)))
+	time.Sleep(150 * time.Millisecond)
+	if row := fx.row(t, "work"); row.State != VPNConnecting {
+		t.Fatalf("state = %v after another connection said it activated, want connecting", row.State)
+	}
+	fx.nm.setActiveState(active, ActiveActivated, ReasonNone)
+	fx.waitRow(t, "work", "connected", func(r VPN) bool { return r.State == VPNConnected })
+}
+
 func TestAFailedAttemptKeepsItsReason(t *testing.T) {
 	fx := startService(t, withProfiles(gpConnection("work")))
 	must(t, fx.svc.VPN.Connect(t.Context(), "work"))

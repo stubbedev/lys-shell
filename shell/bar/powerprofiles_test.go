@@ -46,13 +46,13 @@ func (f *fakePPSource) sets() []string {
 }
 
 // Subscribe hands out ticks, or a closed channel when none is scripted.
-func (f *fakePPSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {
+func (f *fakePPSource) Subscribe(context.Context) (<-chan struct{}, func() error, error) {
 	if f.ticks != nil {
-		return f.ticks, func() {}, nil
+		return f.ticks, func() error { return nil }, nil
 	}
 	ticks := make(chan struct{})
 	close(ticks)
-	return ticks, func() {}, nil
+	return ticks, func() error { return nil }, nil
 }
 
 func TestPowerProfilesLabel(t *testing.T) {

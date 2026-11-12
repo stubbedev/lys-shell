@@ -42,8 +42,8 @@ func (f *fakeProfiles) SetActive(_ context.Context, profile string) error {
 	return nil
 }
 
-func (f *fakeProfiles) Subscribe(context.Context) (<-chan struct{}, func(), error) {
-	return nil, func() {}, nil
+func (f *fakeProfiles) Subscribe(context.Context) (<-chan struct{}, func() error, error) {
+	return nil, func() error { return nil }, nil
 }
 
 func servePower(t *testing.T, src *fakeProfiles) {

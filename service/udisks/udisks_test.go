@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 	"github.com/stubbedev/lys-shell/service/udisks"
 	"github.com/stubbedev/lys-shell/service/udisks/udiskstest"
 )
@@ -213,20 +213,20 @@ func TestWatchClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 		u.Emit(t, stickPart, "org.freedesktop.DBus.Properties.PropertiesChanged",
 			udisks.BlockIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)}, []string{})
 	}
-	handled, handledClosed := bussignaltest.Descriptor(t)
-	change(handled)
+	handled := dbustest.NewPipe(t)
+	change(handled.Write)
 	select {
 	case <-entered:
 	case <-time.After(5 * time.Second):
 		t.Fatal("the watch did not report the change")
 	}
-	unread, unreadClosed := bussignaltest.Descriptor(t)
-	change(unread)
+	unread := dbustest.NewPipe(t)
+	change(unread.Write)
 	if err := conn.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
 		t.Fatalf("wait for the connection to read the signal: %v", err)
 	}
 	stop()
-	unreadClosed("the watch stopped with a signal unread")
+	unread.RequireEveryCopyClosed(t)
 	close(release)
-	handledClosed("the watch handled a property change carrying a descriptor")
+	handled.RequireEveryCopyClosed(t)
 }

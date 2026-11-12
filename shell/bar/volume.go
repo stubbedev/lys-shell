@@ -45,7 +45,7 @@ func newVolume(ctx ModuleContext) (Module, error) {
 	m := &volumeModule{ctx: ctx, source: ctx.Pulse}
 	m.icon = moduleIcon(ctx, ctx.Config.Volume.Icon())
 	m.btn = newBarButton(ctx, m.icon, "")
-	followReads(ctx, "volume", &firstRead{}, ctx.Pulse.Subscribe, m.read, m.apply)
+	followReads(ctx, "volume", &firstRead{}, infallibleStop(ctx.Pulse.Subscribe), m.read, m.apply)
 	return m, nil
 }
 

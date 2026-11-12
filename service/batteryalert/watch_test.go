@@ -63,8 +63,8 @@ func (f *fakeProfiles) SetActive(_ context.Context, profile string) error {
 	return nil
 }
 
-func (f *fakeProfiles) Subscribe(context.Context) (<-chan struct{}, func(), error) {
-	return make(chan struct{}), func() {}, nil
+func (f *fakeProfiles) Subscribe(context.Context) (<-chan struct{}, func() error, error) {
+	return make(chan struct{}), func() error { return nil }, nil
 }
 
 func (f *fakeProfiles) switches() []string {

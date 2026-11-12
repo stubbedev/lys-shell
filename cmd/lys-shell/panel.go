@@ -14,7 +14,6 @@ import (
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 	"github.com/stubbedev/lys-shell/internal/cli"
 	"github.com/stubbedev/lys-shell/service/shellipc"
 )
@@ -132,7 +131,7 @@ func watchRelease(conn *dbus.Conn, released chan<- struct{}, failed chan<- error
 			default:
 			}
 		},
-		bussignal.OnNameLost(func(string, dbus.Sequence) error {
+		dbusx.OnNameLost(func(string, dbus.Sequence) error {
 			select {
 			case released <- struct{}{}:
 			default:

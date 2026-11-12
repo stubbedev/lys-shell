@@ -12,8 +12,6 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // D-Bus names for the SNI protocol.
@@ -57,9 +55,10 @@ type Host struct {
 
 	owned   bool
 	watcher *watcher // non-nil: we serve the watcher role ourselves
-	// external is the watcher another process serves, which the signal
-	// loop follows when watcher is nil.
-	external externalWatcher
+	// externalAsOf sequences the bus's answer naming the watcher
+	// another process serves, which the signal loop follows when
+	// watcher is nil: only an owner change announced after it is news.
+	externalAsOf dbus.Sequence
 	// ctx ends with Close, and with it every call under way and
 	// everything the host started, which work counts.
 	ctx    context.Context
@@ -71,21 +70,25 @@ type Host struct {
 	timeout time.Duration
 	failed  func(error)
 	// names follows the bus names that lose their owner, each handed to
-	// the signal loop through vanished.
+	// the signal loop through vanished; external follows whichever
+	// connection owns the watcher name, and hands the signal loop what
+	// it says through events.
 	names    *dbusx.Watch
 	vanished chan nameLoss
-	feed     []dbusx.Route
+	external *dbusx.Watch
+	events   chan func()
 	// tracks hands the signal loop the items to read from the goroutines
 	// that find them, and results what was read of each: items are
 	// tracked and forgotten on the signal loop alone.
 	tracks  chan string
 	results chan reading
-	// reads are the reads under way, by item key, and owners maps each
-	// tracked item's key to its connection's unique name, so a signal's
-	// sender resolves to the items it belongs to. Both are the signal
-	// loop's own.
-	reads  map[string]*read
-	owners map[string]string
+	// reads are the reads under way, by item key, owners maps each
+	// tracked item's key to its connection's unique name, so a lost
+	// name resolves to the items it brought, and follows are the watches
+	// of the items' signals, by item key. All are the signal loop's own.
+	reads   map[string]*read
+	owners  map[string]string
+	follows map[string]*itemFollow
 
 	mu sync.Mutex
 	// menus are the open menus' change feeds, by item key.
@@ -95,7 +98,6 @@ type Host struct {
 	// when the set of sizes changes.
 	pixmapSizes map[int]int
 	retrack     chan struct{}
-	matched     int
 	exported    bool
 }
 
@@ -108,15 +110,11 @@ func NewHostOn(conn *dbus.Conn, store *Store) (*Host, error) {
 
 func newHost(conn *dbus.Conn, store *Store, timeout time.Duration, failed func(error)) (*Host, error) {
 	h := idleHost(conn, store, timeout, failed)
-	signals := make(chan *dbus.Signal, 64)
-	conn.Signal(signals)
 	if err := h.claim(); err != nil {
 		h.cancel()
-		bussignal.Remove(conn, signals)
 		return nil, errors.Join(err, h.release())
 	}
-	h.feed = h.externalFeed()
-	h.work.Go(func() { h.run(signals) })
+	h.work.Go(h.run)
 	if h.watcher == nil {
 		h.work.Go(h.resync)
 	} else {
@@ -137,10 +135,12 @@ func idleHost(conn *dbus.Conn, store *Store, timeout time.Duration, failed func(
 		timeout:     timeout,
 		failed:      failed,
 		vanished:    make(chan nameLoss),
+		events:      make(chan func()),
 		tracks:      make(chan string),
 		results:     make(chan reading),
 		reads:       make(map[string]*read),
 		owners:      make(map[string]string),
+		follows:     make(map[string]*itemFollow),
 		menus:       make(map[string][]chan struct{}),
 		pixmapSizes: make(map[int]int),
 		retrack:     make(chan struct{}, 1),
@@ -175,7 +175,7 @@ func (h *Host) claimWatcher() error {
 	var owner string
 	call := h.conn.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, WatcherName)
 	if err := call.Store(&owner); err == nil && owner != "" {
-		h.external = externalWatcher{owner: owner, asOf: call.ResponseSequence}
+		h.externalAsOf = call.ResponseSequence
 		return nil
 	}
 	w := newWatcher(h)
@@ -209,20 +209,13 @@ func (h *Host) registerHost() error {
 	return nil
 }
 
-// subscribe matches the watcher's registration signals, every item's
-// change signals and PropertiesChanged and the menus' change signals,
-// and watches the bus names that lose their owner (for the watcher role
-// and item exits).
+// subscribe watches the bus names that lose their owner (for the
+// watcher role and item exits), and the watcher name's owner, before
+// the host asks who that is.
 func (h *Host) subscribe() error {
-	for _, rule := range hostMatches() {
-		if err := h.conn.AddMatchSignal(rule...); err != nil {
-			return fmt.Errorf("sni: match: %w", err)
-		}
-		h.matched++
-	}
 	names, err := dbusx.WatchSignals(context.Background(), h.conn, dbusx.FromBus(),
 		func(err error) { log.Printf("sni: %v", err) },
-		bussignal.OnNameLost(func(name string, announced dbus.Sequence) error {
+		dbusx.OnNameLost(func(name string, announced dbus.Sequence) error {
 			select {
 			case h.vanished <- nameLoss{name: name, announced: announced}:
 			case <-h.ctx.Done():
@@ -233,33 +226,35 @@ func (h *Host) subscribe() error {
 		return fmt.Errorf("sni: %w", err)
 	}
 	h.names = names
+	external, err := dbusx.WatchSignals(context.Background(), h.conn, dbusx.FromOwner(WatcherName), h.failed, h.externalRoutes()...)
+	if err != nil {
+		return fmt.Errorf("sni: %w", err)
+	}
+	h.external = external
 	return nil
 }
 
-func hostMatches() [][]dbus.MatchOption {
-	return [][]dbus.MatchOption{
-		{dbus.WithMatchSender(WatcherName), dbus.WithMatchObjectPath(WatcherPath), dbus.WithMatchInterface(WatcherIface)},
-		dbusx.OwnerMatch(WatcherName),
-		{dbus.WithMatchInterface(ItemIface)},
-		{dbus.WithMatchInterface(PropsIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, ItemIface)},
-		{dbus.WithMatchInterface(MenuIface)},
+// stopWatch stops w, reporting what stopping it met but the connection
+// having closed.
+func stopWatch(w *dbusx.Watch) error {
+	if err := w.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
+		return fmt.Errorf("sni: %w", err)
 	}
+	return nil
 }
 
 func (h *Host) release() error {
 	var errs []error
-	if h.names != nil {
-		if err := h.names.Stop(); err != nil && !errors.Is(err, dbusx.ErrDisconnected) {
-			errs = append(errs, fmt.Errorf("sni: %w", err))
-		}
-		h.names = nil
-	}
-	for _, rule := range hostMatches()[:h.matched] {
-		if err := h.conn.RemoveMatchSignal(rule...); err != nil {
-			errs = append(errs, fmt.Errorf("sni: remove match: %w", err))
+	for _, w := range []**dbusx.Watch{&h.names, &h.external} {
+		if *w != nil {
+			errs = append(errs, stopWatch(*w))
+			*w = nil
 		}
 	}
-	h.matched = 0
+	for key, f := range h.follows {
+		errs = append(errs, f.stop())
+		delete(h.follows, key)
+	}
 	if h.owned {
 		if _, err := h.conn.ReleaseName(WatcherName); err != nil {
 			errs = append(errs, fmt.Errorf("sni: release watcher name: %w", err))
@@ -277,21 +272,20 @@ func (h *Host) release() error {
 	return errors.Join(errs...)
 }
 
-// run is the signal loop: it consumes the signals, the vanished names,
-// the items to read and what was read of them until Close or the end
-// of the connection, which ends the host's other work with it.
-func (h *Host) run(signals chan *dbus.Signal) {
-	defer bussignal.Remove(h.conn, signals)
+// run is the signal loop: it consumes what the watches hand it, the
+// vanished names, the items to read and what was read of them until
+// Close or the end of the connection, which ends the host's other work
+// with it.
+func (h *Host) run() {
 	defer h.cancel()
 	for {
 		select {
 		case <-h.ctx.Done():
 			return
-		case sig, ok := <-signals:
-			if !ok {
-				return
-			}
-			h.handle(sig)
+		case <-h.names.Done():
+			return
+		case event := <-h.events:
+			event()
 		case loss := <-h.vanished:
 			h.nameLost(loss)
 		case reg := <-h.tracks:
@@ -303,6 +297,14 @@ func (h *Host) run(signals chan *dbus.Signal) {
 				h.track(it.Bus + it.Path)
 			}
 		}
+	}
+}
+
+// onLoop has the signal loop run event, from a watch's goroutine.
+func (h *Host) onLoop(event func()) {
+	select {
+	case h.events <- event:
+	case <-h.ctx.Done():
 	}
 }
 
@@ -355,37 +357,37 @@ func (h *Host) wantedPixmapSizes() []int {
 	return sizes
 }
 
-// externalWatcher is the owner of the watcher name another process
-// serves, "" while nobody does, as of the bus's answer sequenced asOf.
-type externalWatcher struct {
-	owner string
-	asOf  dbus.Sequence
-}
-
-// externalFeed routes an external watcher's registrations, and its name
-// passing from one owner to the next: a watcher that takes the name
-// over is told of the host and asked for its items.
-func (h *Host) externalFeed() []dbusx.Route {
+// externalRoutes hand the signal loop an external watcher's
+// registrations, and its name passing from one owner to the next: a
+// watcher that takes the name over is told of the host and asked for
+// its items. Our own watcher tracks directly, so the loop drops what
+// they say while the host serves the watcher role.
+func (h *Host) externalRoutes() []dbusx.Route {
 	return []dbusx.Route{
 		dbusx.OnOthers(WatcherIface, WatcherPath, func(sig *dbus.Signal) error {
 			reg, _ := firstString(sig.Body)
-			switch sig.Name {
-			case WatcherIface + ".StatusNotifierItemRegistered":
-				h.track(reg)
-			case WatcherIface + ".StatusNotifierItemUnregistered":
-				bus, path := ParseAddress(reg)
-				h.forget(bus, path)
-			}
+			name := sig.Name
+			h.onLoop(func() {
+				if h.watcher != nil {
+					return
+				}
+				switch name {
+				case WatcherIface + ".StatusNotifierItemRegistered":
+					h.track(reg)
+				case WatcherIface + ".StatusNotifierItemUnregistered":
+					bus, path := ParseAddress(reg)
+					h.forget(bus, path)
+				}
+			})
 			return sig.CloseFDs()
 		}),
 		dbusx.OnOwnerChange(WatcherName, func(_, owner string, announced dbus.Sequence) error {
-			if announced <= h.external.asOf {
-				return nil
-			}
-			h.external.owner = owner
-			if owner != "" {
+			h.onLoop(func() {
+				if h.watcher != nil || announced <= h.externalAsOf || owner == "" {
+					return
+				}
 				h.work.Go(h.rejoin)
-			}
+			})
 			return nil
 		}),
 	}
@@ -403,35 +405,73 @@ func (h *Host) rejoin() {
 	h.resync()
 }
 
-// handle routes one signal and takes over the descriptors it carries.
-// An external watcher's feed comes from whichever connection owns the
-// watcher name; our own watcher tracks directly. The items' signals
-// come from any connection at any path, which no route names yet
-// (lys-lib#106).
-func (h *Host) handle(sig *dbus.Signal) {
-	member := sig.Name[strings.LastIndex(sig.Name, ".")+1:]
-	iface := strings.TrimSuffix(sig.Name, "."+member)
-	if h.watcher == nil && (iface == WatcherIface || iface == busIface) {
-		if err := dbusx.Dispatch(sig, h.external.owner, h.feed); err != nil {
-			h.failed(err)
-		}
-		return
+// itemFollow is the watch of one item's signals, from whichever
+// connection owns its bus name: the item's own, at its path, and its
+// menu's, from any of its objects.
+type itemFollow struct {
+	watch *dbusx.Watch
+}
+
+// menuLayoutUpdated and menuItemsUpdated are the DBusMenu changes an
+// open menu refetches for.
+var (
+	menuLayoutUpdated = dbusx.NewSignal[struct{}](MenuIface, "LayoutUpdated")
+	menuItemsUpdated  = dbusx.NewSignal[struct{}](MenuIface, "ItemsPropertiesUpdated")
+)
+
+// followItem watches the signals of the item at path on bus: any of
+// the item's (NewIcon, NewAttentionIcon, NewOverlayIcon, NewStatus,
+// NewTitle, NewToolTip, NewMenu, ... and PropertiesChanged) has the
+// signal loop read it again while f is still its follow, and a change
+// of its menu ticks the menu's open feeds.
+func (h *Host) followItem(bus, path string) (*itemFollow, error) {
+	key := bus + path
+	f := &itemFollow{}
+	changed := func() {
+		h.onLoop(func() {
+			if h.follows[key] == f {
+				h.track(key)
+			}
+		})
 	}
-	defer bussignal.Discard(sig)
-	switch iface {
-	case ItemIface, PropsIface:
-		// NewIcon, NewAttentionIcon, NewOverlayIcon, NewStatus, NewTitle,
-		// NewToolTip, NewMenu, ... and PropertiesChanged: re-read the
-		// item's snapshot.
-		for _, key := range h.itemsOf(sig.Sender, string(sig.Path)) {
-			h.track(key)
-		}
-	case MenuIface:
-		// LayoutUpdated, ItemsPropertiesUpdated: open menus refetch.
-		for _, key := range h.menuItemsOf(sig.Sender, string(sig.Path)) {
+	menuChanged := func(menu dbus.ObjectPath, _ struct{}, _ dbus.Sequence) error {
+		if it, ok := h.store.Get(key); ok && it.MenuPath == string(menu) {
 			h.notifyMenu(key)
 		}
+		return nil
 	}
+	watch, err := dbusx.WatchSignals(h.ctx, h.conn, dbusx.FromOwner(bus), h.failed,
+		dbusx.OnOthers(ItemIface, dbus.ObjectPath(path), func(sig *dbus.Signal) error {
+			changed()
+			return sig.CloseFDs()
+		}),
+		dbusx.On(dbusx.PropertiesChanged, dbus.ObjectPath(path), func(dbusx.ChangedProperties, dbus.Sequence) error {
+			changed()
+			return nil
+		}).WithArg0(ItemIface),
+		dbusx.OnUnder(menuLayoutUpdated, "/", menuChanged),
+		dbusx.OnUnder(menuItemsUpdated, "/", menuChanged),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("follow item %s: %w", key, err)
+	}
+	f.watch = watch
+	return f, nil
+}
+
+func (f *itemFollow) stop() error { return stopWatch(f.watch) }
+
+// unfollow stops f off the signal loop: its handlers may be waiting on
+// the loop.
+func (h *Host) unfollow(f *itemFollow) {
+	if f == nil {
+		return
+	}
+	h.work.Go(func() {
+		if err := f.stop(); err != nil {
+			h.failed(err)
+		}
+	})
 }
 
 // nameLoss is the bus announcing that a name lost its owner, and the
@@ -462,36 +502,6 @@ func firstString(body []any) (string, bool) {
 	}
 	s, ok := body[0].(string)
 	return s, ok
-}
-
-// itemsOf lists the tracked items a signal from sender at path is
-// about.
-func (h *Host) itemsOf(sender, path string) []string {
-	var keys []string
-	for key, owner := range h.owners {
-		if owner != sender {
-			continue
-		}
-		if it, ok := h.store.Get(key); ok && it.Path == path {
-			keys = append(keys, key)
-		}
-	}
-	return keys
-}
-
-// menuItemsOf lists the tracked items whose menu object a signal came
-// from.
-func (h *Host) menuItemsOf(sender, path string) []string {
-	var keys []string
-	for key, owner := range h.owners {
-		if owner != sender {
-			continue
-		}
-		if it, ok := h.store.Get(key); ok && it.MenuPath == path {
-			keys = append(keys, key)
-		}
-	}
-	return keys
 }
 
 // resync reads an external watcher's RegisteredStatusNotifierItems.
@@ -565,10 +575,11 @@ func (r *read) lostSince(answered dbus.Sequence, names ...string) bool {
 
 // reading is what a read brought back: the item, the sequence of its
 // answer and the unique name of the connection serving it, or why it
-// could not be read.
+// could not be read, and the follow of its signals the read set up.
 type reading struct {
 	of        *read
 	bus, path string
+	follow    *itemFollow
 	item      *Item
 	answered  dbus.Sequence
 	owner     string
@@ -586,7 +597,9 @@ func (h *Host) requestTrack(reg string) {
 
 // track starts reading one item, off the signal loop, which finish
 // hears from. An item has one read under way at most: asked for again
-// meanwhile, it is read once more when that one ends.
+// meanwhile, it is read once more when that one ends. The read of an
+// item whose signals nothing follows yet follows them first, so no
+// change after its answer goes unheard.
 func (h *Host) track(reg string) {
 	bus, path := ParseAddress(reg)
 	if r, reading := h.reads[bus+path]; reading {
@@ -596,20 +609,32 @@ func (h *Host) track(reg string) {
 	r := &read{}
 	h.reads[bus+path] = r
 	sizes := h.wantedPixmapSizes()
+	follow := h.follows[bus+path] == nil
 	h.work.Go(func() {
-		res := h.read(bus, path, sizes)
+		res := h.read(bus, path, sizes, follow)
 		res.of = r
 		select {
 		case h.results <- res:
 		case <-h.ctx.Done():
+			if res.follow == nil {
+				return
+			}
+			if err := res.follow.stop(); err != nil {
+				h.failed(err)
+			}
 		}
 	})
 }
 
-// read fetches one item and the owner of its bus name, which have the
-// timeout to answer.
-func (h *Host) read(bus, path string, sizes []int) reading {
+// read follows the item's signals when follow says so, and fetches the
+// item and the owner of its bus name, which have the timeout to answer.
+func (h *Host) read(bus, path string, sizes []int, follow bool) reading {
 	res := reading{bus: bus, path: path, owner: bus}
+	if follow {
+		if res.follow, res.err = h.followItem(bus, path); res.err != nil {
+			return res
+		}
+	}
 	ctx, cancel := h.answer()
 	defer cancel()
 	if res.item, res.answered, res.err = readItem(ctx, h.conn, bus, path, sizes); res.err == nil && !strings.HasPrefix(bus, ":") {
@@ -625,13 +650,18 @@ func (h *Host) read(bus, path string, sizes []int) reading {
 // owner, unless the item was forgotten while it was read, or its bus
 // name or its owner left the bus after it answered: that loss is
 // handled, and nothing would forget the item again. A read that failed
-// is reported and leaves the item as it was.
+// is reported and leaves the item as it was. An item left untracked,
+// and not to be read again, is no longer followed.
 func (h *Host) finish(res reading) {
 	key := res.bus + res.path
 	if h.reads[key] != res.of {
+		h.unfollow(res.follow)
 		return
 	}
 	delete(h.reads, key)
+	if res.follow != nil {
+		h.follows[key] = res.follow
+	}
 	switch {
 	case res.err != nil:
 		h.failed(res.err)
@@ -641,13 +671,22 @@ func (h *Host) finish(res reading) {
 	}
 	if res.of.again {
 		h.track(key)
+		return
+	}
+	if _, tracked := h.owners[key]; !tracked {
+		h.unfollow(h.follows[key])
+		delete(h.follows, key)
 	}
 }
 
-// forget drops one item, and what a read of it under way brings.
+// forget drops one item, the follow of its signals, and what a read of
+// it under way brings.
 func (h *Host) forget(bus, path string) {
-	delete(h.owners, bus+path)
-	delete(h.reads, bus+path)
+	key := bus + path
+	delete(h.owners, key)
+	delete(h.reads, key)
+	h.unfollow(h.follows[key])
+	delete(h.follows, key)
 	h.store.Remove(bus, path)
 }
 

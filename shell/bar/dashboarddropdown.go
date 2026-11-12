@@ -1063,9 +1063,11 @@ func (v *dashboardView) follow(life context.Context) {
 		})
 		add(ticks, stop)
 	}
-	for _, sub := range []func(context.Context) (<-chan struct{}, func(), error){
-		subscribeOf(v.ctx.Pulse), subscribeOf(v.ctx.Network), subscribeOf(v.ctx.PowerProfiles), subscribeOf(v.ctx.Battery),
-	} {
+	subs := []sourceSubscription{subscribeOf(v.ctx.Network), subscribeOf(v.ctx.PowerProfiles), subscribeOf(v.ctx.Battery)}
+	if v.ctx.Pulse != nil {
+		subs = append(subs, infallibleStop(v.ctx.Pulse.Subscribe))
+	}
+	for _, sub := range subs {
 		if sub == nil {
 			continue
 		}
@@ -1075,7 +1077,7 @@ func (v *dashboardView) follow(life context.Context) {
 				log.Printf("dashboard: subscribe: %v", err)
 				return
 			}
-			add(ch, stop)
+			add(ch, func() { stopFollowing("dashboard", stop) })
 		})
 	}
 	v.ctx.Go(func() {
@@ -1208,13 +1210,13 @@ func (v *dashboardView) scrollTo(w widget.Widget) {
 	}
 }
 
-// subscriber is the Subscribe seam the pulse, network, power-profiles,
-// and battery sources share.
+// subscriber is the Subscribe seam the network, power-profiles and
+// battery sources share.
 type subscriber interface {
-	Subscribe(ctx context.Context) (<-chan struct{}, func(), error)
+	Subscribe(ctx context.Context) (<-chan struct{}, func() error, error)
 }
 
-func subscribeOf[T subscriber](s T) func(context.Context) (<-chan struct{}, func(), error) {
+func subscribeOf[T subscriber](s T) sourceSubscription {
 	var zero T
 	if any(s) == any(zero) {
 		return nil

@@ -203,5 +203,5 @@ func (v *brightnessView) follow(life context.Context) {
 	if v.ctx.Brightness == nil {
 		return
 	}
-	followInto(life, "brightness", v.ctx.Brightness.Subscribe, v.reads)
+	followInto(life, "brightness", infallibleStop(v.ctx.Brightness.Subscribe), v.reads)
 }

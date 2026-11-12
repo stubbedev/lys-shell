@@ -308,7 +308,7 @@ func (r *refresher[T]) loop() {
 	}
 }
 
-func followInto[T any](life context.Context, what string, subscribe func(context.Context) (<-chan struct{}, func(), error), r *refresher[T]) {
+func followInto[T any](life context.Context, what string, subscribe sourceSubscription, r *refresher[T]) {
 	follow := func() {
 		ticks, stop, err := subscribe(life)
 		r.first()
@@ -317,7 +317,7 @@ func followInto[T any](life context.Context, what string, subscribe func(context
 			return
 		}
 		r.mc.Go(func() {
-			defer stop()
+			defer stopFollowing(what, stop)
 			for {
 				select {
 				case <-life.Done():

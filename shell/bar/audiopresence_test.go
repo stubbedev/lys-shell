@@ -37,10 +37,10 @@ func audioPresenceCases(ctx ModuleContext, source pulse.Source) []struct {
 		follow func()
 	}{
 		{"volume", v, func() *barButton { return v.btn }, func() {
-			followReads(ctx, "volume", &firstRead{}, source.Subscribe, v.read, v.apply)
+			followReads(ctx, "volume", &firstRead{}, infallibleStop(source.Subscribe), v.read, v.apply)
 		}},
 		{"microphone", mic, func() *barButton { return mic.btn }, func() {
-			followReads(ctx, "microphone", &firstRead{}, source.Subscribe, mic.read, mic.apply)
+			followReads(ctx, "microphone", &firstRead{}, infallibleStop(source.Subscribe), mic.read, mic.apply)
 		}},
 	}
 }

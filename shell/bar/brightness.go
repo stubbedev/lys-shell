@@ -52,7 +52,7 @@ func newBrightness(ctx ModuleContext) (Module, error) {
 	m := &brightnessModule{ctx: ctx, source: ctx.Brightness}
 	m.icon = moduleIcon(ctx, config.IconWith(cfg.IconShow, brightnessIcon(cfg.LevelIcons, 0), cfg.IconColor))
 	m.btn = newBarButton(ctx, m.icon, "")
-	followReads(ctx, "brightness", &m.firstRead, ctx.Brightness.Subscribe, m.source.Devices, m.apply)
+	followReads(ctx, "brightness", &m.firstRead, infallibleStop(ctx.Brightness.Subscribe), m.source.Devices, m.apply)
 	return m, nil
 }
 

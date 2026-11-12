@@ -57,8 +57,8 @@ func (f *fakeNetworkSource) setSnap(s network.Snapshot) {
 	f.mu.Unlock()
 }
 
-func (f *fakeNetworkSource) Subscribe(context.Context) (<-chan struct{}, func(), error) {
-	return f.ticks, func() {}, nil
+func (f *fakeNetworkSource) Subscribe(context.Context) (<-chan struct{}, func() error, error) {
+	return f.ticks, func() error { return nil }, nil
 }
 
 func newTestNetworkModule(t *testing.T, cfg *config.Config, snap network.Snapshot) *networkModule {

@@ -38,9 +38,9 @@ func (f *stuckNetwork) Read(context.Context) (network.Snapshot, error) {
 	return network.Snapshot{}, nil
 }
 
-func (f *stuckNetwork) Subscribe(context.Context) (<-chan struct{}, func(), error) {
+func (f *stuckNetwork) Subscribe(context.Context) (<-chan struct{}, func() error, error) {
 	f.hold()
-	return make(chan struct{}), func() {}, nil
+	return make(chan struct{}), func() error { return nil }, nil
 }
 
 type stuckBattery struct {
@@ -53,9 +53,9 @@ func (f *stuckBattery) Read(context.Context) (upower.Device, error) {
 	return upower.Device{}, nil
 }
 
-func (f *stuckBattery) Subscribe(context.Context) (<-chan struct{}, func(), error) {
+func (f *stuckBattery) Subscribe(context.Context) (<-chan struct{}, func() error, error) {
 	f.hold()
-	return make(chan struct{}), func() {}, nil
+	return make(chan struct{}), func() error { return nil }, nil
 }
 
 type stuckProfiles struct {
@@ -68,9 +68,9 @@ func (f *stuckProfiles) Read(context.Context) (powerprofiles.Snapshot, error) {
 	return powerprofiles.Snapshot{}, nil
 }
 
-func (f *stuckProfiles) Subscribe(context.Context) (<-chan struct{}, func(), error) {
+func (f *stuckProfiles) Subscribe(context.Context) (<-chan struct{}, func() error, error) {
 	f.hold()
-	return make(chan struct{}), func() {}, nil
+	return make(chan struct{}), func() error { return nil }, nil
 }
 
 type stuckBrightness struct {

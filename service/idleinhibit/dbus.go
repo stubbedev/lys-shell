@@ -9,8 +9,6 @@ import (
 	"github.com/stubbedev/lys-desktop/service/idleinhibit/inhibitduration"
 	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Daemon is the dev.stubbe.lys.IdleInhibit1 object, which the
@@ -32,7 +30,7 @@ func (d *Daemon) Export(conn *dbus.Conn) (func(), error) {
 	d.conn = conn
 	departed, err := dbusx.WatchSignals(context.Background(), conn, dbusx.FromBus(),
 		func(err error) { log.Printf("idle inhibit: %v", err) },
-		bussignal.OnNameLost(func(name string, _ dbus.Sequence) error {
+		dbusx.OnNameLost(func(name string, _ dbus.Sequence) error {
 			d.state.ReleaseOwner(name)
 			return nil
 		}))

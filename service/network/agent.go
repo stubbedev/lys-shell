@@ -684,13 +684,17 @@ func (r *agentRegistration) register(ctx context.Context, appeared dbus.Sequence
 	log.Printf("network: registered as NetworkManager secret agent")
 }
 
+// unregisterTimeout bounds withdrawing the registration, which runs
+// once the service's context may have ended.
+const unregisterTimeout = 5 * time.Second
+
 // unregister withdraws any registration NM may hold, bounded by
-// unwatchTimeout.
+// unregisterTimeout.
 func (r *agentRegistration) unregister() error {
 	if !r.asked.Swap(false) {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), unwatchTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), unregisterTimeout)
 	defer cancel()
 	err := r.conn.Object(BusName, agentManagerPath).CallWithContext(ctx, agentManagerIface+".Unregister", 0).Err
 	if err == nil || errors.Is(err, dbus.ErrClosed) {

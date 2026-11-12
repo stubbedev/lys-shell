@@ -10,9 +10,8 @@ import (
 	"sync"
 
 	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Profile is one saved NetworkManager connection, the fields of
@@ -42,22 +41,36 @@ type Settings struct {
 	changes  feed.Tick
 }
 
+// connectionArg is what Settings' NewConnection and ConnectionRemoved
+// carry: the profile's object.
+type connectionArg struct {
+	Path dbus.ObjectPath `dbus:"connection"`
+}
+
+var (
+	newConnection     = dbusx.NewSignal[connectionArg](settingsIface, "NewConnection")
+	connectionRemoved = dbusx.NewSignal[connectionArg](settingsIface, "ConnectionRemoved")
+	connectionUpdated = dbusx.NewSignal[struct{}](connectionIface, "Updated")
+)
+
 // newSettings reads every profile and follows NM's announcements until
-// ctx ends; stop takes its watch off the connection.
+// ctx ends; stop takes its watch off the connection. An announcement
+// the watch hears while the first read runs is applied after it.
 func newSettings(ctx context.Context, n nm) (*Settings, func() error, error) {
 	s := &Settings{nm: n}
-	watch, err := watchSignals(ctx, n.conn, 64,
-		[]dbus.MatchOption{dbus.WithMatchObjectPath(settingsPath), dbus.WithMatchInterface(settingsIface)},
-		[]dbus.MatchOption{dbus.WithMatchInterface(connectionIface), dbus.WithMatchMember("Updated")},
-	)
+	loaded := make(chan struct{})
+	watch, err := dbusx.WatchSignals(ctx, n.conn, dbusx.FromOwner(BusName),
+		func(err error) { log.Printf("network: settings: %v", err) },
+		s.routes(ctx, loaded)...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("network: watch settings: %w", err)
 	}
-	if err := s.reload(ctx); err != nil {
-		return nil, nil, errors.Join(err, watch.stop())
+	err = s.reload(ctx)
+	close(loaded)
+	if err != nil {
+		return nil, nil, errors.Join(err, watch.Stop())
 	}
-	go s.follow(ctx, watch.signals)
-	return s, watch.stop, nil
+	return s, watch.Stop, nil
 }
 
 // reload re-reads the whole list (startup, and NM coming back).
@@ -97,69 +110,48 @@ func (s *Settings) read(ctx context.Context, path dbus.ObjectPath) (Profile, err
 	return p, nil
 }
 
-func (s *Settings) follow(ctx context.Context, signals chan *dbus.Signal) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case sig, ok := <-signals:
-			if !ok {
-				return
+// routes follow NM's profiles once loaded is closed: one added, one
+// removed, and one rewritten.
+func (s *Settings) routes(ctx context.Context, loaded <-chan struct{}) []dbusx.Route {
+	return []dbusx.Route{
+		dbusx.On(newConnection, settingsPath, func(added connectionArg, _ dbus.Sequence) error {
+			<-loaded
+			p, err := s.read(ctx, added.Path)
+			if err != nil {
+				return fmt.Errorf("new connection %s: %w", added.Path, err)
 			}
-			s.handle(ctx, sig)
-			bussignal.Discard(sig)
-		}
-	}
-}
-
-func (s *Settings) handle(ctx context.Context, sig *dbus.Signal) {
-	switch sig.Name {
-	case settingsIface + ".NewConnection":
-		path, ok := firstPath(sig)
-		if !ok {
-			return
-		}
-		p, err := s.read(ctx, path)
-		if err != nil {
-			log.Printf("network: new connection %s: %v", path, err)
-			return
-		}
-		s.mu.Lock()
-		s.profiles = slices.DeleteFunc(s.profiles, func(q Profile) bool { return q.Path == path })
-		s.profiles = append(s.profiles, p)
-		s.mu.Unlock()
-	case settingsIface + ".ConnectionRemoved":
-		path, ok := firstPath(sig)
-		if !ok {
-			return
-		}
-		s.mu.Lock()
-		s.profiles = slices.DeleteFunc(s.profiles, func(q Profile) bool { return q.Path == path })
-		s.mu.Unlock()
-	case connectionIface + ".Updated":
-		p, err := s.read(ctx, sig.Path)
-		if err != nil {
-			return
-		}
-		s.mu.Lock()
-		for i := range s.profiles {
-			if s.profiles[i].Path == sig.Path {
-				s.profiles[i] = p
+			s.mu.Lock()
+			s.profiles = slices.DeleteFunc(s.profiles, func(q Profile) bool { return q.Path == added.Path })
+			s.profiles = append(s.profiles, p)
+			s.mu.Unlock()
+			feed.Notify(&s.changes)
+			return nil
+		}),
+		dbusx.On(connectionRemoved, settingsPath, func(removed connectionArg, _ dbus.Sequence) error {
+			<-loaded
+			s.mu.Lock()
+			s.profiles = slices.DeleteFunc(s.profiles, func(q Profile) bool { return q.Path == removed.Path })
+			s.mu.Unlock()
+			feed.Notify(&s.changes)
+			return nil
+		}),
+		dbusx.OnUnder(connectionUpdated, settingsPath, func(path dbus.ObjectPath, _ struct{}, _ dbus.Sequence) error {
+			<-loaded
+			p, err := s.read(ctx, path)
+			if err != nil {
+				return fmt.Errorf("updated connection %s: %w", path, err)
 			}
-		}
-		s.mu.Unlock()
-	default:
-		return
+			s.mu.Lock()
+			for i := range s.profiles {
+				if s.profiles[i].Path == path {
+					s.profiles[i] = p
+				}
+			}
+			s.mu.Unlock()
+			feed.Notify(&s.changes)
+			return nil
+		}),
 	}
-	feed.Notify(&s.changes)
-}
-
-func firstPath(sig *dbus.Signal) (dbus.ObjectPath, bool) {
-	if len(sig.Body) == 0 {
-		return "", false
-	}
-	path, ok := sig.Body[0].(dbus.ObjectPath)
-	return path, ok
 }
 
 // Profiles snapshots the saved profiles in NM's order.

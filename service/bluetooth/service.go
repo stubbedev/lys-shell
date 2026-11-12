@@ -16,9 +16,8 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-desktop/feed"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // Source is the UI's seam onto the service: the live state, change
@@ -155,8 +154,7 @@ func (s *Service) follow() error {
 	}
 	s.conn.Signal(s.signals)
 	if err := s.discover(); err != nil {
-		bussignal.Remove(s.conn, s.signals)
-		return errors.Join(err, s.removeMatches(len(matchRules())))
+		return errors.Join(err, s.removeSignals(), s.removeMatches(len(matchRules())))
 	}
 	return nil
 }
@@ -188,7 +186,7 @@ func (s *Service) Close() error {
 	default:
 	}
 	close(s.done)
-	bussignal.Remove(s.conn, s.signals)
+	removed := s.removeSignals()
 	s.wg.Wait()
 	s.withdraw(func(pending) agentAnswer { return canceled() })
 	s.ticks.Close()
@@ -198,7 +196,14 @@ func (s *Service) Close() error {
 	}
 	s.discSubs = map[chan DisconnectedEvent]dbus.ObjectPath{}
 	s.mu.Unlock()
-	return errors.Join(s.removeMatches(len(matchRules())), s.unregisterAgent())
+	return errors.Join(removed, s.removeMatches(len(matchRules())), s.unregisterAgent())
+}
+
+func (s *Service) removeSignals() error {
+	if err := dbusx.RemoveSignal(s.conn, s.signals); err != nil {
+		return fmt.Errorf("bluetooth: stop following signals: %w", err)
+	}
+	return nil
 }
 
 type managedObjects map[dbus.ObjectPath]map[string]map[string]dbus.Variant
@@ -237,7 +242,9 @@ func (s *Service) run() {
 				return
 			}
 			s.handle(sig)
-			bussignal.Discard(sig)
+			if err := sig.CloseFDs(); err != nil {
+				log.Printf("bluetooth: close the descriptors of %s from %s: %v", sig.Name, sig.Sender, err)
+			}
 		}
 	}
 }

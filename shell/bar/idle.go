@@ -119,7 +119,7 @@ func (p *idlePolicy) followPowerSource(ctx context.Context) <-chan struct{} {
 	p.source = readPowerSource(ctx, battery)
 	go func() {
 		defer close(done)
-		defer stop()
+		defer stopFollowing("idle: power source", stop)
 		for range ticks {
 			source := readPowerSource(ctx, battery)
 			p.mu.Lock()

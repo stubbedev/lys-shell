@@ -17,8 +17,6 @@ import (
 	"github.com/stubbedev/lys-lib/dbusx"
 	"github.com/stubbedev/lys-lib/logind"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
-
-	"github.com/stubbedev/lys-shell/internal/bussignal"
 )
 
 // This file is VPN state and control with NetworkManager as the single
@@ -152,23 +150,89 @@ func newVPNService(ctx context.Context, n nm, settings *Settings, agent *Agent, 
 		timing:     timing,
 		watched:    make(map[dbus.ObjectPath]*vpnEntry),
 	}
-	watch, err := watchSignals(ctx, n.conn, 64,
-		[]dbus.MatchOption{dbus.WithMatchObjectPath(nmPath), dbus.WithMatchInterface(properties), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchArg(0, nmIface)},
-		[]dbus.MatchOption{dbus.WithMatchInterface(activeIface), dbus.WithMatchMember("StateChanged")},
-		dbusx.OwnerMatch(BusName),
-		logind.PrepareForSleepMatch(),
-	)
+	sleep := &sleepResume{vpn: s}
+	restart := &restartResume{vpn: s}
+	events := make(chan func())
+	post := func(event func()) {
+		select {
+		case events <- event:
+		case <-ctx.Done():
+		}
+	}
+	failed := func(err error) { log.Printf("network: VPNs: %v", err) }
+	nmWatch, err := dbusx.WatchSignals(ctx, n.conn, dbusx.FromOwner(BusName), failed, s.nmRoutes(ctx, post, restart)...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("network: watch VPNs: %w", err)
+	}
+	sleepWatch, err := dbusx.WatchSignals(ctx, n.conn, dbusx.FromOwner(logind.BusName), failed,
+		dbusx.On(logind.PrepareForSleep, logind.ManagerPath, func(sleeping logind.Sleep, _ dbus.Sequence) error {
+			post(func() { sleep.prepareForSleep(ctx, sleeping.Start) })
+			return nil
+		}))
+	if err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("network: watch sleep for VPNs: %w", err), nmWatch.Stop())
 	}
 	s.managerState = n.managerState(ctx)
 	profiles := settings.Changes(ctx)
 	failures := agent.Failures(ctx)
 	s.rebuild()
 	s.resync(ctx)
-	go s.run(ctx, watch.signals, profiles, failures)
+	go s.run(ctx, events, profiles, failures, sleep, restart)
 	go s.watchUnderlay(ctx)
-	return s, watch.stop, nil
+	return s, func() error { return errors.Join(nmWatch.Stop(), sleepWatch.Stop()) }, nil
+}
+
+// activeStateChange is what an active connection's StateChanged
+// carries.
+type activeStateChange struct {
+	State  uint32 `dbus:"state"`
+	Reason uint32 `dbus:"reason"`
+}
+
+var activeStateChanged = dbusx.NewSignal[activeStateChange](activeIface, "StateChanged")
+
+// activeConnectionsPath is the namespace of NM's active connections.
+const activeConnectionsPath = dbus.ObjectPath(nmPath + "/ActiveConnection")
+
+// nmRoutes post to the event loop what NM says: its state and its list
+// of active connections changing, each active connection's
+// transitions, and its name changing owner.
+func (s *VPNService) nmRoutes(ctx context.Context, post func(func()), restart *restartResume) []dbusx.Route {
+	return []dbusx.Route{
+		dbusx.On(dbusx.PropertiesChanged, nmPath, func(props dbusx.ChangedProperties, _ dbus.Sequence) error {
+			stateVariant, stateChanged := props.Changed["State"]
+			_, activeChanged := props.Changed["ActiveConnections"]
+			var state uint32
+			if stateChanged {
+				if err := stateVariant.Store(&state); err != nil {
+					return fmt.Errorf("NM's State: %w", err)
+				}
+			}
+			if !stateChanged && !activeChanged {
+				return nil
+			}
+			post(func() {
+				if stateChanged {
+					s.mu.Lock()
+					s.managerState = State(state)
+					s.mu.Unlock()
+					feed.Notify(&s.stateChanges)
+				}
+				if activeChanged {
+					s.resync(ctx)
+				}
+			})
+			return nil
+		}).WithArg0(nmIface),
+		dbusx.OnUnder(activeStateChanged, activeConnectionsPath, func(path dbus.ObjectPath, change activeStateChange, _ dbus.Sequence) error {
+			post(func() { s.stateChanged(path, change.State, change.Reason) })
+			return nil
+		}),
+		dbusx.OnOwnerChange(BusName, func(oldOwner, newOwner string, _ dbus.Sequence) error {
+			post(func() { restart.ownerChanged(ctx, oldOwner != "", newOwner != "") })
+			return nil
+		}),
+	}
 }
 
 // Entries snapshots the rows in NM's profile order.
@@ -520,16 +584,11 @@ func (s *VPNService) applyFailure() {
 	}
 }
 
-// run is the service's one event loop: profile churn, the active list,
-// per-connection transitions, sign-in failures, and the two resume
+// run is the service's one event loop: profile churn, sign-in
+// failures, and what the watches post, in the order each watch heard
+// it: the active list, per-connection transitions, and the two resume
 // triggers.
-func (s *VPNService) run(ctx context.Context, signals chan *dbus.Signal, profiles, failures <-chan struct{}) {
-	sleep := &sleepResume{vpn: s}
-	restart := &restartResume{vpn: s}
-	owner := []dbusx.Route{dbusx.OnOwnerChange(BusName, func(oldOwner, newOwner string, _ dbus.Sequence) error {
-		restart.ownerChanged(ctx, oldOwner != "", newOwner != "")
-		return nil
-	})}
+func (s *VPNService) run(ctx context.Context, events <-chan func(), profiles, failures <-chan struct{}, sleep *sleepResume, restart *restartResume) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -541,54 +600,8 @@ func (s *VPNService) run(ctx context.Context, signals chan *dbus.Signal, profile
 			s.resync(ctx)
 		case <-failures:
 			s.applyFailure()
-		case sig, ok := <-signals:
-			if !ok {
-				return
-			}
-			s.signal(ctx, sig, sleep, owner)
-		}
-	}
-}
-
-// signal handles one signal of the watch and takes over the descriptors
-// it carries: NM's own on the paths of every active connection, which
-// no route can name yet (lys-lib#106), logind's, and NM's owner changing.
-func (s *VPNService) signal(ctx context.Context, sig *dbus.Signal, sleep *sleepResume, owner []dbusx.Route) {
-	switch sig.Name {
-	case properties + ".PropertiesChanged", activeIface + ".StateChanged", logind.PrepareForSleep.Name():
-	default:
-		if err := dbusx.Dispatch(sig, "", owner); err != nil {
-			log.Printf("network: %v", err)
-		}
-		return
-	}
-	defer bussignal.Discard(sig)
-	switch sig.Name {
-	case properties + ".PropertiesChanged":
-		if sig.Path != nmPath || len(sig.Body) < 2 {
-			return
-		}
-		changed, _ := sig.Body[1].(map[string]dbus.Variant)
-		if v, ok := changed["State"]; ok {
-			if state, ok := v.Value().(uint32); ok {
-				s.mu.Lock()
-				s.managerState = State(state)
-				s.mu.Unlock()
-				feed.Notify(&s.stateChanges)
-			}
-		}
-		if _, ok := changed["ActiveConnections"]; ok {
-			s.resync(ctx)
-		}
-	case activeIface + ".StateChanged":
-		if len(sig.Body) == 2 {
-			state, _ := sig.Body[0].(uint32)
-			reason, _ := sig.Body[1].(uint32)
-			s.stateChanged(sig.Path, state, reason)
-		}
-	case logind.PrepareForSleep.Name():
-		if s, err := logind.PrepareForSleep.Decode(sig); err == nil {
-			sleep.prepareForSleep(ctx, s.Start)
+		case event := <-events:
+			event()
 		}
 	}
 }

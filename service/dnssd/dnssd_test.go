@@ -9,7 +9,6 @@ import (
 
 	"github.com/stubbedev/lys-lib/dbustest"
 
-	"github.com/stubbedev/lys-shell/internal/bussignal/bussignaltest"
 	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/service/dnssd/dnssdtest"
 )
@@ -150,7 +149,7 @@ func TestBrowseClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	fd, closed := bussignaltest.Descriptor(t)
-	a.Emit(t, "/Client0/ServiceBrowser9", dnssd.BrowserIface+".ItemNew", fd)
-	closed("the browse handled a signal carrying a descriptor")
+	pipe := dbustest.NewPipe(t)
+	a.Emit(t, "/Client0/ServiceBrowser9", dnssd.BrowserIface+".ItemNew", pipe.Write)
+	pipe.RequireEveryCopyClosed(t)
 }
