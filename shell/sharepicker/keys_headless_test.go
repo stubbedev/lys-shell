@@ -35,11 +35,12 @@ const (
 // client focused, as the app asking to share is, and the remapped
 // keyboard.
 type keyRig struct {
-	t       *testing.T
-	a       *app.Application
-	p       *Picker
-	kb      *keytest.Keyboard
-	answers chan string
+	t         *testing.T
+	a         *app.Application
+	p         *Picker
+	kb        *keytest.Keyboard
+	answers   chan string
+	callbacks *atomic.Uint64
 }
 
 // keyPicker shows the picker for r over five windows and two outputs,
@@ -54,6 +55,13 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 		return err
 	})
 	p, _ := headlessPicker(t, a, page)
+	callbacks := new(atomic.Uint64)
+	p.invoke = func(fn func()) {
+		a.Invoke(func() {
+			callbacks.Add(1)
+			fn()
+		})
+	}
 	t.Cleanup(func() { p.Dismiss("/r/keys") })
 	kb := keytest.Dial(t, a)
 	answers := make(chan string, 1)
@@ -65,7 +73,7 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 		choices := p.choices[p.nb.SelectedTab()]
 		return len(choices) > 0 && !slices.ContainsFunc(choices, func(c widget.Widget) bool { return c.(widget.Boundser).Bounds().W == 0 })
 	})
-	return &keyRig{t: t, a: a, p: p, kb: kb, answers: answers}
+	return &keyRig{t: t, a: a, p: p, kb: kb, answers: answers, callbacks: callbacks}
 }
 
 // headlessPicker is a picker on a's compositor over five windows and
@@ -238,20 +246,51 @@ func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
 	if len(spinners) != len(fiveWindows) {
 		t.Fatalf("%d spinners, want one per window card (%d)", len(spinners), len(fiveWindows))
 	}
-	apptest.Until(t, k.a, "every capture landed, each window's hiding its spinner", func() bool {
-		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() }) &&
-			len(treetest.WithClass(k.p.root, "share-picker-card-loading")) == 0
+	apptest.Until(t, k.a, "every capture of every page landed, each window's hiding its spinner", func() bool {
+		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() }) && k.p.loadingCards() == 0
 	})
+	widget.WaitAssetLoads()
 	apptest.Drawn(t, k.a, k.p.layer.HostSurface(), k.p.root.(interface{ Invalidate() }).Invalidate)
-	type activity struct{ damage, walks uint64 }
-	sample := func() activity {
-		return apptest.On(k.a, func() activity { return activity{widget.DamageGeneration(), widget.DamageWalks()} })
-	}
-	before := sample()
+	before := k.idleState()
 	time.Sleep(idleWindow)
-	if after := sample(); after != before {
-		t.Errorf("the idle picker invalidated %d times and walked damage %d times in %v", after.damage-before.damage, after.walks-before.walks, idleWindow)
+	if after := k.idleState(); after.damage != before.damage || after.walks != before.walks {
+		t.Errorf("the idle picker invalidated %d times and walked damage %d times in %v\nbefore: %+v\nafter:  %+v",
+			after.damage-before.damage, after.walks-before.walks, idleWindow, before, after)
 	}
+}
+
+type idleState struct {
+	damage, walks   uint64
+	pickerCallbacks uint64
+	assetsOwed      int
+	loadingCards    int
+	focus           string
+	keyboardHeld    bool
+}
+
+func (k *keyRig) idleState() idleState {
+	return apptest.On(k.a, func() idleState {
+		focused := k.a.Focused()
+		return idleState{
+			damage:          widget.DamageGeneration(),
+			walks:           widget.DamageWalks(),
+			pickerCallbacks: k.callbacks.Load(),
+			assetsOwed:      widget.TreeAssetsOwed(k.p.root),
+			loadingCards:    k.p.loadingCards(),
+			focus:           fmt.Sprintf("%T %q", focused, widget.Describe(focused).Name),
+			keyboardHeld:    k.a.Session().KeyboardFocus() == k.p.layer.HostSurface(),
+		}
+	})
+}
+
+func (p *Picker) loadingCards() int {
+	n := 0
+	for _, choices := range p.choices {
+		for _, c := range choices {
+			n += len(treetest.WithClass(c, "share-picker-card-loading"))
+		}
+	}
+	return n
 }
 
 // idleWindow is how long the idle picker is watched for frames.
