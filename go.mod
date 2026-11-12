@@ -1,6 +1,6 @@
 module github.com/stubbedev/lys-shell
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/makiuchi-d/gozxing v0.1.1
