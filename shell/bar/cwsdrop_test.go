@@ -8,6 +8,7 @@ import (
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/render"
+	"github.com/stubbedev/lys-ui/anim"
 	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/service/hyprland"
@@ -452,14 +453,19 @@ func TestCwsUnderlineTravelsAsTheIndicator(t *testing.T) {
 	}
 }
 
-func TestHyprlandIndicatorIgnoresAnotherMonitorsSwitch(t *testing.T) {
-	_, m := newTestHypr(t, nil)
-	row := widget.NewBox(widget.Row, 0, 0).Append(m.segs, false)
-	t.Cleanup(widget.Host(row))
-	layout := func() {
+func hostHyprRow(t *testing.T, segs *widget.SegmentIndicator) (layout func()) {
+	t.Helper()
+	row := widget.NewBox(widget.Row, 0, 0).Append(segs, false)
+	t.Cleanup(widget.Host(row, new(anim.Clock)))
+	return func() {
 		widget.SizeWithin(row, widget.Size{W: 400, H: 40})
 		row.Arrange(render.Rect{W: 400, H: 40})
 	}
+}
+
+func TestHyprlandIndicatorIgnoresAnotherMonitorsSwitch(t *testing.T) {
+	_, m := newTestHypr(t, nil)
+	layout := hostHyprRow(t, m.segs)
 	layout()
 	before, active := m.segs.EnableDrop().Bounds(), m.segs.Active()
 	if before.Empty() || active < 0 {
@@ -475,12 +481,7 @@ func TestHyprlandIndicatorIgnoresAnotherMonitorsSwitch(t *testing.T) {
 
 func TestHyprlandIndicatorTravelsOnTheBarsMonitor(t *testing.T) {
 	_, m := newTestHypr(t, nil)
-	row := widget.NewBox(widget.Row, 0, 0).Append(m.segs, false)
-	t.Cleanup(widget.Host(row))
-	layout := func() {
-		widget.SizeWithin(row, widget.Size{W: 400, H: 40})
-		row.Arrange(render.Rect{W: 400, H: 40})
-	}
+	layout := hostHyprRow(t, m.segs)
 	layout()
 	if m.segs.Count() < 2 {
 		t.Fatalf("%d segments, the test needs two", m.segs.Count())
@@ -528,12 +529,7 @@ func TestHyprlandWorkspaceDestroyedBeforeTheActiveDoesNotAnimate(t *testing.T) {
 	f, m := newTestHypr(t, nil)
 	f.set("j/workspaces", `[{"id":1,"name":"1","monitor":"DP-1","windows":1},{"id":2,"name":"2","monitor":"DP-1","windows":1},{"id":4,"name":"4","monitor":"DP-1","windows":1}]`)
 	f.set("j/monitors", `[{"id":0,"name":"DP-1","activeWorkspace":{"id":2,"name":"2"},"focused":true}]`)
-	row := widget.NewBox(widget.Row, 0, 0).Append(m.segs, false)
-	t.Cleanup(widget.Host(row))
-	layout := func() {
-		widget.SizeWithin(row, widget.Size{W: 400, H: 40})
-		row.Arrange(render.Rect{W: 400, H: 40})
-	}
+	layout := hostHyprRow(t, m.segs)
 	defer widget.SetAnimationsInstant(true)()
 	handleNow(t, m, hyprland.Event{Kind: hyprland.EventCreateWspcV2, ID: 4, Name: "4"})
 	layout()

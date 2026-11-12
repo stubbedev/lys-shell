@@ -405,7 +405,7 @@ var panelSizeSpring = anim.SpringParams{Response: 220 * time.Millisecond, Dampin
 
 func newPanelMotion(f *panelFrame, w, h int) *panelMotion {
 	m := &panelMotion{f: f, alive: true, compositorFade: true}
-	m.revS = anim.NewSpring(anim.SpringSnappy, []float64{0}, func(pos []float64) {
+	m.revS = anim.NewSpring(f.root, anim.SpringSnappy, []float64{0}, func(pos []float64) {
 		m.reveal = pos[0]
 		m.applyReveal()
 		if m.done != nil && pos[0] <= 0 {
@@ -416,7 +416,7 @@ func newPanelMotion(f *panelFrame, w, h int) *panelMotion {
 		}
 	})
 	m.revS.SetPrecision(0.002)
-	m.sizeS = anim.NewSpring(panelSizeSpring, []float64{0, 0}, func(pos []float64) {
+	m.sizeS = anim.NewSpring(f.root, panelSizeSpring, []float64{0, 0}, func(pos []float64) {
 		m.w, m.h = pos[0], pos[1]
 		if m.alive {
 			f.root.InvalidateLayout()
@@ -500,7 +500,7 @@ func (m *panelMotion) fade(from, to float64, d uint32, done func()) {
 	}
 	m.reveal = from
 	m.applyReveal()
-	m.fadeStop = anim.Start(time.Duration(d)*time.Millisecond, func(t float64) {
+	m.fadeStop = anim.Start(m.f.root, time.Duration(d)*time.Millisecond, func(t float64) {
 		m.reveal = from + float64((to-from)*t)
 		m.applyReveal()
 		if t >= 1 && done != nil {

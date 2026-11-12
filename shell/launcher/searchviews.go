@@ -246,7 +246,7 @@ func newSearchList(v *panelViews, cfg *config.Config, font render.Font, variants
 	l := &searchList{v: v, font: font, variants: variants, rowH: rowH, headerH: headerH, margin: rowMargin(scaledPx(cfg)), iconSize: iconSize, icons: cfg.Launcher.ShowIcons, selected: -1}
 	l.SetElement("listview")
 	l.AddClass("launcher-search-list")
-	l.scroll = anim.NewSpring(anim.SpringParams{Response: 160 * time.Millisecond, Damping: 1}, []float64{0}, func(pos []float64) {
+	l.scroll = anim.NewSpring(l, anim.SpringParams{Response: 160 * time.Millisecond, Damping: 1}, []float64{0}, func(pos []float64) {
 		l.offset = pos[0]
 		l.InvalidateLayout()
 	})
