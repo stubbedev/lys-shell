@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
@@ -169,16 +170,48 @@ func TestMonitoringFollowsDevices(t *testing.T) {
 	}
 }
 
+// Only BlueZ, and only about its own tree, changes the model: another
+// connection's word in BlueZ's name is ignored even on a connection
+// whose other rules let it in, as is an object BlueZ announces outside
+// /org/bluez.
 func TestMonitoringIgnoresForeignSignals(t *testing.T) {
 	f := populated(t)
-	s := f.service()
-	// A peer that is not org.bluez announces a device and changes one:
-	// the sender-scoped match drops both.
+	conn := f.bus.Conn(t)
+	for _, iface := range []string{objectManager, propertiesIface, deviceIface} {
+		if err := conn.AddMatchSignal(dbus.WithMatchInterface(iface)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s, err := New(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	events, stop := s.Disconnected(dev2)
+	defer stop()
 	impostor := f.bus.Conn(t)
-	_ = impostor.Emit(objectManagerAt, objectManager+".InterfacesAdded", dbus.ObjectPath("/org/bluez/hci0/dev_FAKE"),
-		map[string]map[string]dbus.Variant{deviceIface: deviceProps("FF:FF:FF:FF:FF:FF", "Fake", hci0)})
-	_ = impostor.Emit(dev2, propertiesChange, deviceIface, map[string]dbus.Variant{"Connected": dbus.MakeVariant(true)}, []string{})
-	// A real change after them proves the loop processed its queue.
+	for _, emit := range []func() error{
+		func() error {
+			return impostor.Emit(objectManagerAt, objectManager+".InterfacesAdded", dbus.ObjectPath("/org/bluez/hci0/dev_FAKE"),
+				map[string]map[string]dbus.Variant{deviceIface: deviceProps("FF:FF:FF:FF:FF:FF", "Fake", hci0)})
+		},
+		func() error {
+			return impostor.Emit(dev2, dbusx.PropertiesChanged.Name(), deviceIface, map[string]dbus.Variant{"Connected": dbus.MakeVariant(true)}, []string{})
+		},
+		func() error {
+			return impostor.Emit(objectManagerAt, objectManager+".InterfacesRemoved", dev1, []string{deviceIface})
+		},
+		func() error {
+			return impostor.Emit(dev2, deviceIface+".Disconnected", "org.bluez.Reason.Remote", "gone")
+		},
+		func() error { return impostor.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err },
+	} {
+		if err := emit(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.emit(objectManagerAt, objectManager+".InterfacesAdded", dbus.ObjectPath("/org/freedesktop/UDisks2/drives/a"),
+		map[string]map[string]dbus.Variant{deviceIface: deviceProps("FF:FF:FF:FF:FF:FE", "Elsewhere", hci0)})
 	f.update(dev2, deviceIface, map[string]dbus.Variant{"Alias": dbus.MakeVariant("Renamed")})
 	waitFor(t, "the real change", func() bool {
 		d, _ := s.State().Device(dev2)
@@ -186,12 +219,16 @@ func TestMonitoringIgnoresForeignSignals(t *testing.T) {
 	})
 	st := s.State()
 	if len(st.Devices) != 2 {
-		t.Errorf("devices = %d, the impostor's device was added", len(st.Devices))
+		t.Errorf("devices = %+v, want the headset and the speaker alone", st.Devices)
 	}
 	if d, _ := st.Device(dev2); d.Connected {
 		t.Error("the impostor's property change was applied")
 	}
-	// Changes for unknown paths are ignored, not invented.
+	select {
+	case ev := <-events:
+		t.Errorf("the impostor's Disconnected was streamed: %+v", ev)
+	default:
+	}
 	f.update("/org/bluez/hci0/dev_UNKNOWN", deviceIface, map[string]dbus.Variant{"Connected": dbus.MakeVariant(true)})
 	f.update(dev2, deviceIface, map[string]dbus.Variant{"Alias": dbus.MakeVariant("Again")})
 	waitFor(t, "the second change", func() bool {
@@ -505,13 +542,22 @@ func TestCloseEndsSubscriptions(t *testing.T) {
 	}
 }
 
-// The service reads BlueZ's signals off a channel of its own and keeps
-// none of the descriptors one carries: each is closed once the signal
-// is handled.
+// The service keeps none of the descriptors BlueZ's signals carry: an
+// object's properties and the properties it is added with are closed
+// once applied.
 func TestTheServiceClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	f := populated(t)
-	f.service()
-	pipe := dbustest.NewPipe(t)
-	f.update(dev1, deviceIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(pipe.Write)})
-	pipe.RequireEveryCopyClosed(t)
+	s := f.service()
+	changed := dbustest.NewPipe(t)
+	f.update(dev1, deviceIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(changed.Write)})
+	changed.RequireEveryCopyClosed(t)
+	added := dbustest.NewPipe(t)
+	props := deviceProps("AA:BB:CC:DD:EE:03", "Keyboard", hci0)
+	props["Handed"] = dbus.MakeVariant(added.Write)
+	f.add("/org/bluez/hci0/dev_AA_BB_CC_DD_EE_03", deviceIface, props, true)
+	waitFor(t, "the added keyboard", func() bool {
+		_, ok := s.State().Device("/org/bluez/hci0/dev_AA_BB_CC_DD_EE_03")
+		return ok
+	})
+	added.RequireEveryCopyClosed(t)
 }

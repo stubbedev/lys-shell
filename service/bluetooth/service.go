@@ -108,10 +108,9 @@ func (s State) Snapshot() Snapshot {
 
 // Service is the live BlueZ model plus the pairing agent.
 type Service struct {
-	conn    *dbus.Conn
-	signals chan *dbus.Signal
-	done    chan struct{}
-	wg      sync.WaitGroup
+	conn      *dbus.Conn
+	watch     *dbusx.Watch
+	closeOnce sync.Once
 
 	mu       sync.Mutex
 	adapters []*Adapter
@@ -128,8 +127,6 @@ type Service struct {
 func New(conn *dbus.Conn) (*Service, error) {
 	s := &Service{
 		conn:     conn,
-		signals:  make(chan *dbus.Signal, 256),
-		done:     make(chan struct{}),
 		ticks:    feed.NewTick(),
 		discSubs: make(map[chan DisconnectedEvent]dbus.ObjectPath),
 	}
@@ -139,71 +136,121 @@ func New(conn *dbus.Conn) (*Service, error) {
 	if err := s.follow(); err != nil {
 		return nil, errors.Join(err, s.unregisterAgent())
 	}
-	s.wg.Add(1)
-	go s.run()
 	return s, nil
 }
 
-// follow matches before reading the tree so nothing between the two is
-// lost; replays of what the read already saw are idempotent.
+// follow watches BlueZ before reading the tree, so nothing between the
+// two is lost: a signal the watch hears while the read runs is applied
+// after it, and replays of what the read already saw are idempotent.
 func (s *Service) follow() error {
-	for i, opts := range matchRules() {
-		if err := s.conn.AddMatchSignal(opts...); err != nil {
-			return errors.Join(fmt.Errorf("bluetooth: match signals: %w", err), s.removeMatches(i))
-		}
+	loaded := make(chan struct{})
+	watch, err := dbusx.WatchSignals(context.Background(), s.conn, dbusx.FromOwner(BusName),
+		func(err error) { log.Printf("bluetooth: %v", err) },
+		s.routes(loaded)...)
+	if err != nil {
+		return fmt.Errorf("bluetooth: watch BlueZ: %w", err)
 	}
-	s.conn.Signal(s.signals)
-	if err := s.discover(); err != nil {
-		return errors.Join(err, s.removeSignals(), s.removeMatches(len(matchRules())))
+	err = s.discover()
+	close(loaded)
+	if err != nil {
+		return errors.Join(err, watch.Stop())
 	}
+	s.watch = watch
 	return nil
 }
 
-func (s *Service) removeMatches(n int) error {
-	var errs []error
-	for _, opts := range matchRules()[:n] {
-		if err := s.conn.RemoveMatchSignal(opts...); err != nil {
-			errs = append(errs, fmt.Errorf("bluetooth: remove match: %w", err))
-		}
-	}
-	return errors.Join(errs...)
+// interfacesAdded and interfacesRemoved are what BlueZ's ObjectManager
+// says of an object gaining and losing interfaces.
+type interfacesAdded struct {
+	Object     dbus.ObjectPath                    `dbus:"object_path"`
+	Interfaces map[string]map[string]dbus.Variant `dbus:"interfaces_and_properties"`
 }
 
-func matchRules() [][]dbus.MatchOption {
-	return [][]dbus.MatchOption{
-		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(objectManager), dbus.WithMatchObjectPath(objectManagerAt)},
-		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(propertiesIface), dbus.WithMatchMember("PropertiesChanged"), dbus.WithMatchPathNamespace(bluezRoot)},
-		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(deviceIface), dbus.WithMatchMember("Disconnected"), dbus.WithMatchPathNamespace(bluezRoot)},
+type interfacesRemoved struct {
+	Object     dbus.ObjectPath `dbus:"object_path"`
+	Interfaces []string        `dbus:"interfaces"`
+}
+
+// disconnected is what a device's Disconnected carries.
+type disconnected struct {
+	Reason  string `dbus:"reason"`
+	Message string `dbus:"message"`
+}
+
+var (
+	interfacesAddedSignal   = dbusx.NewSignal[interfacesAdded](objectManager, "InterfacesAdded")
+	interfacesRemovedSignal = dbusx.NewSignal[interfacesRemoved](objectManager, "InterfacesRemoved")
+	disconnectedSignal      = dbusx.NewSignal[disconnected](deviceIface, "Disconnected")
+)
+
+// routes fold BlueZ's signals into the model once loaded is closed:
+// objects coming and going under /org/bluez, their properties
+// changing, and a device's disconnections.
+func (s *Service) routes(loaded <-chan struct{}) []dbusx.Route {
+	return []dbusx.Route{
+		dbusx.On(interfacesAddedSignal, objectManagerAt, func(added interfacesAdded, _ dbus.Sequence) error {
+			<-loaded
+			if underBlueZ(added.Object) {
+				s.mu.Lock()
+				if s.addInterfacesLocked(added.Object, added.Interfaces) {
+					s.primary = selectPrimary(s.primary, s.adapters)
+				}
+				s.mu.Unlock()
+				s.changed()
+			}
+			if err := dbus.CloseFDs([]any{added.Interfaces}); err != nil {
+				return fmt.Errorf("close the descriptors %s was added with: %w", added.Object, err)
+			}
+			return nil
+		}),
+		dbusx.On(interfacesRemovedSignal, objectManagerAt, func(removed interfacesRemoved, _ dbus.Sequence) error {
+			<-loaded
+			if !underBlueZ(removed.Object) {
+				return nil
+			}
+			s.mu.Lock()
+			s.removeInterfacesLocked(removed.Object, removed.Interfaces)
+			s.mu.Unlock()
+			s.changed()
+			return nil
+		}),
+		dbusx.OnUnder(dbusx.PropertiesChanged, bluezRoot, func(path dbus.ObjectPath, props dbusx.ChangedProperties, _ dbus.Sequence) error {
+			<-loaded
+			s.mu.Lock()
+			s.applyPropertiesLocked(path, props.Interface, props.Changed, props.Invalidated)
+			s.mu.Unlock()
+			s.changed()
+			return nil
+		}),
+		dbusx.OnUnder(disconnectedSignal, bluezRoot, func(path dbus.ObjectPath, d disconnected, _ dbus.Sequence) error {
+			<-loaded
+			s.fanDisconnected(path, DisconnectedEvent{Reason: ParseDisconnectReason(d.Reason), Message: d.Message})
+			return nil
+		}),
 	}
 }
 
 // Close stops following BlueZ, cancels a pending agent request, and
-// unregisters the agent; the connection stays open.
+// unregisters the agent; the connection stays open. Calling it again
+// does nothing.
 func (s *Service) Close() error {
-	select {
-	case <-s.done:
-		return nil
-	default:
-	}
-	close(s.done)
-	removed := s.removeSignals()
-	s.wg.Wait()
-	s.withdraw(func(pending) agentAnswer { return canceled() })
-	s.ticks.Close()
-	s.mu.Lock()
-	for ch := range s.discSubs {
-		close(ch)
-	}
-	s.discSubs = map[chan DisconnectedEvent]dbus.ObjectPath{}
-	s.mu.Unlock()
-	return errors.Join(removed, s.removeMatches(len(matchRules())), s.unregisterAgent())
-}
-
-func (s *Service) removeSignals() error {
-	if err := dbusx.RemoveSignal(s.conn, s.signals); err != nil {
-		return fmt.Errorf("bluetooth: stop following signals: %w", err)
-	}
-	return nil
+	var err error
+	s.closeOnce.Do(func() {
+		stopped := s.watch.Stop()
+		if stopped != nil {
+			stopped = fmt.Errorf("bluetooth: stop following BlueZ: %w", stopped)
+		}
+		s.withdraw(func(pending) agentAnswer { return canceled() })
+		s.ticks.Close()
+		s.mu.Lock()
+		for ch := range s.discSubs {
+			close(ch)
+		}
+		s.discSubs = map[chan DisconnectedEvent]dbus.ObjectPath{}
+		s.mu.Unlock()
+		err = errors.Join(stopped, s.unregisterAgent())
+	})
+	return err
 }
 
 type managedObjects map[dbus.ObjectPath]map[string]map[string]dbus.Variant
@@ -228,74 +275,6 @@ func (s *Service) discover() error {
 	s.primary = bestAdapter(s.adapters)
 	s.mu.Unlock()
 	return nil
-}
-
-// run folds BlueZ's signals into the model until Close.
-func (s *Service) run() {
-	defer s.wg.Done()
-	for {
-		select {
-		case <-s.done:
-			return
-		case sig, ok := <-s.signals:
-			if !ok {
-				return
-			}
-			s.handle(sig)
-			if err := sig.CloseFDs(); err != nil {
-				log.Printf("bluetooth: close the descriptors of %s from %s: %v", sig.Name, sig.Sender, err)
-			}
-		}
-	}
-}
-
-func (s *Service) handle(sig *dbus.Signal) {
-	if !fromBlueZ(sig) {
-		return
-	}
-	switch sig.Name {
-	case objectManager + ".InterfacesAdded":
-		var path dbus.ObjectPath
-		var ifaces map[string]map[string]dbus.Variant
-		if dbus.Store(sig.Body, &path, &ifaces) != nil {
-			return
-		}
-		s.mu.Lock()
-		adapterAdded := s.addInterfacesLocked(path, ifaces)
-		if adapterAdded {
-			s.primary = selectPrimary(s.primary, s.adapters)
-		}
-		s.mu.Unlock()
-	case objectManager + ".InterfacesRemoved":
-		var path dbus.ObjectPath
-		var ifaces []string
-		if dbus.Store(sig.Body, &path, &ifaces) != nil {
-			return
-		}
-		s.mu.Lock()
-		s.removeInterfacesLocked(path, ifaces)
-		s.mu.Unlock()
-	case propertiesChange:
-		var iface string
-		var changed map[string]dbus.Variant
-		var invalidated []string
-		if dbus.Store(sig.Body, &iface, &changed, &invalidated) != nil {
-			return
-		}
-		s.mu.Lock()
-		s.applyPropertiesLocked(sig.Path, iface, changed, invalidated)
-		s.mu.Unlock()
-	case deviceIface + ".Disconnected":
-		var reason, message string
-		if dbus.Store(sig.Body, &reason, &message) != nil {
-			return
-		}
-		s.fanDisconnected(sig.Path, DisconnectedEvent{Reason: ParseDisconnectReason(reason), Message: message})
-		return
-	default:
-		return
-	}
-	s.changed()
 }
 
 // addInterfacesLocked adds the adapter/device at path, or the battery
@@ -599,14 +578,6 @@ func (s *Service) fanDisconnected(path dbus.ObjectPath, ev DisconnectedEvent) {
 		default:
 		}
 	}
-}
-
-func fromBlueZ(sig *dbus.Signal) bool {
-	if sig.Path == objectManagerAt && len(sig.Body) > 0 {
-		path, ok := sig.Body[0].(dbus.ObjectPath)
-		return ok && underBlueZ(path)
-	}
-	return underBlueZ(sig.Path)
 }
 
 func underBlueZ(path dbus.ObjectPath) bool {

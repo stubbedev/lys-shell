@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
@@ -195,7 +196,7 @@ func (f *fakeBlueZ) update(path dbus.ObjectPath, iface string, changed map[strin
 	if invalidated == nil {
 		invalidated = []string{}
 	}
-	f.emit(path, propertiesChange, iface, changed, invalidated)
+	f.emit(path, dbusx.PropertiesChanged.Name(), iface, changed, invalidated)
 }
 
 func (f *fakeBlueZ) emit(path dbus.ObjectPath, name string, args ...any) {

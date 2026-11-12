@@ -3,23 +3,23 @@ package bluetooth
 import (
 	"strings"
 
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 )
 
 // BlueZ names (types/mod.rs).
 const (
 	// BusName is BlueZ's well-known name on the system bus.
-	BusName          = "org.bluez"
-	bluezRoot        = "/org/bluez"
-	objectManagerAt  = "/"
-	adapterIface     = "org.bluez.Adapter1"
-	deviceIface      = "org.bluez.Device1"
-	batteryIface     = "org.bluez.Battery1"
-	agentIface       = "org.bluez.Agent1"
-	agentManager     = "org.bluez.AgentManager1"
-	objectManager    = "org.freedesktop.DBus.ObjectManager"
-	propertiesIface  = "org.freedesktop.DBus.Properties"
-	propertiesChange = propertiesIface + ".PropertiesChanged"
+	BusName         = "org.bluez"
+	bluezRoot       = "/org/bluez"
+	objectManagerAt = "/"
+	adapterIface    = "org.bluez.Adapter1"
+	deviceIface     = "org.bluez.Device1"
+	batteryIface    = "org.bluez.Battery1"
+	agentIface      = "org.bluez.Agent1"
+	agentManager    = "org.bluez.AgentManager1"
+	objectManager   = "org.freedesktop.DBus.ObjectManager"
+	propertiesIface = dbusx.PropertiesInterface
 )
 
 // AddressType is the Bluetooth address type (types/adapter.rs). BlueZ
