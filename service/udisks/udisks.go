@@ -27,7 +27,6 @@ const (
 	EncryptedIface  = BusName + ".Encrypted"
 	DriveIface      = BusName + ".Drive"
 	objectManager   = "org.freedesktop.DBus.ObjectManager"
-	propertiesIface = "org.freedesktop.DBus.Properties"
 	// ErrDeviceBusy is UDisks2's error for a filesystem in use.
 	ErrDeviceBusy = BusName + ".Error.DeviceBusy"
 )
@@ -168,58 +167,32 @@ func decimalSize(n uint64) string {
 	return strconv.FormatUint(whole, 10) + " " + units[unit]
 }
 
-// Watch calls changed whenever UDisks2's objects may have changed: one
-// added or removed (a hotplug, an unlock), or a property changing (a
-// mount), until stop is called.
+// Watch calls changed, from one goroutine, whenever UDisks2's objects
+// may have changed: one added or removed (a hotplug, an unlock), or a
+// property changing (a mount), until stop, which returns once the last
+// call has. Only UDisks2 is heard.
 func (c *Client) Watch(changed func()) (stop func(), err error) {
-	rules := [][]dbus.MatchOption{
-		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(objectManager)},
-		{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(propertiesIface), dbus.WithMatchMember("PropertiesChanged")},
-	}
-	for i, rule := range rules {
-		if err := c.conn.AddMatchSignal(rule...); err != nil {
-			for _, added := range rules[:i] {
-				_ = c.conn.RemoveMatchSignal(added...)
+	watch, err := dbusx.WatchSignals(context.Background(), c.conn, dbusx.FromOwner(BusName),
+		func(err error) { log.Printf("udisks: %v", err) },
+		dbusx.OnOthers(objectManager, ManagerPath, func(sig *dbus.Signal) error {
+			changed()
+			if err := sig.CloseFDs(); err != nil {
+				return fmt.Errorf("close the descriptors of %s: %w", sig.Name, err)
 			}
-			return nil, fmt.Errorf("udisks: watching objects: %w", err)
-		}
+			return nil
+		}),
+		dbusx.OnUnder(dbusx.PropertiesChanged, ManagerPath, func(dbus.ObjectPath, dbusx.ChangedProperties, dbus.Sequence) error {
+			changed()
+			return nil
+		}))
+	if err != nil {
+		return nil, fmt.Errorf("udisks: watching objects: %w", err)
 	}
-	signals := make(chan *dbus.Signal, 16)
-	c.conn.Signal(signals)
-	done := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case sig, ok := <-signals:
-				if !ok {
-					return
-				}
-				if sig.Name == objectManager+".InterfacesAdded" || sig.Name == objectManager+".InterfacesRemoved" ||
-					(sig.Name == propertiesIface+".PropertiesChanged" && udisksObject(sig.Path)) {
-					changed()
-				}
-				if err := sig.CloseFDs(); err != nil {
-					log.Printf("udisks: close the descriptors of %s from %s: %v", sig.Name, sig.Sender, err)
-				}
-			}
-		}
-	}()
 	return func() {
-		for _, rule := range rules {
-			_ = c.conn.RemoveMatchSignal(rule...)
-		}
-		if err := dbusx.RemoveSignal(c.conn, signals); err != nil {
+		if err := watch.Stop(); err != nil {
 			log.Printf("udisks: stop watching objects: %v", err)
 		}
-		close(done)
 	}, nil
-}
-
-// udisksObject reports a path under UDisks2's manager.
-func udisksObject(path dbus.ObjectPath) bool {
-	return len(path) > len(ManagerPath) && string(path[:len(ManagerPath)+1]) == string(ManagerPath)+"/"
 }
 
 // noOptions is the empty option dictionary UDisks2's methods take.

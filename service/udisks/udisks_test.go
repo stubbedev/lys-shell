@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -190,10 +191,47 @@ func TestWatchFollowsHotplug(t *testing.T) {
 	}
 }
 
-// The watch reads UDisks2's signals off a channel of its own and keeps
-// none of the descriptors one carries: each is closed once the signal
-// is handled, and those of the signals unread when it stops are closed
-// with it.
+// The watch hears UDisks2 alone: another connection's word in its name
+// is no change, even on a connection whose other rules let it in.
+func TestWatchIgnoresAnotherConnection(t *testing.T) {
+	u, _ := fixture(t)
+	conn := u.Client(t)
+	for _, iface := range []string{"org.freedesktop.DBus.ObjectManager", "org.freedesktop.DBus.Properties"} {
+		if err := conn.AddMatchSignal(dbus.WithMatchInterface(iface)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var changes atomic.Int32
+	stop, err := udisks.New(conn).Watch(func() { changes.Add(1) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stop()
+	impostor := u.Client(t)
+	for _, err := range []error{
+		impostor.Emit(udisks.ManagerPath, "org.freedesktop.DBus.ObjectManager.InterfacesRemoved", stickPart, []string{udisks.BlockIface}),
+		impostor.Emit(stickPart, "org.freedesktop.DBus.Properties.PropertiesChanged", udisks.BlockIface, map[string]dbus.Variant{"Size": dbus.MakeVariant(uint64(1))}, []string{}),
+		impostor.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err,
+	} {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	u.Remove(t, stickPart)
+	for deadline := time.Now().Add(5 * time.Second); changes.Load() == 0; time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("no change for UDisks2's removal")
+		}
+	}
+	time.Sleep(150 * time.Millisecond)
+	if n := changes.Load(); n != 1 {
+		t.Errorf("%d changes, want UDisks2's removal alone", n)
+	}
+}
+
+// The watch keeps none of the descriptors UDisks2's signals carry: each
+// is closed once the signal is handled, and those of the signals still
+// unread when it stops are closed with it.
 func TestWatchClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	u := udiskstest.Start(t)
 	conn := u.Client(t)
@@ -225,8 +263,17 @@ func TestWatchClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	if err := conn.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
 		t.Fatalf("wait for the connection to read the signal: %v", err)
 	}
-	stop()
-	unread.RequireEveryCopyClosed(t)
+	stopped := make(chan struct{})
+	go func() {
+		stop()
+		close(stopped)
+	}()
 	close(release)
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stop did not return once the change it waited on did")
+	}
 	handled.RequireEveryCopyClosed(t)
+	unread.RequireEveryCopyClosed(t)
 }
