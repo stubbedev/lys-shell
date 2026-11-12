@@ -1002,6 +1002,81 @@ func TestPanelOpensAtItsDefaultSize(t *testing.T) {
 	}
 }
 
+func TestPanelSqueezedBelowItsFloorOpensAtTheFloor(t *testing.T) {
+	const roomW, roomH = panelMinW - 80, panelMinH - 60
+	hs := newHarness(t, "")
+	got := hs.open(t, OpenRequest{})
+	panel := hs.panel(t)
+	hs.do(func() {
+		lay(hs.cfg.Root, roomW, roomH)
+		r, grab := treetest.Pointer(hs.cfg.Root, classed(t, panel, "file-chooser-title"), roomW, roomH)
+		drag(r, grab, widget.Point{X: grab.X + 5, Y: grab.Y + 5})
+		lay(hs.cfg.Root, roomW, roomH)
+	})
+	if p := panel.PanelRect(); p.W != roomW || p.H != roomH {
+		t.Fatalf("the panel on a %dx%d area is %v, want it squeezed to the area", roomW, roomH, p)
+	}
+	hs.do(func() { hs.c.finish(nil) })
+	answer(t, got)
+	hs.open(t, OpenRequest{})
+	hs.run(func() { lay(hs.cfg.Root, 1920, 1080) })
+	if p := hs.panel(t).PanelRect(); p.W != panelMinW || p.H != panelMinH {
+		t.Errorf("after a squeezed panel the next request opened at %v, want the %dx%d floor", p, panelMinW, panelMinH)
+	}
+}
+
+func TestLongTitleKeepsClearOfTheHeaderButtons(t *testing.T) {
+	const title = "File Upload - Kontainer : Test Kontainer — Mozilla Firefox, with a title longer than any header holds"
+	for _, mode := range []struct {
+		name    string
+		request func(hs *harness) []string
+		buttons int
+	}{
+		{name: "open", buttons: 5, request: func(hs *harness) []string {
+			return hs.c.Open(testCaller, OpenRequest{Title: title, CurrentFolder: hs.root}).URIs
+		}},
+		{name: "save", buttons: 6, request: func(hs *harness) []string {
+			return hs.c.Save(testCaller, SaveRequest{Title: title, CurrentFolder: hs.root, CurrentName: "a.txt"}).URIs
+		}},
+	} {
+		t.Run(mode.name, func(t *testing.T) {
+			hs := newHarness(t, "")
+			hs.c.size = widget.Size{W: panelMinW, H: panelMinH}
+			hs.ask(t, func() []string { return mode.request(hs) })
+			hs.run(func() {
+				panel := hs.laidOut(t)
+				if panel.W != panelMinW-2*panelBorder {
+					t.Fatalf("panel %v, want it at its %dpx floor", panel, panelMinW)
+				}
+				header := classed(t, hs.cfg.Root, "file-chooser-header").Bounds()
+				label := classed(t, hs.cfg.Root, "file-chooser-title").(*widget.Label)
+				tb := label.Bounds()
+				if tb.W <= 0 || !inside(tb, header) {
+					t.Fatalf("title at %v, want it inside the header %v", tb, header)
+				}
+				if label.CharsWithin(tb.W) >= len([]rune(title)) {
+					t.Errorf("the whole title fits its %dpx: the test never squeezed it", tb.W)
+				}
+				buttons := treetest.WithClass(hs.cfg.Root, "file-chooser-nav")
+				var inHeader int
+				for _, w := range buttons {
+					b := w.(widget.Boundser).Bounds()
+					if !inside(b, header) {
+						continue
+					}
+					inHeader++
+					if !b.Intersect(tb).Empty() {
+						t.Errorf("title at %v covers %q at %v", tb, widget.Describe(w).Name, b)
+					}
+				}
+				if inHeader != mode.buttons {
+					t.Errorf("%d header buttons, want %d", inHeader, mode.buttons)
+				}
+			})
+		})
+	}
+}
+
 // A modal request holds the keyboard; a request with modal off takes it
 // only on demand.
 func TestModalDecidesTheKeyboard(t *testing.T) {

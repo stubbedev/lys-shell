@@ -579,15 +579,19 @@ func (c *Chooser) build(r request) {
 	s := c.s
 	title, name := r.title, r.name
 
-	// Header: up, the centred title, the view toggles. The bar is the
-	// panel's drag handle.
+	// Header: up, the title, the view toggles. The bar is the panel's
+	// drag handle.
 	th := widget.Current()
 	headerRow := widget.NewBox(widget.Row, th.Spacing/4, 0)
 	headerRow.Append(c.iconButton("ld-arrow-up-symbolic", "Up", c.goUp), false)
 	if s.mode == ModeSave || s.mode.folders() {
 		headerRow.Append(c.iconButton("ld-folder-plus-symbolic", "Create Folder", c.showNewFolder), false)
 	}
-	headerRow.Append(widget.NewSpacer(0, 0), true)
+	titleLabel := widget.NewLabel(c.d.Font, widgets.TextPx(styling.Subtitle, 1), title, 0)
+	titleLabel.AddClass("file-chooser-title", css.Heading)
+	titleLabel.SetAlignment(render.AlignCenter)
+	titleLabel.SetEllipsize(widget.EllipsizeEnd)
+	headerRow.AppendAligned(titleLabel, true, widget.AlignCenter)
 	u.viewToggle, u.viewIcon = c.swappableIconButton(viewIcon(c.view.grid), "Toggle grid view", c.toggleView)
 	u.previewToggle = c.iconToggle("ld-panel-right-symbolic", "Preview pane", false, c.togglePreview)
 	u.hiddenTg = c.iconToggle("ld-eye-symbolic", "Show hidden files", c.hidden, c.toggleHidden)
@@ -596,13 +600,8 @@ func (c *Chooser) build(r request) {
 	for _, b := range []*widget.ToggleButton{u.previewToggle, u.hiddenTg, u.recursiveToggle} {
 		headerRow.Append(b, false)
 	}
-	headerStack := widget.NewOverlay()
-	headerStack.Append(headerRow)
-	titleLabel := widget.NewLabel(c.d.Font, widgets.TextPx(styling.Subtitle, 1), title, 0)
-	titleLabel.AddClass("file-chooser-title", css.Heading)
-	headerStack.AppendAligned(titleLabel, widget.AlignCenter, widget.AlignCenter)
 	header := section(widget.Column, "file-chooser-header")
-	header.Append(headerStack, false)
+	header.Append(headerRow, false)
 
 	// Path bar: breadcrumbs and the search box.
 	crumbBar := section(widget.Row, "file-chooser-crumbbar")
