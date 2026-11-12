@@ -96,6 +96,8 @@ type harness struct {
 	specs   []dialogsurface.Spec
 	windows []*fakeWindow
 	openErr error
+	// surface is what the dialogs open on.
+	surface dialogsurface.Surface
 	// focusErr fails every opened overlay's SetFocus.
 	focusErr error
 	cfg      app.LayerConfig
@@ -141,7 +143,9 @@ func newHarness(t *testing.T, viewFile string) *harness {
 			}
 			w := &fakeWindow{refuse: hs.focusErr}
 			hs.windows = append(hs.windows, w)
-			hs.opened <- s.Overlay
+			cfg := s.Layer
+			cfg.Root = s.Root(hs.surface)
+			hs.opened <- cfg
 			return w, nil
 		},
 		Invoke:    hs.invoke,
@@ -782,7 +786,7 @@ func insertText(t *testing.T, data []byte, key, value string) []byte {
 // release, not on every motion.
 func TestColumnGripResizesAndRelaysRows(t *testing.T) {
 	hs := newHarness(t, "")
-	hs.c.size = widget.Size{W: panelMaxW, H: panelMaxH}
+	hs.c.size = widget.Size{W: panelMax.W, H: panelMax.H}
 	hs.open(t, OpenRequest{})
 	const W, H = 1800, 1200
 	var grips []*columnGrip
@@ -896,7 +900,7 @@ func TestPanelFloatsOnTheOutput(t *testing.T) {
 		t.Errorf("layer anchor %v margin %+v size %dx%d, want it spanning the output", c.Anchor, c.Margin, c.Width, c.Height)
 	}
 	panel := hs.panel(t)
-	centred := render.Rect{X: (1920 - panelW) / 2, Y: (1080 - panelH) / 2, W: panelW, H: panelH}
+	centred := render.Rect{X: (1920 - panelSize.W) / 2, Y: (1080 - panelSize.H) / 2, W: panelSize.W, H: panelSize.H}
 	var r *widget.Router
 	var grab, up widget.Point
 	hs.run(func() {
@@ -947,7 +951,7 @@ func TestPanelFloatsOnTheOutput(t *testing.T) {
 	target = dp2
 	hs.open(t, OpenRequest{})
 	hs.run(func() { lay(hs.cfg.Root, 2560, 1440) })
-	if want := (render.Rect{X: (2560 - panelW) / 2, Y: (1440 - panelH) / 2, W: panelW, H: panelH}); hs.cfg.Output != dp2 || hs.panel(t).PanelRect() != want {
+	if want := (render.Rect{X: (2560 - panelSize.W) / 2, Y: (1440 - panelSize.H) / 2, W: panelSize.W, H: panelSize.H}); hs.cfg.Output != dp2 || hs.panel(t).PanelRect() != want {
 		t.Errorf("on another output: %v at %v, want DP-2 at %v", hs.cfg.Output, hs.panel(t).PanelRect(), want)
 	}
 }
@@ -971,17 +975,17 @@ func TestPanelSizeIsLimitedAndKept(t *testing.T) {
 		return p
 	}
 	from := resize(5000, 5000)
-	if p := panel.PanelRect(); p != (render.Rect{X: from.X, Y: from.Y, W: panelMaxW, H: panelMaxH}) {
-		t.Errorf("grown to %v from %v, want the %dx%d ceiling at the same corner", p, from, panelMaxW, panelMaxH)
+	if p := panel.PanelRect(); p != (render.Rect{X: from.X, Y: from.Y, W: panelMax.W, H: panelMax.H}) {
+		t.Errorf("grown to %v from %v, want the %dx%d ceiling at the same corner", p, from, panelMax.W, panelMax.H)
 	}
 	resize(-5000, -5000)
-	if p := panel.PanelRect(); p != (render.Rect{X: from.X, Y: from.Y, W: panelMinW, H: panelMinH}) {
-		t.Errorf("shrunk to %v from %v, want the %dx%d floor at the same corner", p, from, panelMinW, panelMinH)
+	if p := panel.PanelRect(); p != (render.Rect{X: from.X, Y: from.Y, W: panelMin.W, H: panelMin.H}) {
+		t.Errorf("shrunk to %v from %v, want the %dx%d floor at the same corner", p, from, panelMin.W, panelMin.H)
 	}
 	resize(100, 60)
 	kept := panel.PanelRect()
-	if kept.W != panelMinW+100 || kept.H != panelMinH+60 {
-		t.Fatalf("resized to %v, want %dx%d", kept, panelMinW+100, panelMinH+60)
+	if kept.W != panelMin.W+100 || kept.H != panelMin.H+60 {
+		t.Fatalf("resized to %v, want %dx%d", kept, panelMin.W+100, panelMin.H+60)
 	}
 	hs.do(func() { hs.c.finish(nil) })
 	answer(t, got)
@@ -997,31 +1001,67 @@ func TestPanelOpensAtItsDefaultSize(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.open(t, OpenRequest{})
 	hs.run(func() { lay(hs.cfg.Root, 1920, 1080) })
-	if p := hs.panel(t).PanelRect(); p != (render.Rect{X: (1920 - panelW) / 2, Y: (1080 - panelH) / 2, W: panelW, H: panelH}) {
-		t.Errorf("a new chooser opened at %v, want %dx%d centred", p, panelW, panelH)
+	if p := hs.panel(t).PanelRect(); p != (render.Rect{X: (1920 - panelSize.W) / 2, Y: (1080 - panelSize.H) / 2, W: panelSize.W, H: panelSize.H}) {
+		t.Errorf("a new chooser opened at %v, want %dx%d centred", p, panelSize.W, panelSize.H)
 	}
 }
 
-func TestPanelSqueezedBelowItsFloorOpensAtTheFloor(t *testing.T) {
-	const roomW, roomH = panelMinW - 80, panelMinH - 60
+// A panel squeezed by a small output, moved there, opens the next
+// request at the size it was chosen at, not the size it was squeezed
+// to.
+func TestASqueezedPanelKeepsTheSizeItWasChosenAt(t *testing.T) {
+	for name, room := range map[string]widget.Size{
+		"below its floor":        {W: panelMin.W - 80, H: panelMin.H - 60},
+		"below its default size": {W: panelSize.W - 60, H: panelSize.H - 40},
+	} {
+		t.Run(name, func(t *testing.T) {
+			hs := newHarness(t, "")
+			got := hs.open(t, OpenRequest{})
+			panel := hs.panel(t)
+			hs.do(func() {
+				lay(hs.cfg.Root, room.W, room.H)
+				r, grab := treetest.Pointer(hs.cfg.Root, classed(t, panel, "file-chooser-title"), room.W, room.H)
+				drag(r, grab, widget.Point{X: grab.X + 5, Y: grab.Y + 5})
+				lay(hs.cfg.Root, room.W, room.H)
+			})
+			if p := panel.PanelRect(); p.W != room.W || p.H != room.H {
+				t.Fatalf("the panel on a %v area is %v, want it squeezed to the area", room, p)
+			}
+			hs.do(func() { hs.c.finish(nil) })
+			answer(t, got)
+			hs.open(t, OpenRequest{})
+			hs.run(func() { lay(hs.cfg.Root, 1920, 1080) })
+			if p := hs.panel(t).PanelRect(); p.W != panelSize.W || p.H != panelSize.H {
+				t.Errorf("after a squeezed panel the next request opened at %v, want the %v it was chosen at", p, panelSize)
+			}
+		})
+	}
+}
+
+// A panel the user shrinks by its grip on a small output opens the
+// next request at the size it was shrunk to.
+func TestAPanelShrunkOnASmallOutputKeepsThatSize(t *testing.T) {
+	room := widget.Size{W: panelSize.W - 60, H: panelSize.H - 40}
+	shrunk := widget.Size{W: room.W - 30, H: room.H - 20}
 	hs := newHarness(t, "")
 	got := hs.open(t, OpenRequest{})
 	panel := hs.panel(t)
 	hs.do(func() {
-		lay(hs.cfg.Root, roomW, roomH)
-		r, grab := treetest.Pointer(hs.cfg.Root, classed(t, panel, "file-chooser-title"), roomW, roomH)
-		drag(r, grab, widget.Point{X: grab.X + 5, Y: grab.Y + 5})
-		lay(hs.cfg.Root, roomW, roomH)
+		lay(hs.cfg.Root, room.W, room.H)
+		p := panel.PanelRect()
+		corner := widget.Point{X: p.X + p.W - 4, Y: p.Y + p.H - 4}
+		drag(&widget.Router{Root: hs.cfg.Root}, corner, widget.Point{X: corner.X - (room.W - shrunk.W), Y: corner.Y - (room.H - shrunk.H)})
+		lay(hs.cfg.Root, room.W, room.H)
 	})
-	if p := panel.PanelRect(); p.W != roomW || p.H != roomH {
-		t.Fatalf("the panel on a %dx%d area is %v, want it squeezed to the area", roomW, roomH, p)
+	if p := panel.PanelRect(); p.W != shrunk.W || p.H != shrunk.H {
+		t.Fatalf("the panel on a %v area shrunk to %v, want %v", room, p, shrunk)
 	}
 	hs.do(func() { hs.c.finish(nil) })
 	answer(t, got)
 	hs.open(t, OpenRequest{})
 	hs.run(func() { lay(hs.cfg.Root, 1920, 1080) })
-	if p := hs.panel(t).PanelRect(); p.W != panelMinW || p.H != panelMinH {
-		t.Errorf("after a squeezed panel the next request opened at %v, want the %dx%d floor", p, panelMinW, panelMinH)
+	if p := hs.panel(t).PanelRect(); p.W != shrunk.W || p.H != shrunk.H {
+		t.Errorf("the next request opened at %v, want the %v it was shrunk to", p, shrunk)
 	}
 }
 
@@ -1041,12 +1081,12 @@ func TestLongTitleKeepsClearOfTheHeaderButtons(t *testing.T) {
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			hs := newHarness(t, "")
-			hs.c.size = widget.Size{W: panelMinW, H: panelMinH}
+			hs.c.size = widget.Size{W: panelMin.W, H: panelMin.H}
 			hs.ask(t, func() []string { return mode.request(hs) })
 			hs.run(func() {
 				panel := hs.laidOut(t)
-				if panel.W != panelMinW-2*panelBorder {
-					t.Fatalf("panel %v, want it at its %dpx floor", panel, panelMinW)
+				if panel.W != panelMin.W-2*panelBorder {
+					t.Fatalf("panel %v, want it at its %dpx floor", panel, panelMin.W)
 				}
 				header := classed(t, hs.cfg.Root, "file-chooser-header").Bounds()
 				label := classed(t, hs.cfg.Root, "file-chooser-title").(*widget.Label)

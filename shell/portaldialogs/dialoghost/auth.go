@@ -84,7 +84,7 @@ func (h *Dialogs) authStep(c portaldialogs.Caller, r portaldialogs.AuthRequest, 
 }
 
 // build makes the dialog's widgets, filled by step.
-func (a *authDialog) build() widget.Widget {
+func (a *authDialog) build() *widget.Card {
 	h := a.h
 	a.message = h.label("", "portal-dialog-auth-message")
 	a.details = widget.NewBox(widget.Column, 0, 0)

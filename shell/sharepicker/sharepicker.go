@@ -1,6 +1,6 @@
 // Package sharepicker is the screencast source picker
 // (crates/lys-shell/src/shell/share_picker) the portal pops over
-// dev.stubbe.lys.SharePicker1: a layer surface with Windows, Outputs, Region
+// dev.stubbe.lys.SharePicker1: a dialog with Windows, Outputs, Region
 // and, where the compositor offers its cast target, Dynamic pages. A card
 // or region confirms at once in single-select
 // mode; in multi-select mode cards toggle into a pending set the Share
@@ -106,7 +106,7 @@ type Picker struct {
 	allowToken   bool
 	multiple     bool
 	pending      []string
-	root         widget.Widget
+	surface      *widget.Card
 	nb           *widget.Notebook
 	pages        []string
 	choices      map[string][]widget.Widget
@@ -303,13 +303,12 @@ func compositorOutputs() []outputInfo {
 
 // open builds and maps the surface.
 func (p *Picker) open(toplevels []sharepreview.Toplevel, sources Sources, read outputsRead) {
-	p.root = p.build(toplevels, sources, read)
+	p.surface = p.build(toplevels, sources, read)
 	if err := p.mapSurface(); err != nil {
 		log.Printf("share picker: %v", err)
 		p.answer("")
 		return
 	}
-	reveal.Show(p.rev, p.anims, config.AnimSharePicker)
 	p.focusPage(p.nb.SelectedTab())
 }
 
@@ -335,34 +334,49 @@ func (p *Picker) px(s config.Size, baseRem float64) int {
 	return int(s.ResolvePx(baseRem*styling.RemBase, p.scale))
 }
 
-func (p *Picker) width() int  { return p.px(p.cfg.Width, config.SharePickerWidthBaseRem) }
-func (p *Picker) height() int { return p.px(p.cfg.Height, config.SharePickerHeightBaseRem) }
+// size is the card's configured size: its floor on either surface,
+// and the size a window opens at.
+func (p *Picker) size() widget.Size {
+	return widget.Size{W: p.px(p.cfg.Width, config.SharePickerWidthBaseRem), H: p.px(p.cfg.Height, config.SharePickerHeightBaseRem)}
+}
+
 func (p *Picker) widgetSize() int {
 	return p.px(p.cfg.WidgetSize, config.SharePickerWidgetBaseRem)
 }
 
+// title names the picker: its card's title and its window's.
+const title = "Share your screen"
+
 // mapSurface maps the picker for the request's window, or as an
-// overlay: unanchored (centered by the compositor) and sized by the
-// surface's size request.
+// overlay.
 func (p *Picker) mapSurface() error {
-	layer, err := dialogsurface.Open(p.app, dialogsurface.Spec{
-		Caller: p.caller, Title: "Share your screen",
-		Overlay: app.LayerConfig{
-			Layer:         app.LayerOverlay,
-			ExclusiveZone: -1,
-			Keyboard:      app.KeyboardExclusive,
-			Namespace:     "lys-shell-share-picker",
-			Root:          p.root,
-			OnKey:         keys.OnKey(p.app.KeySym, p.key),
-			OnPresented:   p.presented,
-		},
-		Failed: func() { p.answer("") },
-	})
+	layer, err := dialogsurface.Open(p.app, p.spec())
 	if err != nil {
 		return err
 	}
 	p.layer = layer
 	return nil
+}
+
+// spec is the picker as a dialog: as an overlay unanchored (centered by
+// the compositor) and sized by the card's size request; as a window
+// opening at that size and growing from it.
+func (p *Picker) spec() dialogsurface.Spec {
+	size := p.size()
+	return dialogsurface.Spec{
+		Caller: p.caller, Title: title,
+		Root: p.root,
+		Layer: app.LayerConfig{
+			Layer:         app.LayerOverlay,
+			ExclusiveZone: -1,
+			Keyboard:      app.KeyboardExclusive,
+			Namespace:     "lys-shell-share-picker",
+			OnKey:         keys.OnKey(p.app.KeySym, p.key),
+			OnPresented:   p.presented,
+		},
+		Window: dialogsurface.WindowSize{Initial: size, Min: size},
+		Failed: func() { p.answer("") },
+	}
 }
 
 // key handles the picker's own keys after the widgets had theirs:
@@ -430,6 +444,14 @@ func (p *Picker) moveFocus(r *widget.Router, dir direction) {
 	if err := r.SetFocus(choices[next]); err != nil {
 		log.Printf("share picker: move the focus: %v", err)
 	}
+}
+
+// root is the tree around the card on s, its entry playing.
+func (p *Picker) root(s dialogsurface.Surface) widget.Widget {
+	root, rev := dialogsurface.CardRoot(s, p.surface, "share-picker-window", p.d.Sheet)
+	p.rev = rev
+	reveal.Show(rev, p.anims, config.AnimSharePicker)
+	return root
 }
 
 // hide unmaps the surface at once (the Region page steps aside while
@@ -527,19 +549,19 @@ func regionPayload(sel regionoverlay.Selection) string {
 	return Target{Kind: TargetRegion, Name: sel.Output, X: intconv.Clamp[int32](sel.X), Y: intconv.Clamp[int32](sel.Y), Width: intconv.Clamp[int32](sel.Width), Height: intconv.Clamp[int32](sel.Height)}.Payload()
 }
 
-// build assembles the surface (the view!):
+// build assembles the card p.root puts on each surface (the view!):
 //
-//	window.background.share-picker-window
-//	└ revealer
-//	  └ box.share-picker-surface (vertical, the configured size request)
-//	    ├ notebook.share-picker-notebook (the pages of the sources
-//	    │   offered: Windows, Outputs, Region, Dynamic)
-//	    ├ checkbutton.share-picker-restore-button > label
-//	    └ button.share-picker-confirm-button (multi-select only)
+//	card.share-picker-surface (the configured size request)
+//	├ header: the title over the requester
+//	└ content (vertical)
+//	  ├ notebook.share-picker-notebook (the pages of the sources
+//	  │   offered: Windows, Outputs, Region, Dynamic)
+//	  ├ checkbutton.share-picker-restore-button > label
+//	  └ button.share-picker-confirm-button (multi-select only)
 //
 // The configured default page opens when it is offered, else the first
 // page offered.
-func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources, read outputsRead) widget.Widget {
+func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources, read outputsRead) *widget.Card {
 	nb := widget.NewNotebook(p.d.Font)
 	nb.AddClass("share-picker-notebook")
 	nb.SetVExpand(true)
@@ -571,16 +593,8 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources, read 
 	nb.SelectTab(wanted)
 	nb.OnSelect = p.focusPage
 	p.pages = pages
-	th := widget.Current()
-	surface := widget.NewBox(widget.Column, 2*th.Spacing, 3*th.Padding)
-	surface.AddClass(css.Card, "share-picker-surface")
-	surface.SetSizeRequest(p.width(), p.height())
-	if p.requester != "" {
-		requester := p.label(p.requester)
-		requester.AddClass("share-picker-requester", css.Heading)
-		surface.Append(requester, false)
-	}
-	surface.Append(nb, true)
+	content := widget.NewBox(widget.Column, 2*widget.Current().Spacing, 0)
+	content.Append(nb, true)
 	if !p.cfg.HideTokenRestore {
 		check := widget.NewCheckButton(p.allowToken)
 		check.AddClass("share-picker-restore-button")
@@ -588,7 +602,7 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources, read 
 		hint.AddClass(css.DimLabel)
 		check.SetChild(hint)
 		check.OnChanged = func(on bool) { p.allowToken = on }
-		surface.Append(check, false)
+		content.Append(check, false)
 	}
 	p.confirm, p.confirmLbl = nil, nil
 	if p.multiple {
@@ -598,17 +612,15 @@ func (p *Picker) build(toplevels []sharepreview.Toplevel, sources Sources, read 
 		p.confirm.AddClass(css.SuggestedAction, "share-picker-confirm-button")
 		p.confirm.SetEnabled(false)
 		p.confirm.OnClick = p.confirmPending
-		surface.Append(p.confirm, false)
+		content.Append(p.confirm, false)
 	}
-	p.rev = widget.NewRevealer(surface)
-	root := widget.NewBox(widget.Column, 0, 0)
-	root.SetElement("window")
-	root.AddClass("background", "share-picker-window")
-	if p.d.Sheet != nil {
-		root.AttachStylesheet(p.d.Sheet)
-	}
-	root.Append(p.rev, true)
-	return root
+	card := widget.NewCard(p.d.Font, title)
+	card.AddClass("share-picker-surface")
+	card.SetDescription(p.requester)
+	card.SetContent(content)
+	size := p.size()
+	card.SetSizeRequest(size.W, size.H)
+	return card
 }
 
 // label is a line at the body size, scaled.

@@ -19,8 +19,10 @@ import (
 
 	"github.com/stubbedev/lys-desktop/service/lyswm"
 	"github.com/stubbedev/lys-desktop/service/lyswm/lyswmtest"
+	"github.com/stubbedev/lys-lib/render"
 	"github.com/stubbedev/lys-lib/wmipc"
 	"github.com/stubbedev/lys-ui/app"
+	"github.com/stubbedev/lys-ui/widget"
 
 	"github.com/stubbedev/lys-shell/internal/apptest"
 	"github.com/stubbedev/lys-shell/internal/toplevels"
@@ -221,6 +223,21 @@ func (r *Rig) CloseOwner(t *testing.T) {
 	r.AwaitNoToplevel(t, OwnerAppID)
 }
 
+// ResizeBy has lys-wm resize the window of appID by dx and dy as the
+// user would: focused, then grown or shrunk by its keyboard binding.
+func (r *Rig) ResizeBy(t *testing.T, appID string, dx, dy int) {
+	t.Helper()
+	w, err := lysWMWindow(appID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, cmd := range []string{"focuswindow " + strconv.FormatUint(w.ID, 10), fmt.Sprintf("resizeactive %d %d", dx, dy)} {
+		if err := lyswm.Dispatch(cmd); err != nil {
+			t.Fatalf("lys-wm %q: %v", cmd, err)
+		}
+	}
+}
+
 // MapOther maps one more app window in a process of its own, asks
 // lys-wm to focus it as the user would, and returns whether it holds
 // the keyboard focus.
@@ -250,4 +267,18 @@ func (r *Rig) AwaitOtherFocused(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+// CornerAlphas lays root out at its natural size, paints it, and
+// returns the alpha of its four corner pixels, top left first and
+// clockwise: all opaque for a dialog filling its window, translucent
+// where a floating card rounds off over its shadow.
+func CornerAlphas(root widget.Widget) [4]byte {
+	size := widget.SizeWithin(root, widget.Size{W: 4096, H: 4096})
+	stride := render.Stride(size.W)
+	px := make([]byte, stride*size.H)
+	root.Arrange(render.Rect{W: size.W, H: size.H})
+	root.Paint(render.New(px, stride, size.W, size.H))
+	alpha := func(x, y int) byte { return px[y*stride+x*4+3] }
+	return [4]byte{alpha(0, 0), alpha(size.W-1, 0), alpha(size.W-1, size.H-1), alpha(0, size.H-1)}
 }

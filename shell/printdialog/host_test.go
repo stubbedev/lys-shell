@@ -105,7 +105,7 @@ func newHarness(t *testing.T) *harness {
 			hs.mu.Lock()
 			hs.specs = append(hs.specs, s)
 			hs.mu.Unlock()
-			hs.opened <- s.Overlay
+			hs.opened <- s.LayerConfig()
 			return &fakeWindow{}, nil
 		},
 		Invoke:       hs.do,

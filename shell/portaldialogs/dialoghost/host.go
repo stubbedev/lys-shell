@@ -120,7 +120,7 @@ func New(d Deps) *Dialogs {
 }
 
 // ask shows a dialog for c on the loop and waits for its answer.
-func (h *Dialogs) ask(c portaldialogs.Caller, build func(answer func(bool, string)) widget.Widget) (bool, string) {
+func (h *Dialogs) ask(c portaldialogs.Caller, build func(answer func(bool, string)) *widget.Card) (bool, string) {
 	type result struct {
 		ok     bool
 		choice string
@@ -166,7 +166,7 @@ func (h *Dialogs) finish(ok bool, choice string) {
 // title, the subtitle and body below it.
 func (h *Dialogs) Access(c portaldialogs.Caller, r portaldialogs.AccessRequest) (bool, []portaldialogs.Selection) {
 	var picked []portaldialogs.Selection
-	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+	ok, _ := h.ask(c, func(answer func(bool, string)) *widget.Card {
 		detail := strings.Join(nonEmpty(r.Subtitle, r.Body), "\n")
 		rows, collect := widgets.ChoiceRows(h.d.Font, r.Choices, "portal-dialog-choice")
 		grant := func(ok bool, s string) {
@@ -186,7 +186,7 @@ func (h *Dialogs) Access(c portaldialogs.Caller, r portaldialogs.AccessRequest) 
 // Account asks to share the user's name and avatar, previewing it.
 func (h *Dialogs) Account(c portaldialogs.Caller, reason string, info portaldialogs.AccountInfo) (bool, portaldialogs.AccountInfo) {
 	shared := info
-	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+	ok, _ := h.ask(c, func(answer func(bool, string)) *widget.Card {
 		if reason == "" {
 			reason = "An application is requesting your name and avatar."
 		}
@@ -239,7 +239,7 @@ func (h *Dialogs) Account(c portaldialogs.Caller, reason string, info portaldial
 // submits.
 func (h *Dialogs) Password(c portaldialogs.Caller, r portaldialogs.PasswordRequest) (bool, string, []portaldialogs.Selection) {
 	var picked []portaldialogs.Selection
-	ok, password := h.ask(c, func(answer func(bool, string)) widget.Widget {
+	ok, password := h.ask(c, func(answer func(bool, string)) *widget.Card {
 		entry := h.passwordEntry("Password")
 		rows := []widget.Widget{entry}
 		var again *widget.Entry
@@ -297,7 +297,7 @@ func (h *Dialogs) passwordEntry(placeholder string) *widget.Entry {
 
 // ConfirmWallpaper previews a file:// image before it is set.
 func (h *Dialogs) ConfirmWallpaper(c portaldialogs.Caller, uri string) bool {
-	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+	ok, _ := h.ask(c, func(answer func(bool, string)) *widget.Card {
 		path, _ := fileuri.Path(uri)
 		return h.confirm(answer, h.headerFile(path, wallpaperPx), "Set as wallpaper?", "", "Cancel", "Set wallpaper")
 	})
@@ -308,7 +308,7 @@ func (h *Dialogs) ConfirmWallpaper(c portaldialogs.Caller, uri string) bool {
 // button per device, all checked, naming it and the access asked for.
 func (h *Dialogs) ChooseDevices(c portaldialogs.Caller, devices []portaldialogs.Device) (bool, []string) {
 	picked := []string{}
-	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+	ok, _ := h.ask(c, func(answer func(bool, string)) *widget.Card {
 		checks := make([]*widget.CheckButton, len(devices))
 		rows := make([]widget.Widget, len(devices))
 		for i, d := range devices {
@@ -347,7 +347,7 @@ func (h *Dialogs) ChooseDevices(c portaldialogs.Caller, devices []portaldialogs.
 // user records. Saving answers the trigger each row was left with.
 func (h *Dialogs) BindShortcuts(c portaldialogs.Caller, r portaldialogs.ShortcutsRequest) (bool, []portaldialogs.ShortcutTrigger) {
 	var triggers []portaldialogs.ShortcutTrigger
-	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+	ok, _ := h.ask(c, func(answer func(bool, string)) *widget.Card {
 		recorders := make([]*widget.ShortcutRecorder, len(r.Rows))
 		rows := make([]widget.Widget, len(r.Rows))
 		for i, row := range r.Rows {
@@ -391,7 +391,7 @@ func (h *Dialogs) BindShortcuts(c portaldialogs.Caller, r portaldialogs.Shortcut
 // name installs under the default one.
 func (h *Dialogs) ConfirmInstall(c portaldialogs.Caller, r portaldialogs.LauncherRequest) (bool, string) {
 	chosen := r.Name
-	ok, _ := h.ask(c, func(answer func(bool, string)) widget.Widget {
+	ok, _ := h.ask(c, func(answer func(bool, string)) *widget.Card {
 		var extra []widget.Widget
 		title := "Install “" + r.Name + "”?"
 		var entry *widget.Entry
@@ -431,7 +431,7 @@ func (h *Dialogs) ChooseApplication(c portaldialogs.Caller, r portaldialogs.Choo
 		h.d.Invoke(func() { h.choosers[c.Handle] = ac })
 		defer h.d.Invoke(func() { delete(h.choosers, c.Handle) })
 	}
-	_, choice := h.ask(c, func(answer func(bool, string)) widget.Widget { return h.chooser(answer, ac) })
+	_, choice := h.ask(c, func(answer func(bool, string)) *widget.Card { return h.chooser(answer, ac) })
 	return choice
 }
 
@@ -528,7 +528,7 @@ func (h *Dialogs) requester() widget.Widget {
 // surface is the dialog card: the title over the muted body ("" for
 // none) with the requester at the header's end, the rows as its content
 // and the buttons in its footer.
-func (h *Dialogs) surface(title, body string, rows []widget.Widget, buttons ...*widget.Button) widget.Widget {
+func (h *Dialogs) surface(title, body string, rows []widget.Widget, buttons ...*widget.Button) *widget.Card {
 	card := widgets.DialogCard(h.d.Font, title, "portal-dialog-surface", surfaceWidth)
 	card.SetDescription(body)
 	card.SetAction(h.requester())
@@ -542,7 +542,7 @@ func (h *Dialogs) surface(title, body string, rows []widget.Widget, buttons ...*
 }
 
 // confirm is a yes/no dialog.
-func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title, body, cancel, confirm string, extra ...widget.Widget) widget.Widget {
+func (h *Dialogs) confirm(answer func(bool, string), header widget.Widget, title, body, cancel, confirm string, extra ...widget.Widget) *widget.Card {
 	var rows []widget.Widget
 	if header != nil {
 		rows = append(rows, widgets.Center(header))
@@ -565,7 +565,7 @@ func (h *Dialogs) accept(text string, onClick func()) *widget.Button {
 // the last choice selected; activating one answers its app id. The
 // search hides the rows whose name lacks the query (the list's filter,
 // as set_filter_func does).
-func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) widget.Widget {
+func (h *Dialogs) chooser(answer func(bool, string), ac *appChooser) *widget.Card {
 	contentType := ac.req.ContentType
 	list := widget.NewListBox()
 	list.AddClass("portal-dialog-app-list")
@@ -662,23 +662,12 @@ func (h *Dialogs) appRow(a desktopentry.App) widget.Widget {
 	return row
 }
 
-// show maps the overlay with tree and plays the entry.
-func (h *Dialogs) show(caller portaldialogs.Caller, tree widget.Widget) {
+// show maps card and plays its entry.
+func (h *Dialogs) show(caller portaldialogs.Caller, card *widget.Card) {
 	if h.win != nil {
 		h.win.Close()
 		h.win, h.closing = nil, false
 	}
-	cfg := h.d.Config()
-	// window.portal-dialog-window > revealer > the surface, on an
-	// unanchored layer the compositor centers, sized to its content.
-	h.rev = widget.NewRevealer(tree)
-	root := widget.NewBox(widget.Column, 0, 0)
-	root.SetElement("window")
-	root.AddClass("portal-dialog-window")
-	if h.d.Sheet != nil {
-		root.AttachStylesheet(h.d.Sheet)
-	}
-	root.Append(h.rev, true)
 	focus, grab := h.focus, h.grab
 	h.focus, h.grab = nil, false
 	keyboard := app.KeyboardOnDemand
@@ -687,12 +676,17 @@ func (h *Dialogs) show(caller portaldialogs.Caller, tree widget.Widget) {
 	}
 	win, err := h.d.Open(dialogsurface.Spec{
 		Caller: caller, Title: h.app,
-		Overlay: app.LayerConfig{
+		Root: func(s dialogsurface.Surface) widget.Widget {
+			root, rev := dialogsurface.CardRoot(s, card, "portal-dialog-window", h.d.Sheet)
+			h.rev = rev
+			reveal.Show(rev, h.d.Config().Animations, config.AnimDialog)
+			return root
+		},
+		Layer: app.LayerConfig{
 			Layer:         app.LayerOverlay,
 			ExclusiveZone: -1,
 			Keyboard:      keyboard,
 			Namespace:     "lys-shell-portal-dialog",
-			Root:          root,
 			OnKey:         keys.OnEscape(h.d.KeySym, func() { h.escape() }),
 		},
 		Failed: func() { h.finish(false, "") },
@@ -703,7 +697,6 @@ func (h *Dialogs) show(caller portaldialogs.Caller, tree widget.Widget) {
 		return
 	}
 	h.win = win
-	reveal.Show(h.rev, cfg.Animations, config.AnimDialog)
 	if focus != nil {
 		if err := win.SetFocus(focus); err != nil {
 			log.Printf("portal dialogs: cannot focus the entry: %v", err)

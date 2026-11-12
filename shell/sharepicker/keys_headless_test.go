@@ -67,7 +67,7 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 	answers := make(chan string, 1)
 	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/keys"}, r) }()
 	apptest.Until(t, a, "the picker holds the keyboard, laid out", func() bool {
-		if p.layer == nil || a.Session().KeyboardFocus() != p.layer.HostSurface() || !treetest.Contains(p.root, a.Focused()) {
+		if p.layer == nil || a.Session().KeyboardFocus() != p.layer.HostSurface() || !treetest.Contains(p.surface, a.Focused()) {
 			return false
 		}
 		choices := p.choices[p.nb.SelectedTab()]
@@ -242,7 +242,7 @@ func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 // widget invalidates and no frame is drawn while nothing changes.
 func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
 	k := keyPicker(t, config.SharePickerWindows, Request{Sources: AllSources})
-	spinners := apptest.On(k.a, func() []*widget.Spinner { return treetest.All[*widget.Spinner](k.p.root) })
+	spinners := apptest.On(k.a, func() []*widget.Spinner { return treetest.All[*widget.Spinner](k.p.surface) })
 	if len(spinners) != len(fiveWindows) {
 		t.Fatalf("%d spinners, want one per window card (%d)", len(spinners), len(fiveWindows))
 	}
@@ -250,7 +250,7 @@ func TestHeadlessIdlePickerDrawsNothing(t *testing.T) {
 		return !slices.ContainsFunc(spinners, func(s *widget.Spinner) bool { return s.Visible() }) && k.p.loadingCards() == 0
 	})
 	widget.WaitAssetLoads()
-	apptest.Drawn(t, k.a, k.p.layer.HostSurface(), k.p.root.(interface{ Invalidate() }).Invalidate)
+	apptest.Drawn(t, k.a, k.p.layer.HostSurface(), k.p.surface.Invalidate)
 	before := k.idleState()
 	time.Sleep(idleWindow)
 	if after := k.idleState(); after.damage != before.damage || after.walks != before.walks {
@@ -275,7 +275,7 @@ func (k *keyRig) idleState() idleState {
 			damage:          widget.DamageGeneration(),
 			walks:           widget.DamageWalks(),
 			pickerCallbacks: k.callbacks.Load(),
-			assetsOwed:      widget.TreeAssetsOwed(k.p.root),
+			assetsOwed:      widget.TreeAssetsOwed(k.p.surface),
 			loadingCards:    k.p.loadingCards(),
 			focus:           fmt.Sprintf("%T %q", focused, widget.Describe(focused).Name),
 			keyboardHeld:    k.a.Session().KeyboardFocus() == k.p.layer.HostSurface(),
@@ -314,7 +314,7 @@ func TestHeadlessTallPreviewKeepsItsCardsTitle(t *testing.T) {
 	go func() { answers <- p.Pick(portaldialogs.Caller{Handle: "/r/tall"}, Request{Sources: AllSources}) }()
 	apptest.Answer(t, "the picker presented", presented)
 	apptest.Until(t, a, "every preview landed and laid out", func() bool {
-		return int(landed.Load()) == len(shapes) && len(treetest.WithClass(p.root, "share-picker-card-loading")) == 0 && p.laidOutPreviews() == len(shapes)
+		return int(landed.Load()) == len(shapes) && len(treetest.WithClass(p.surface, "share-picker-card-loading")) == 0 && p.laidOutPreviews() == len(shapes)
 	})
 	cards := apptest.On(a, func() []cardLayout { return p.windowCardLayouts() })
 	if len(cards) != len(shapes) {
@@ -356,7 +356,7 @@ func boundsOf(w widget.Widget) rect { return rect(w.(widget.Boundser).Bounds()) 
 // laidOutPreviews counts the window previews with a box and a picture.
 func (p *Picker) laidOutPreviews() int {
 	n := 0
-	for _, im := range treetest.WithClass(p.root, "share-picker-image") {
+	for _, im := range treetest.WithClass(p.surface, "share-picker-image") {
 		if b := boundsOf(im); b.W > 0 && b.H > 0 {
 			n++
 		}
@@ -366,9 +366,9 @@ func (p *Picker) laidOutPreviews() int {
 
 // windowCardLayouts reads the open page's window cards.
 func (p *Picker) windowCardLayouts() []cardLayout {
-	page := treetest.WithClass(p.root, "share-picker-page")
+	page := treetest.WithClass(p.surface, "share-picker-page")
 	var out []cardLayout
-	for _, button := range treetest.WithClass(p.root, "share-picker-window-button") {
+	for _, button := range treetest.WithClass(p.surface, "share-picker-window-button") {
 		out = append(out, cardLayout{
 			page:    boundsOf(page[0]),
 			card:    boundsOf(treetest.WithClass(button, "share-picker-card")[0]),

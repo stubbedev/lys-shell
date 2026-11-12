@@ -58,7 +58,7 @@ func newGTKPrintRig(t *testing.T) *gtkPrintRig {
 	dialog := printdialog.New(printdialog.Deps{
 		Config: func() *config.Config { return cfg },
 		Open: func(s dialogsurface.Spec) (printdialog.Window, error) {
-			g.opened <- s.Overlay.Root
+			g.opened <- s.LayerConfig().Root
 			return gtkWindow{}, nil
 		},
 		Invoke: func(fn func()) {

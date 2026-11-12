@@ -62,11 +62,16 @@ func TestHeadlessShortcutsEditorRecordsAKeyboardChord(t *testing.T) {
 	a := apptest.Run(t)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
-	opened := make(chan dialogsurface.Spec, 1)
+	opened := make(chan widget.Widget, 1)
 	h := New(Deps{
 		Config: func() *config.Config { return cfg },
 		Open: func(s dialogsurface.Spec) (Window, error) {
-			opened <- s
+			build := s.Root
+			s.Root = func(surface dialogsurface.Surface) widget.Widget {
+				root := build(surface)
+				opened <- root
+				return root
+			}
 			return dialogsurface.Open(a, s)
 		},
 		Invoke:   a.Invoke,
@@ -87,12 +92,12 @@ func TestHeadlessShortcutsEditorRecordsAKeyboardChord(t *testing.T) {
 		})
 		answers <- answer{ok, triggers}
 	}()
-	spec := apptest.Answer(t, "the editor opening", opened)
+	root := apptest.Answer(t, "the editor opening", opened)
 	kb := keytest.Dial(t, a)
 	keytest.AwaitFocus(t, a)
 	var rec *widget.ShortcutRecorder
 	apptest.Until(t, a, "the recorder", func() bool {
-		recs := treetest.All[*widget.ShortcutRecorder](spec.Overlay.Root)
+		recs := treetest.All[*widget.ShortcutRecorder](root)
 		if len(recs) == 1 {
 			rec = recs[0]
 		}
@@ -109,7 +114,7 @@ func TestHeadlessShortcutsEditorRecordsAKeyboardChord(t *testing.T) {
 	}
 	apptest.Until(t, a, "the chord recorded", func() bool { return !rec.Recording() && rec.Accel() == "Ctrl+Alt+L" })
 	apptest.Never(t, "the dialog answering on the chord", answers)
-	a.Invoke(func() { treetest.Button(t, spec.Overlay.Root, "Save").OnClick() })
+	a.Invoke(func() { treetest.Button(t, root, "Save").OnClick() })
 	got := apptest.Answer(t, "the editor after Save", answers)
 	if want := []portaldialogs.ShortcutTrigger{{ID: "shot", Trigger: "Ctrl+Alt+L"}}; !got.ok || !slices.Equal(got.triggers, want) {
 		t.Errorf("saved %+v, want %+v", got, want)

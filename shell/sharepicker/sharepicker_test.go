@@ -12,7 +12,6 @@ import (
 	"github.com/stubbedev/lys-desktop/config"
 	"github.com/stubbedev/lys-desktop/i18n"
 	"github.com/stubbedev/lys-desktop/shell/apptheme"
-	"github.com/stubbedev/lys-desktop/shell/reveal"
 	"github.com/stubbedev/lys-desktop/shell/treetest"
 	"github.com/stubbedev/lys-desktop/styling"
 	"github.com/stubbedev/lys-lib/capture"
@@ -23,6 +22,7 @@ import (
 	"github.com/stubbedev/lys-ui/widget/css"
 
 	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/shell/dialogsurface"
 	"github.com/stubbedev/lys-shell/shell/regionoverlay"
 )
 
@@ -49,7 +49,7 @@ func testPicker(t *testing.T, cfg config.SharePickerConfig, allowToken, multiple
 	p.queue.Enqueue("/r/test", func() {}, func() {})
 	p.reply, p.allowToken, p.multiple = ch, allowToken, multiple
 	p.previews, p.endPreviews = context.WithCancel(context.Background())
-	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
+	p.surface = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
 	return p, ch
 }
 
@@ -156,11 +156,11 @@ func TestBuildPagesAndOptions(t *testing.T) {
 	cfg := config.DefaultsSharePicker()
 	cfg.DefaultPage = config.SharePickerOutputs
 	p, _ := testPicker(t, cfg, false, false)
-	nb := treetest.First[*widget.Notebook](t, p.root)
+	nb := treetest.First[*widget.Notebook](t, p.surface)
 	if nb.SelectedTab() != pageOutputs {
 		t.Fatalf("notebook %v", nb)
 	}
-	if r := treetest.WithClass(p.root, "share-picker-restore-button"); len(r) != 1 || !isLabeledCheck(r[0], "Allow a restore token") {
+	if r := treetest.WithClass(p.surface, "share-picker-restore-button"); len(r) != 1 || !isLabeledCheck(r[0], "Allow a restore token") {
 		t.Error("the restore-token checkbutton is missing")
 	}
 	if p.confirm != nil {
@@ -168,7 +168,7 @@ func TestBuildPagesAndOptions(t *testing.T) {
 	}
 	cfg.HideTokenRestore = true
 	p, _ = testPicker(t, cfg, false, false)
-	if len(treetest.WithClass(p.root, "share-picker-restore-button")) != 0 {
+	if len(treetest.WithClass(p.surface, "share-picker-restore-button")) != 0 {
 		t.Error("hide-token-restore kept the box")
 	}
 	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-card")); n != 2 {
@@ -248,8 +248,8 @@ func TestBuildOffersOnlyTheSourcesAsked(t *testing.T) {
 		{SourceWindows, []string{pageWindows}, pageWindows},
 		{SourceRegions, []string{pageRegion}, pageRegion},
 	} {
-		p.root = p.build(nil, tc.sources, p.readOutputs(p.previews, 8))
-		nb := treetest.First[*widget.Notebook](t, p.root)
+		p.surface = p.build(nil, tc.sources, p.readOutputs(p.previews, 8))
+		nb := treetest.First[*widget.Notebook](t, p.surface)
 		if got := tabs(nb); !slices.Equal(got, tc.tabs) || nb.SelectedTab() != tc.selected {
 			t.Errorf("sources %#x: tabs %v on %q, want %v on %q", tc.sources, got, nb.SelectedTab(), tc.tabs, tc.selected)
 		}
@@ -260,7 +260,7 @@ func TestEmptyPagesShowPlaceholders(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	p.windows = func() []sharepreview.Toplevel { return nil }
 	p.outputs = func() []outputInfo { return nil }
-	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
+	p.surface = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
 	if n := len(treetest.WithClass(p.windowsPage(nil), "share-picker-placeholder")) + len(treetest.WithClass(p.outputsPage(p.readOutputs(p.previews, 8)), "share-picker-placeholder")); n != 2 {
 		t.Fatalf("%d placeholders, want 2", n)
 	}
@@ -371,24 +371,24 @@ func TestDaemonOverTheBus(t *testing.T) {
 	}
 }
 
-// The surface is the view!: window.share-picker-window over the reveal
-// over the .share-picker-surface at the configured size (scaled by
-// [styling] scale), spinners on the window cards until the captures
-// land, and every label's ink left to the stylesheet.
+// The surface is the view!: on the overlay, window.share-picker-window
+// over the reveal over the .share-picker-surface card at the configured
+// size (scaled by [styling] scale), spinners on the window cards until
+// the captures land, and every label's ink left to the stylesheet.
 func TestSurfaceIsTheRustTree(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
-	root, ok := p.root.(*widget.Box)
+	root, ok := p.root(dialogsurface.OnOverlay).(*widget.Box)
 	if !ok || root.Element() != "window" || !widget.HasClass(root, "share-picker-window") {
-		t.Fatalf("root %T, want the .share-picker-window node", p.root)
+		t.Fatalf("root %T, want the .share-picker-window node", root)
 	}
-	surfaces := treetest.WithClass(p.root, "share-picker-surface")
+	surfaces := treetest.WithClass(root, "share-picker-surface")
 	if len(surfaces) != 1 {
 		t.Fatal("no .share-picker-surface")
 	}
-	if got := surfaces[0].(*widget.Box).SizeRequest(); got != (widget.Size{W: p.width(), H: p.height()}) {
-		t.Errorf("surface request %v, want %dx%d", got, p.width(), p.height())
+	if got, want := surfaces[0].(*widget.Card).SizeRequest(), p.size(); got != want {
+		t.Errorf("surface request %v, want %v", got, want)
 	}
-	nbs := treetest.All[*widget.Notebook](p.root)
+	nbs := treetest.All[*widget.Notebook](root)
 	if len(nbs) != 1 {
 		t.Fatalf("%d notebooks, want the one", len(nbs))
 	}
@@ -398,13 +398,13 @@ func TestSurfaceIsTheRustTree(t *testing.T) {
 			t.Errorf("tab %q label %v, want page_label's pointer .share-picker-tab-label", name, nbs[0].TabLabel(name))
 		}
 	}
-	if len(treetest.All[*widget.Revealer](p.root)) != 1 {
+	if len(treetest.All[*widget.Revealer](root)) != 1 {
 		t.Error("the surface is not behind the reveal")
 	}
 	if len(treetest.All[*widget.Spinner](p.windowsPage(nil))) != 2 {
 		t.Error("the window cards carry no loading spinners")
 	}
-	for _, l := range treetest.All[*widget.Label](p.root) {
+	for _, l := range treetest.All[*widget.Label](root) {
 		if l.Color() != 0 {
 			t.Errorf("label %q pins ink %#08x", l.Text(), uint32(l.Color()))
 		}
@@ -413,9 +413,15 @@ func TestSurfaceIsTheRustTree(t *testing.T) {
 	full.Styling.Scale = 2
 	p.d.Config = func() *config.Config { return full }
 	p.snapshot()
-	if want := int(full.SharePicker.Width.ResolvePx(config.SharePickerWidthBaseRem*styling.RemBase, 2)); p.width() != want {
-		t.Errorf("width %d at scale 2, want %d", p.width(), want)
+	if want := int(full.SharePicker.Width.ResolvePx(config.SharePickerWidthBaseRem*styling.RemBase, 2)); p.size().W != want {
+		t.Errorf("width %d at scale 2, want %d", p.size().W, want)
 	}
+}
+
+// isCard reports lys-ui's card.
+func isCard(w widget.Widget) bool {
+	_, ok := w.(*widget.Card)
+	return ok
 }
 
 // isLabeledCheck reports a checkbutton carrying text as its label.
@@ -433,8 +439,8 @@ func TestPickerNamesTheRequester(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, false)
 	p.d.Describe = func(appID string) (string, string) { return "Meet " + appID, "" }
 	p.requester = p.describe(portaldialogs.Caller{Handle: "/r/9", AppID: "org.meet"})
-	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
-	if labels := treetest.Labels(p.root); !slices.Contains(labels, "Meet org.meet wants to share your screen") {
+	p.surface = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
+	if labels := treetest.Labels(p.surface); !slices.Contains(labels, "Meet org.meet wants to share your screen") {
 		t.Errorf("labels = %q", labels)
 	}
 }
@@ -445,7 +451,7 @@ func TestPickerNamesTheRequester(t *testing.T) {
 // the page rather than across an unbounded width.
 func TestPickerTakesLysUiParts(t *testing.T) {
 	p, _ := testPicker(t, config.DefaultsSharePicker(), false, true)
-	if s := treetest.WithClass(p.root, "share-picker-surface"); len(s) != 1 || !widget.HasClass(s[0], css.Card) {
+	if s := treetest.WithClass(p.surface, "share-picker-surface"); len(s) != 1 || !isCard(s[0]) {
 		t.Fatal("the surface is not lys-ui's card")
 	}
 	cards := treetest.WithClass(p.windowsPage(nil), "share-picker-card")
@@ -492,10 +498,9 @@ func TestFocusedChoiceIsHighlighted(t *testing.T) {
 	cfg.DefaultPage = config.SharePickerOutputs
 	p, _ := testPicker(t, cfg, false, false)
 	p.d.Sheet = apptheme.New(config.Defaults()).Sheet
-	p.root = p.build(nil, AllSources, p.readOutputs(p.previews, 8))
-	reveal.Show(p.rev, p.anims, config.AnimSharePicker)
+	root := p.root(dialogsurface.OnOverlay)
 	const w, h = 1000, 500
-	p.root.Arrange(render.Rect{W: w, H: h})
+	root.Arrange(render.Rect{W: w, H: h})
 	choices := p.choices[pageOutputs]
 	if len(choices) != 2 {
 		t.Fatalf("test premise: %d output choices", len(choices))
@@ -503,15 +508,15 @@ func TestFocusedChoiceIsHighlighted(t *testing.T) {
 	card := choices[0].(*widget.Button).Bounds()
 	paint := func() []byte {
 		data := make([]byte, render.Stride(w)*h)
-		p.root.Arrange(render.Rect{W: w, H: h})
-		p.root.Paint(render.NewScaled(data, render.Stride(w), w, h, 1, 1))
+		root.Arrange(render.Rect{W: w, H: h})
+		root.Paint(render.NewScaled(data, render.Stride(w), w, h, 1, 1))
 		var out []byte
 		for y := card.Y; y < card.Y+card.H; y++ {
 			out = append(out, data[y*render.Stride(w)+card.X*4:y*render.Stride(w)+(card.X+card.W)*4]...)
 		}
 		return out
 	}
-	r := &widget.Router{Root: p.root}
+	r := &widget.Router{Root: root}
 	resting := paint()
 	if err := r.SetFocus(choices[1]); err != nil {
 		t.Fatal(err)
@@ -531,7 +536,7 @@ func TestFocusedChoiceIsHighlighted(t *testing.T) {
 // answers the cast target.
 func TestTheDynamicPageAnswersTheCastTarget(t *testing.T) {
 	p, ch := testPicker(t, config.DefaultsSharePicker(), false, false)
-	nb := treetest.First[*widget.Notebook](t, p.root)
+	nb := treetest.First[*widget.Notebook](t, p.surface)
 	if l, ok := nb.TabLabel(pageDynamic).(*widget.Label); !ok || l.Text() != i18n.T("share-picker-dynamic-page") {
 		t.Fatalf("the Dynamic tab label is %v", nb.TabLabel(pageDynamic))
 	}

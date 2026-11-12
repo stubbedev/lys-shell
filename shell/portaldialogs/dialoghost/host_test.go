@@ -79,7 +79,7 @@ func newHarness(t *testing.T, apps []desktopentry.App) *harness {
 			}
 			w := &fakeWindow{}
 			hs.windows = append(hs.windows, w)
-			hs.opened <- s.Overlay
+			hs.opened <- s.LayerConfig()
 			return w, nil
 		},
 		Invoke: hs.do,

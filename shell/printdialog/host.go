@@ -439,30 +439,25 @@ func outputFormat(formats []string) string {
 	return formats[0]
 }
 
-// show maps the overlay with tree and plays the entry.
-func (h *Dialog) show(caller portaldialogs.Caller, tree widget.Widget) {
+// show maps card, the sheet, and plays its entry.
+func (h *Dialog) show(caller portaldialogs.Caller, card *widget.Card) {
 	if h.win != nil {
 		h.win.Close()
 		h.win, h.closing = nil, false
 	}
-	// window.print-window > revealer > the sheet, on an unanchored
-	// layer the compositor centers, sized to its content.
-	h.rev = widget.NewRevealer(tree)
-	root := widget.NewBox(widget.Column, 0, 0)
-	root.SetElement("window")
-	root.AddClass("print-window")
-	if h.d.Sheet != nil {
-		root.AttachStylesheet(h.d.Sheet)
-	}
-	root.Append(h.rev, true)
 	win, err := h.d.Open(dialogsurface.Spec{
 		Caller: caller, Title: "Print",
-		Overlay: app.LayerConfig{
+		Root: func(s dialogsurface.Surface) widget.Widget {
+			root, rev := dialogsurface.CardRoot(s, card, "print-window", h.d.Sheet)
+			h.rev = rev
+			reveal.Show(rev, h.d.Config().Animations, config.AnimPrint)
+			return root
+		},
+		Layer: app.LayerConfig{
 			Layer:         app.LayerOverlay,
 			ExclusiveZone: -1,
 			Keyboard:      app.KeyboardOnDemand,
 			Namespace:     "lys-shell-print",
-			Root:          root,
 			OnKey:         keys.OnEscape(h.d.KeySym, func() { h.finish(prepared{}, false) }),
 		},
 		Failed: func() { h.finish(prepared{}, false) },
@@ -473,7 +468,6 @@ func (h *Dialog) show(caller portaldialogs.Caller, tree widget.Widget) {
 		return
 	}
 	h.win = win
-	reveal.Show(h.rev, h.d.Config().Animations, config.AnimPrint)
 }
 
 // hide plays the exit and closes the surface.

@@ -35,7 +35,7 @@ type sheet struct {
 	r     PrepareRequest
 	appID string
 
-	root   widget.Widget
+	root   *widget.Card
 	list   *widget.ListBox
 	queues []queue
 	// details are the queues' detail lines, by queue.

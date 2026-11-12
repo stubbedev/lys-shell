@@ -36,28 +36,33 @@ import (
 	"github.com/stubbedev/lys-shell/shell/keys"
 )
 
-// The panel's geometry (shell/file_chooser: its default size,
-// column widths, icon sizes). The panel's floor keeps the
-// sidebar and columns usable, its ceiling a sane maximum on huge
-// outputs.
+// The panel's size (shell/file_chooser): its default, its floor,
+// which keeps the sidebar and columns usable, and its ceiling, a sane
+// maximum on huge outputs. They bound the overlay's panel and the
+// window alike.
+var (
+	panelSize = widget.Size{W: 760, H: 520}
+	panelMin  = widget.Size{W: 480, H: 320}
+	panelMax  = widget.Size{W: 1600, H: 1100}
+)
+
+// The panel's geometry (shell/file_chooser: column widths, icon
+// sizes).
 const (
-	panelW, panelH       = 760, 520
-	panelMinW, panelMinH = 480, 320
-	panelMaxW, panelMaxH = 1600, 1100
-	sidebarW             = 180
-	searchW              = 150
-	previewW             = 220
-	listRowH             = 34
-	gridCellW            = 112
-	gridCellH            = 104
-	rowIconPx            = 24
-	gridIconPx           = 48
-	previewIconPx        = 96
-	navIconPx            = 16
-	minColumnW           = 50
-	nameMinW             = 160
-	maxColumnW           = 400
-	crumbMaxChars        = 16
+	sidebarW      = 180
+	searchW       = 150
+	previewW      = 220
+	listRowH      = 34
+	gridCellW     = 112
+	gridCellH     = 104
+	rowIconPx     = 24
+	gridIconPx    = 48
+	previewIconPx = 96
+	navIconPx     = 16
+	minColumnW    = 50
+	nameMinW      = 160
+	maxColumnW    = 400
+	crumbMaxChars = 16
 )
 
 // The mouse's thumb buttons, which walk the history.
@@ -226,7 +231,7 @@ func New(d Deps) *Chooser {
 	c := &Chooser{
 		d: d, view: defaultView, columns: [3]int{90, 150, 90}, thumbnailer: newThumbnailer(), thumbs: newThumbSet(),
 		reader: newDirReader(), viewFile: statefile.File{Path: d.ViewFile}, folders: loadFolderMemory(foldersFile(d.ViewFile)),
-		size: widget.Size{W: panelW, H: panelH},
+		size: panelSize,
 	}
 	c.previewLoader = c.loadPreview
 	if d.ViewFile != "" {
@@ -473,7 +478,7 @@ func (c *Chooser) unwatch() {
 
 // ui holds the widgets a request updates.
 type ui struct {
-	root               *widget.FloatingPanel
+	header, main       widget.Widget
 	crumbs             *widget.Box
 	search             *widget.SearchEntry
 	name               *widget.Entry
@@ -711,10 +716,7 @@ func (c *Chooser) build(r request) {
 	main.Append(u.notice, false)
 	main.Append(footer, false)
 
-	u.root = widget.NewFloatingPanel(header, main)
-	u.root.SetSizeLimits(widget.Size{W: panelMinW, H: panelMinH}, widget.Size{W: panelMaxW, H: panelMaxH})
-	u.root.SetPanelSize(c.size.W, c.size.H)
-	u.root.OnGeometryChanged = c.placedAt
+	u.header, u.main = header, main
 
 	c.ui = u
 	c.updateSortLabels()
@@ -1155,19 +1157,12 @@ func (c *Chooser) awaitOffLoop() {
 // --- surface --------------------------------------------------------
 
 func (c *Chooser) show() {
-	c.rev = widget.NewRevealer(c.ui.root)
-	if c.d.Sheet != nil {
-		c.rev.AttachStylesheet(c.d.Sheet)
-	}
 	var output *app.Output
 	if c.d.Target != nil {
 		output = c.d.Target()
 	}
 	if name := outputName(output); name != c.placedOn {
 		c.moved, c.placedOn = false, name
-	}
-	if c.moved {
-		c.ui.root.SetPosition(c.at)
 	}
 	keyboard := app.KeyboardExclusive
 	if !c.caller.Modal {
@@ -1177,17 +1172,18 @@ func (c *Chooser) show() {
 	// input only over itself through the revealer.
 	win, err := c.d.Open(dialogsurface.Spec{
 		Caller: c.caller, Title: c.title,
-		Overlay: app.LayerConfig{
+		Root: c.root,
+		Layer: app.LayerConfig{
 			Output:        output,
 			Layer:         app.LayerOverlay,
 			Anchor:        app.AnchorTop | app.AnchorBottom | app.AnchorLeft | app.AnchorRight,
 			ExclusiveZone: -1,
 			Keyboard:      keyboard,
 			Namespace:     "lys-shell-file-chooser",
-			Root:          c.rev,
 			OnKey:         keys.OnKey(c.d.KeySym, c.key),
 			OnPress:       func(button uint32, _ widget.Widget) { c.press(button) },
 		},
+		Window: dialogsurface.WindowSize{Initial: c.size, Min: panelMin, Max: panelMax, OnResize: c.resized},
 		Failed: func() { c.finish(nil) },
 	})
 	if err != nil {
@@ -1196,7 +1192,6 @@ func (c *Chooser) show() {
 		return
 	}
 	c.win = win
-	reveal.Show(c.rev, c.d.Config().Animations, config.AnimFileChooser)
 	first := c.focusView()
 	if c.s.mode == ModeSave {
 		first = c.ui.name
@@ -1209,6 +1204,33 @@ func (c *Chooser) show() {
 	if c.s.mode == ModeSave {
 		selectStem(c.ui.name)
 	}
+}
+
+func (c *Chooser) root(s dialogsurface.Surface) widget.Widget {
+	c.rev = widget.NewRevealer(c.frame(s))
+	if c.d.Sheet != nil {
+		c.rev.AttachStylesheet(c.d.Sheet)
+	}
+	reveal.Show(c.rev, c.d.Config().Animations, config.AnimFileChooser)
+	return c.rev
+}
+
+func (c *Chooser) frame(s dialogsurface.Surface) widget.Widget {
+	if s == dialogsurface.OnWindow {
+		w := widget.NewBox(widget.Column, 0, 0)
+		w.SetElement("window")
+		w.Append(c.ui.header, false)
+		w.Append(c.ui.main, true)
+		return w
+	}
+	p := widget.NewFloatingPanel(c.ui.header, c.ui.main)
+	p.SetSizeLimits(panelMin, panelMax)
+	p.SetPanelSize(c.size.W, c.size.H)
+	if c.moved {
+		p.SetPosition(c.at)
+	}
+	p.OnGeometryChanged = func(r render.Rect) { c.placedAt(r, p.Bounds()) }
+	return p
 }
 
 // outputName names o, "" for the compositor's pick.
@@ -1305,10 +1327,24 @@ func (c *Chooser) press(button uint32) {
 	}
 }
 
-// placedAt keeps the panel's size and place as a move or resize left
-// them, for the requests after.
-func (c *Chooser) placedAt(r render.Rect) {
-	c.size, c.at, c.moved = widget.Size{W: r.W, H: r.H}, widget.Point{X: r.X, Y: r.Y}, true
+// placedAt keeps the panel's place, and the size the user chose, as a
+// move or resize in area left them, for the requests after. A panel
+// that fills the area along an axis may be squeezed to it there, so
+// its size there was chosen at least that large: the size kept before
+// stands when larger.
+func (c *Chooser) placedAt(r, area render.Rect) {
+	chosen := func(extent, room, before int) int {
+		if extent < room {
+			return extent
+		}
+		return max(extent, before)
+	}
+	c.size = widget.Size{W: chosen(r.W, area.W, c.size.W), H: chosen(r.H, area.H, c.size.H)}
+	c.at, c.moved = widget.Point{X: r.X, Y: r.Y}, true
+}
+
+func (c *Chooser) resized(sz widget.Size) {
+	c.size = widget.Size{W: min(max(sz.W, panelMin.W), panelMax.W), H: min(max(sz.H, panelMin.H), panelMax.H)}
 }
 
 // --- state changes --------------------------------------------------
