@@ -1,6 +1,6 @@
 {
   lib,
-  buildGo127Module,
+  buildGoModule,
   makeWrapper,
   libX11,
   xkeyboard-config,
@@ -24,9 +24,10 @@ let
   # internal/version is the one place the release version lives.
   version =
     let
-      line = lib.findFirst (lib.hasPrefix "const Version = ") (throw "internal/version/version.go declares no Version") (
-        lib.splitString "\n" (builtins.readFile ../internal/version/version.go)
-      );
+      line =
+        lib.findFirst (lib.hasPrefix "const Version = ")
+          (throw "internal/version/version.go declares no Version")
+          (lib.splitString "\n" (builtins.readFile ../internal/version/version.go));
     in
     lib.removeSuffix "\"" (lib.removePrefix "const Version = \"" line);
 
@@ -63,7 +64,7 @@ let
     "lys-lock"
   ];
 in
-buildGo127Module {
+buildGoModule {
   pname = "lys-shell";
   inherit version src;
 

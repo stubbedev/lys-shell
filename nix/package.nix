@@ -1,10 +1,12 @@
-_:
+{ inputs, ... }:
 let
-  # Built with the toolchain go.mod pins. The overlay builds it against the
-  # consumer's nixpkgs, so the pin is applied per package set.
   lysShellFor =
     pkgs:
-    pkgs.callPackage ./lys-shell.nix { };
+    pkgs.callPackage ./lys-shell.nix {
+      buildGoModule = pkgs.buildGoModule.override {
+        go = inputs.devtools.packages.${pkgs.stdenv.hostPlatform.system}.go;
+      };
+    };
 in
 {
   perSystem =

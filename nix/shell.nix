@@ -15,7 +15,6 @@
     in
     {
       devShells.default = pkgs.mkShell {
-        # The Go toolchain go.mod pins, from the package.
         inputsFrom = [ self'.packages.lys-shell ];
 
         packages = with pkgs; [
@@ -70,7 +69,14 @@
         # are the reference consumers the portal is checked against, and the
         # RemoteDesktop and InputCapture tests libei, the reference EIS client.
         LD_LIBRARY_PATH = lib.makeLibraryPath (
-          lib.unique (gpuDrivers.libraries ++ self'.packages.lys-shell.libs ++ [ pkgs.pipewire pkgs.libei ])
+          lib.unique (
+            gpuDrivers.libraries
+            ++ self'.packages.lys-shell.libs
+            ++ [
+              pkgs.pipewire
+              pkgs.libei
+            ]
+          )
         );
 
         # The real xdg-desktop-portal frontend the portal contract tests

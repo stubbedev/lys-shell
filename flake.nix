@@ -17,6 +17,11 @@
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.follows = "nixpkgs";
     };
+    devtools = {
+      url = "github:stubbedev/flakes.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+    };
     # The dev shell's GPU driver setup (lib.gpuDriverEnv), shared with
     # lys-lib's and lys-ui's shells; the Go code comes through go.mod.
     lys-lib = {
