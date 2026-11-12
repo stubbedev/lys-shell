@@ -76,6 +76,12 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 	return &keyRig{t: t, a: a, p: p, kb: kb, answers: answers, callbacks: callbacks}
 }
 
+func stillSurfaces(t *testing.T, a *app.Application) {
+	t.Helper()
+	apptest.On(a, func() bool { a.SetSurfaceMotion(false); return true })
+	t.Cleanup(func() { apptest.On(a, func() bool { a.SetSurfaceMotion(true); return true }) })
+}
+
 // headlessPicker is a picker on a's compositor over five windows and
 // two outputs, opening on page, with animations off and, as the bar
 // runs it, lys-ui's own surface motion off too; presented closes
@@ -83,8 +89,7 @@ func keyPicker(t *testing.T, page config.SharePickerPage, r Request) *keyRig {
 // the size it was configured to.
 func headlessPicker(t *testing.T, a *app.Application, page config.SharePickerPage) (p *Picker, presented <-chan struct{}) {
 	t.Helper()
-	apptest.On(a, func() bool { a.SetSurfaceMotion(false); return true })
-	t.Cleanup(func() { apptest.On(a, func() bool { a.SetSurfaceMotion(true); return true }) })
+	stillSurfaces(t, a)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	cfg.SharePicker.DefaultPage = page
@@ -219,6 +224,7 @@ func TestHeadlessMultiSelectByKeyboard(t *testing.T) {
 // Return in that keymap, leaves the picker open.
 func TestHeadlessEscapeCancelsByItsSymbol(t *testing.T) {
 	a := apptest.Run(t)
+	stillSurfaces(t, a)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	p := New(a, Deps{Config: func() *config.Config { return cfg }, Font: treetest.Font(t)}, &regionoverlay.Gate{}, nil, nil)
@@ -275,7 +281,7 @@ func (k *keyRig) idleState() idleState {
 			damage:          widget.DamageGeneration(),
 			walks:           widget.DamageWalks(),
 			pickerCallbacks: k.callbacks.Load(),
-			assetsOwed:      widget.TreeAssetsOwed(k.p.surface),
+			assetsOwed:      widget.TreeAssetsOwed(k.p.rev.Parent()),
 			loadingCards:    k.p.loadingCards(),
 			focus:           fmt.Sprintf("%T %q", focused, widget.Describe(focused).Name),
 			keyboardHeld:    k.a.Session().KeyboardFocus() == k.p.layer.HostSurface(),
@@ -602,6 +608,7 @@ func showsRed(img *image.RGBA) bool {
 
 func TestHeadlessOutputThumbShowsNoOverlay(t *testing.T) {
 	a := apptest.Run(t)
+	stillSurfaces(t, a)
 	apptest.Until(t, a, "an output appeared", func() bool { return len(a.Session().Outputs()) > 0 })
 	name := apptest.On(a, func() string { return a.Session().Outputs()[0].Name })
 	gate := &regionoverlay.Gate{}

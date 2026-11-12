@@ -33,6 +33,7 @@ type pickRig struct {
 func windowPicker(t *testing.T, screen string) *pickRig {
 	t.Helper()
 	a := apptest.Run(t)
+	stillSurfaces(t, a)
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	gate := &regionoverlay.Gate{}
