@@ -19,7 +19,6 @@
     };
     devtools = {
       url = "github:stubbedev/flakes.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-parts.follows = "flake-parts";
     };
     # The dev shell's GPU driver setup (lib.gpuDriverEnv), shared with
