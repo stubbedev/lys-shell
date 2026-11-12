@@ -6,7 +6,7 @@ require (
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
 	github.com/stubbedev/lys-desktop v0.0.8-0.20261112090859-2f100d9cebd6
-	github.com/stubbedev/lys-lib v0.3.22-0.20261112093217-79af4b466a5c
+	github.com/stubbedev/lys-lib v0.3.22-0.20261112094636-bb68aecdbd56
 	github.com/stubbedev/lys-secrets v0.3.22-0.20261112091955-65c637ff3c2b
 	github.com/stubbedev/lys-ui v0.2.25-0.20261112094024-c27e09d90e4a
 	github.com/stubbedev/memory-go v0.5.0

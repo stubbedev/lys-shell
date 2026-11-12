@@ -18,7 +18,7 @@ const (
 	batteryIface    = "org.bluez.Battery1"
 	agentIface      = "org.bluez.Agent1"
 	agentManager    = "org.bluez.AgentManager1"
-	objectManager   = "org.freedesktop.DBus.ObjectManager"
+	objectManager   = dbusx.ObjectManagerInterface
 	propertiesIface = dbusx.PropertiesInterface
 )
 

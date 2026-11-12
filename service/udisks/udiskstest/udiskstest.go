@@ -12,15 +12,14 @@ import (
 	"testing"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/udisks"
 )
 
 const (
-	objectManager   = "org.freedesktop.DBus.ObjectManager"
-	propertiesIface = "org.freedesktop.DBus.Properties"
-	errFailed       = udisks.BusName + ".Error.Failed"
+	errFailed = udisks.BusName + ".Error.Failed"
 )
 
 // The calls Calls records, each followed by a space and the object.
@@ -56,7 +55,7 @@ func Start(t *testing.T) *UDisks {
 	t.Helper()
 	u := &UDisks{Bus: dbustest.Start(t), Passphrase: "correct horse", MountRoot: t.TempDir(), objs: map[dbus.ObjectPath]map[string]map[string]dbus.Variant{}}
 	u.conn = u.Bus.Conn(t)
-	if err := u.conn.Export(manager{u}, udisks.ManagerPath, objectManager); err != nil {
+	if err := u.conn.Export(manager{u}, udisks.ManagerPath, dbusx.ObjectManagerInterface); err != nil {
 		t.Fatalf("udiskstest: export the manager: %v", err)
 	}
 	if reply, err := u.conn.RequestName(udisks.BusName, dbus.NameFlagDoNotQueue); err != nil || reply != dbus.RequestNameReplyPrimaryOwner {
@@ -150,7 +149,7 @@ func (u *UDisks) remove(path dbus.ObjectPath) error {
 		}
 	}
 	slices.Sort(names)
-	return u.conn.Emit(udisks.ManagerPath, objectManager+".InterfacesRemoved", path, names)
+	return dbusx.InterfacesRemoved.Emit(u.conn, udisks.ManagerPath, dbusx.RemovedInterfaces{Object: path, Interfaces: names})
 }
 
 func (u *UDisks) add(t *testing.T, path dbus.ObjectPath, ifaces map[string]map[string]dbus.Variant) {
@@ -180,7 +179,7 @@ func (u *UDisks) export(path dbus.ObjectPath, ifaces map[string]map[string]dbus.
 			return err
 		}
 	}
-	return u.conn.Emit(udisks.ManagerPath, objectManager+".InterfacesAdded", path, ifaces)
+	return dbusx.InterfacesAdded.Emit(u.conn, udisks.ManagerPath, dbusx.AddedInterfaces{Object: path, Interfaces: ifaces})
 }
 
 func (u *UDisks) record(call string, path dbus.ObjectPath) {
@@ -198,7 +197,7 @@ func (u *UDisks) set(path dbus.ObjectPath, iface, key string, value dbus.Variant
 	if !ok {
 		return dbus.NewError(errFailed, []any{"no " + iface + " at " + string(path)})
 	}
-	if err := u.conn.Emit(path, propertiesIface+".PropertiesChanged", iface, map[string]dbus.Variant{key: value}, []string{}); err != nil {
+	if err := dbusx.PropertiesChanged.Emit(u.conn, path, dbusx.ChangedProperties{Interface: iface, Changed: map[string]dbus.Variant{key: value}, Invalidated: []string{}}); err != nil {
 		return dbus.MakeFailedError(err)
 	}
 	return nil

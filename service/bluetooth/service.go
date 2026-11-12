@@ -159,36 +159,20 @@ func (s *Service) follow() error {
 	return nil
 }
 
-// interfacesAdded and interfacesRemoved are what BlueZ's ObjectManager
-// says of an object gaining and losing interfaces.
-type interfacesAdded struct {
-	Object     dbus.ObjectPath                    `dbus:"object_path"`
-	Interfaces map[string]map[string]dbus.Variant `dbus:"interfaces_and_properties"`
-}
-
-type interfacesRemoved struct {
-	Object     dbus.ObjectPath `dbus:"object_path"`
-	Interfaces []string        `dbus:"interfaces"`
-}
-
 // disconnected is what a device's Disconnected carries.
 type disconnected struct {
 	Reason  string `dbus:"reason"`
 	Message string `dbus:"message"`
 }
 
-var (
-	interfacesAddedSignal   = dbusx.NewSignal[interfacesAdded](objectManager, "InterfacesAdded")
-	interfacesRemovedSignal = dbusx.NewSignal[interfacesRemoved](objectManager, "InterfacesRemoved")
-	disconnectedSignal      = dbusx.NewSignal[disconnected](deviceIface, "Disconnected")
-)
+var disconnectedSignal = dbusx.NewSignal[disconnected](deviceIface, "Disconnected")
 
 // routes fold BlueZ's signals into the model once loaded is closed:
 // objects coming and going under /org/bluez, their properties
 // changing, and a device's disconnections.
 func (s *Service) routes(loaded <-chan struct{}) []dbusx.Route {
 	return []dbusx.Route{
-		dbusx.On(interfacesAddedSignal, objectManagerAt, func(added interfacesAdded, _ dbus.Sequence) error {
+		dbusx.On(dbusx.InterfacesAdded, objectManagerAt, func(added dbusx.AddedInterfaces, _ dbus.Sequence) error {
 			<-loaded
 			if underBlueZ(added.Object) {
 				s.mu.Lock()
@@ -198,12 +182,9 @@ func (s *Service) routes(loaded <-chan struct{}) []dbusx.Route {
 				s.mu.Unlock()
 				s.changed()
 			}
-			if err := dbus.CloseFDs([]any{added.Interfaces}); err != nil {
-				return fmt.Errorf("close the descriptors %s was added with: %w", added.Object, err)
-			}
 			return nil
 		}),
-		dbusx.On(interfacesRemovedSignal, objectManagerAt, func(removed interfacesRemoved, _ dbus.Sequence) error {
+		dbusx.On(dbusx.InterfacesRemoved, objectManagerAt, func(removed dbusx.RemovedInterfaces, _ dbus.Sequence) error {
 			<-loaded
 			if !underBlueZ(removed.Object) {
 				return nil

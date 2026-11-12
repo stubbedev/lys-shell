@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	"github.com/stubbedev/lys-lib/dbusx"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/udisks"
@@ -196,7 +197,7 @@ func TestWatchFollowsHotplug(t *testing.T) {
 func TestWatchIgnoresAnotherConnection(t *testing.T) {
 	u, _ := fixture(t)
 	conn := u.Client(t)
-	for _, iface := range []string{"org.freedesktop.DBus.ObjectManager", "org.freedesktop.DBus.Properties"} {
+	for _, iface := range []string{dbusx.ObjectManagerInterface, dbusx.PropertiesInterface} {
 		if err := conn.AddMatchSignal(dbus.WithMatchInterface(iface)); err != nil {
 			t.Fatal(err)
 		}
@@ -209,8 +210,8 @@ func TestWatchIgnoresAnotherConnection(t *testing.T) {
 	defer stop()
 	impostor := u.Client(t)
 	for _, err := range []error{
-		impostor.Emit(udisks.ManagerPath, "org.freedesktop.DBus.ObjectManager.InterfacesRemoved", stickPart, []string{udisks.BlockIface}),
-		impostor.Emit(stickPart, "org.freedesktop.DBus.Properties.PropertiesChanged", udisks.BlockIface, map[string]dbus.Variant{"Size": dbus.MakeVariant(uint64(1))}, []string{}),
+		dbusx.InterfacesRemoved.Emit(impostor, udisks.ManagerPath, dbusx.RemovedInterfaces{Object: stickPart, Interfaces: []string{udisks.BlockIface}}),
+		dbusx.PropertiesChanged.Emit(impostor, stickPart, dbusx.ChangedProperties{Interface: udisks.BlockIface, Changed: map[string]dbus.Variant{"Size": dbus.MakeVariant(uint64(1))}, Invalidated: []string{}}),
 		impostor.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err,
 	} {
 		if err != nil {
@@ -248,7 +249,7 @@ func TestWatchClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 		t.Fatal(err)
 	}
 	change := func(fd dbus.UnixFD) {
-		u.Emit(t, stickPart, "org.freedesktop.DBus.Properties.PropertiesChanged",
+		u.Emit(t, stickPart, dbusx.PropertiesInterface+".PropertiesChanged",
 			udisks.BlockIface, map[string]dbus.Variant{"Handed": dbus.MakeVariant(fd)}, []string{})
 	}
 	handled := dbustest.NewPipe(t)

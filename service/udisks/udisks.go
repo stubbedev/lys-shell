@@ -26,7 +26,6 @@ const (
 	FilesystemIface = BusName + ".Filesystem"
 	EncryptedIface  = BusName + ".Encrypted"
 	DriveIface      = BusName + ".Drive"
-	objectManager   = "org.freedesktop.DBus.ObjectManager"
 	// ErrDeviceBusy is UDisks2's error for a filesystem in use.
 	ErrDeviceBusy = BusName + ".Error.DeviceBusy"
 )
@@ -78,7 +77,7 @@ type objects = map[dbus.ObjectPath]map[string]map[string]dbus.Variant
 // Volumes lists the volumes UDisks2 has, by object path.
 func (c *Client) Volumes(ctx context.Context) ([]Volume, error) {
 	var objs objects
-	if err := c.conn.Object(BusName, ManagerPath).CallWithContext(ctx, objectManager+".GetManagedObjects", 0).Store(&objs); err != nil {
+	if err := c.conn.Object(BusName, ManagerPath).CallWithContext(ctx, dbusx.ObjectManagerInterface+".GetManagedObjects", 0).Store(&objs); err != nil {
 		return nil, fmt.Errorf("udisks: listing objects: %w", err)
 	}
 	return volumesOf(objs), nil
@@ -174,11 +173,12 @@ func decimalSize(n uint64) string {
 func (c *Client) Watch(changed func()) (stop func(), err error) {
 	watch, err := dbusx.WatchSignals(context.Background(), c.conn, dbusx.FromOwner(BusName),
 		func(err error) { log.Printf("udisks: %v", err) },
-		dbusx.OnOthers(objectManager, ManagerPath, func(sig *dbus.Signal) error {
+		dbusx.On(dbusx.InterfacesAdded, ManagerPath, func(dbusx.AddedInterfaces, dbus.Sequence) error {
 			changed()
-			if err := sig.CloseFDs(); err != nil {
-				return fmt.Errorf("close the descriptors of %s: %w", sig.Name, err)
-			}
+			return nil
+		}),
+		dbusx.On(dbusx.InterfacesRemoved, ManagerPath, func(dbusx.RemovedInterfaces, dbus.Sequence) error {
+			changed()
 			return nil
 		}),
 		dbusx.OnUnder(dbusx.PropertiesChanged, ManagerPath, func(dbus.ObjectPath, dbusx.ChangedProperties, dbus.Sequence) error {
