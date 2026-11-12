@@ -39,14 +39,20 @@ func TestHeadlessEscapeDeniesByItsSymbol(t *testing.T) {
 }
 
 // headlessDialogs is the portal dialogs on a's compositor, with
-// animations off.
-func headlessDialogs(t *testing.T, a *app.Application) *Dialogs {
+// animations off, each dialog's spec passed through adjust before it
+// opens.
+func headlessDialogs(t *testing.T, a *app.Application, adjust ...func(*dialogsurface.Spec)) *Dialogs {
 	t.Helper()
 	cfg := config.Defaults()
 	cfg.Animations.Enabled = false
 	return New(Deps{
-		Config:   func() *config.Config { return cfg },
-		Open:     func(s dialogsurface.Spec) (Window, error) { return dialogsurface.Open(a, s) },
+		Config: func() *config.Config { return cfg },
+		Open: func(s dialogsurface.Spec) (Window, error) {
+			for _, f := range adjust {
+				f(&s)
+			}
+			return dialogsurface.Open(a, s)
+		},
 		Invoke:   a.Invoke,
 		KeySym:   a.KeySym,
 		Font:     treetest.Font(t),
@@ -60,24 +66,14 @@ func headlessDialogs(t *testing.T, a *app.Application) *Dialogs {
 // Save answers it.
 func TestHeadlessShortcutsEditorRecordsAKeyboardChord(t *testing.T) {
 	a := apptest.Run(t)
-	cfg := config.Defaults()
-	cfg.Animations.Enabled = false
 	opened := make(chan widget.Widget, 1)
-	h := New(Deps{
-		Config: func() *config.Config { return cfg },
-		Open: func(s dialogsurface.Spec) (Window, error) {
-			build := s.Root
-			s.Root = func(surface dialogsurface.Surface) widget.Widget {
-				root := build(surface)
-				opened <- root
-				return root
-			}
-			return dialogsurface.Open(a, s)
-		},
-		Invoke:   a.Invoke,
-		KeySym:   a.KeySym,
-		Font:     treetest.Font(t),
-		Describe: func(string) (string, string) { return "App", "" },
+	h := headlessDialogs(t, a, func(s *dialogsurface.Spec) {
+		build := s.Root
+		s.Root = func(surface dialogsurface.Surface) widget.Widget {
+			root := build(surface)
+			opened <- root
+			return root
+		}
 	})
 	const handle = "/r/headless-keys"
 	t.Cleanup(func() { h.Dismiss(handle) })

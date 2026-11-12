@@ -261,6 +261,100 @@ func TestAWindowDialogResizesWithinItsBounds(t *testing.T) {
 	}
 }
 
+var (
+	rowSize      = widget.Size{W: 160, H: 60}
+	contentStart = widget.Size{W: rowSize.W, H: 2 * rowSize.H}
+)
+
+// growing is a window dialog whose tree starts two rows tall and takes
+// more rows as the test adds them.
+type growing struct {
+	r    *surfacetest.Rig
+	seen *sizes
+	rows *widget.Box
+}
+
+// openGrowing maps a growing window dialog for the rig's owner window,
+// opened at its content's size and at most limit.
+func openGrowing(t *testing.T, r *surfacetest.Rig, limit widget.Size) *growing {
+	t.Helper()
+	g := &growing{r: r, seen: &sizes{}}
+	s := spec(r.Parent, &built{}, nil)
+	s.Root = func(dialogsurface.Surface) widget.Widget {
+		g.rows = widget.NewBox(widget.Column, 0, 0)
+		return g.rows
+	}
+	s.Window = dialogsurface.WindowSize{Initial: contentStart, Max: limit, OnResize: g.seen.resized}
+	openSpec(t, r, s)
+	g.add(t, 2)
+	r.AwaitParented(t, testAppID)
+	g.await(t, "the window opened", contentStart)
+	return g
+}
+
+// add appends n rows to the dialog's tree.
+func (g *growing) add(t *testing.T, n int) {
+	t.Helper()
+	apptest.On(g.r.Shell, func() struct{} {
+		for range n {
+			g.rows.Append(widget.NewDrawingArea(rowSize.W, rowSize.H), false)
+		}
+		return struct{}{}
+	})
+}
+
+// await waits until the window last took want.
+func (g *growing) await(t *testing.T, what string, want widget.Size) {
+	t.Helper()
+	apptest.Until(t, g.r.Shell, what, func() bool { return g.seen.last() == want })
+}
+
+// holds fails the test if the window leaves want within a moment.
+func (g *growing) holds(t *testing.T, what string, want widget.Size) {
+	t.Helper()
+	apptest.Dispatched(t, g.r.Shell)
+	for deadline := time.Now().Add(300 * time.Millisecond); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if got := g.seen.last(); got != want {
+			t.Fatalf("%s: the window took %v, want it kept at %v", what, got, want)
+		}
+	}
+}
+
+// A window dialog whose content grows past it grows to fit, up to its
+// maximum, and no further.
+func TestAWindowDialogGrowsWithItsContent(t *testing.T) {
+	r := surfacetest.Start(t)
+	limit := widget.Size{W: 400, H: 7 * rowSize.H}
+	g := openGrowing(t, r, limit)
+	g.add(t, 3)
+	g.await(t, "the window grown to five rows", widget.Size{W: rowSize.W, H: 5 * rowSize.H})
+	g.add(t, 3)
+	g.await(t, "the window grown to its ceiling", widget.Size{W: rowSize.W, H: limit.H})
+	g.holds(t, "eight rows past a seven-row ceiling", widget.Size{W: rowSize.W, H: limit.H})
+	for _, sz := range g.seen.got() {
+		if sz.H > limit.H {
+			t.Errorf("the window took %v, above its ceiling %v", sz, limit)
+		}
+	}
+}
+
+// A window the user enlarged keeps its size while its content still
+// fits, grows only along the axis the content outgrows, and cannot be
+// shrunk below its content.
+func TestAUserEnlargedWindowDialogStaysEnlarged(t *testing.T) {
+	r := surfacetest.Start(t)
+	g := openGrowing(t, r, widget.Size{})
+	enlarged := widget.Size{W: contentStart.W + 100, H: contentStart.H + 2*rowSize.H}
+	r.ResizeBy(t, testAppID, 100, 2*rowSize.H)
+	g.await(t, "the window enlarged by the user", enlarged)
+	g.add(t, 1)
+	g.holds(t, "a row that still fits", enlarged)
+	g.add(t, 2)
+	g.await(t, "the window grown to five rows, its width kept", widget.Size{W: enlarged.W, H: 5 * rowSize.H})
+	r.ResizeBy(t, testAppID, -1000, -1000)
+	g.await(t, "the window shrunk to its content", widget.Size{W: rowSize.W, H: 5 * rowSize.H})
+}
+
 // A spec Open cannot trust maps nothing and says why.
 func TestAnInvalidSpecIsRefused(t *testing.T) {
 	r := surfacetest.Start(t)

@@ -38,6 +38,19 @@ func TestAChooserWindowOpensAtItsSizeWithinThePanelBounds(t *testing.T) {
 	}
 }
 
+func TestAChooserWindowShrinksToItsFloor(t *testing.T) {
+	hs := newHarness(t, "")
+	hs.openWindow(t)
+	root := hs.cfg.Root
+	hs.run(func() {
+		lay(root, panelSize.W, panelSize.H)
+		least := widget.Size{W: root.Measure(widget.Row, widget.Unknown).Min, H: root.Measure(widget.Column, panelMin.W).Min}
+		if least.W > panelMin.W || least.H > panelMin.H {
+			t.Errorf("the window's content needs %v, want it to lay out at the %v floor so the window shrinks that far", least, panelMin)
+		}
+	})
+}
+
 func TestAChooserWindowIsFramedByTheWindowAlone(t *testing.T) {
 	hs := newHarness(t, "")
 	hs.openWindow(t)

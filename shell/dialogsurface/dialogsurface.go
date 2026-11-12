@@ -77,8 +77,11 @@ type Spec struct {
 
 // WindowSize is a window dialog's size. Initial is the size it opens
 // at, the tree's natural size on a zero axis; Min and Max bound how far
-// the compositor resizes it, unbounded on a zero axis. OnResize, when
-// set, hears every size the window takes, the first included.
+// the compositor resizes it, unbounded on a zero axis. Within Max, the
+// window's minimum also follows the least size its tree lays out at, so
+// content that grows grows the window and the user cannot shrink it
+// below its content. OnResize, when set, hears every size the window
+// takes, the first included.
 type WindowSize struct {
 	Initial, Min, Max widget.Size
 	OnResize          func(widget.Size)
