@@ -207,6 +207,49 @@ func TestRecordingFailureIsReportedAndStillFinalized(t *testing.T) {
 	}
 }
 
+func TestStopReportsAnEncoderThatFailsToClose(t *testing.T) {
+	fx := loadFixture(t)
+	closeErr := errors.New("recorder: close the H.264 encoder recording HDMI-A-1 on iGPU: gpu: timed out")
+	video := &fakeVideo{fx: fx, closeErr: closeErr}
+	r, path, terms := startTest(t, recordingParts{video: video}, config.RecorderFormatMp4)
+	waitRecording(t, "three frames", func() bool { return len(video.frames()) >= 3 })
+	if err := r.Stop(); !errors.Is(err, closeErr) {
+		t.Fatalf("Stop = %v, want the encoder's close error", err)
+	}
+	if err := r.Stop(); !errors.Is(err, closeErr) {
+		t.Errorf("a second Stop = %v, want the first's close error", err)
+	}
+	if video.closes != 1 {
+		t.Errorf("closed %d times, want once", video.closes)
+	}
+	if p := ffprobe(t, path); p.Streams[0].Frames != strconv.Itoa(len(video.frames())) {
+		t.Errorf("%s frames in the file, want all %d encoded: a failed encoder close must still finalize the file", p.Streams[0].Frames, len(video.frames()))
+	}
+	if got := terms.all(); len(got) != 0 {
+		t.Errorf("a requested stop reported %q", got)
+	}
+}
+
+func TestStartRecordingReportsAnEncoderThatFailsToClose(t *testing.T) {
+	fx := loadFixture(t)
+	path := filepath.Join(t.TempDir(), "x.webm")
+	closeErr := errors.New("recorder: close the H.264 encoder recording HDMI-A-1 on iGPU: gpu: timed out")
+	video := &fakeVideo{fx: fx, closeErr: closeErr}
+	_, err := startRecording(recordingParts{video: video, fps: testFPS, wall: systemClock{}}, Options{OutputPath: path, Format: "webm"}, func(string) {})
+	if err == nil || !strings.Contains(err.Error(), `no muxer for output format "webm"`) {
+		t.Errorf("start = %v, want the start's own failure", err)
+	}
+	if !errors.Is(err, closeErr) {
+		t.Errorf("start = %v, want the encoder's close error joined to it", err)
+	}
+	if video.closes != 1 {
+		t.Errorf("closed %d times, want once", video.closes)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the output was left behind: %v", err)
+	}
+}
+
 // fakeCamera hands out the frames the test sends; closing frames ends
 // it with err.
 type fakeCamera struct {

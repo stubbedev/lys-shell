@@ -121,8 +121,10 @@ func requireH264(d *gpu.Device) error {
 	}
 	enc, err := d.NewEncoder(gpu.EncoderConfig{Codec: gpu.H264, Width: 16, Height: 16, FrameRate: 1, KeyInterval: 1, QP: videoQP})
 	if err == nil {
-		enc.Close()
-		return fmt.Errorf("recorder: %w: %s lists no %s among %v, yet made an encoder for it", ErrNoVideoEncoder, d.Name(), gpu.H264, d.Codecs())
+		return errors.Join(
+			fmt.Errorf("recorder: %w: %s lists no %s among %v, yet made an encoder for it", ErrNoVideoEncoder, d.Name(), gpu.H264, d.Codecs()),
+			closeEncoder(enc, "the probe "+gpu.H264.String()+" encoder", d.Name()),
+		)
 	}
 	return fmt.Errorf("recorder: %w", err)
 }
@@ -195,8 +197,10 @@ func newGPUVideo(s *screen, fps uint32) (*gpuVideo, error) {
 		return nil, fmt.Errorf("recorder: a %dx%d H.264 encoder at %d fps on %s: %w", size.X, size.Y, fps, s.dev.Name(), err)
 	}
 	if ps := enc.ParameterSets(); len(ps) != 2 {
-		enc.Close()
-		return nil, fmt.Errorf("recorder: the H.264 encoder on %s gave %d parameter sets, want an SPS and a PPS", s.dev.Name(), len(ps))
+		return nil, errors.Join(
+			fmt.Errorf("recorder: the H.264 encoder on %s gave %d parameter sets, want an SPS and a PPS", s.dev.Name(), len(ps)),
+			closeEncoder(enc, "the "+gpu.H264.String()+" encoder for "+s.output.Name, s.dev.Name()),
+		)
 	}
 	log.Print(encodingLine(s.dev.Name(), enc.Backend()))
 	return &gpuVideo{s: s, enc: enc}, nil
@@ -247,4 +251,13 @@ func (v *gpuVideo) Frame(pts time.Duration) ([]gpu.Packet, error) {
 
 func (v *gpuVideo) Flush() ([]gpu.Packet, error) { return v.enc.Flush() }
 
-func (v *gpuVideo) Close() { v.enc.Close() }
+func (v *gpuVideo) Close() error {
+	return closeEncoder(v.enc, "the "+gpu.H264.String()+" encoder recording "+v.s.output.Name, v.s.dev.Name())
+}
+
+func closeEncoder(enc *gpu.Encoder, what, device string) error {
+	if err := enc.Close(); err != nil {
+		return fmt.Errorf("recorder: close %s on %s: %w", what, device, err)
+	}
+	return nil
+}

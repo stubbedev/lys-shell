@@ -237,14 +237,12 @@ func (g *gpuSession) parts(opts Options) (recordingParts, error) {
 		width, errW := intconv.Exact[int32](size.X)
 		height, errH := intconv.Exact[int32](size.Y)
 		if err := errors.Join(errW, errH); err != nil {
-			video.Close()
-			return recordingParts{}, fmt.Errorf("recorder: a %dx%d frame: %w", size.X, size.Y, err)
+			return recordingParts{}, errors.Join(fmt.Errorf("recorder: a %dx%d frame: %w", size.X, size.Y, err), video.Close())
 		}
 		parts.camRect = webcamRect(*opts.Webcam, width, height)
 		cam, err := openWebcam(opts.Webcam.Device, parts.camRect.Size())
 		if err != nil {
-			video.Close()
-			return recordingParts{}, err
+			return recordingParts{}, errors.Join(err, video.Close())
 		}
 		parts.cam = cam
 	}

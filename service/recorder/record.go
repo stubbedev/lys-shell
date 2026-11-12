@@ -40,7 +40,7 @@ type videoEncoder interface {
 	Frame(pts time.Duration) ([]gpu.Packet, error)
 	// Flush returns the frames still in flight.
 	Flush() ([]gpu.Packet, error)
-	Close()
+	Close() error
 }
 
 // camera is a webcam delivering frames already padded to the overlay's
@@ -202,7 +202,7 @@ func startPipeline(parts recordingParts, term func(reason string), open func([]m
 	r := &recording{p: parts, term: term, stop: make(chan struct{})}
 	defer func() {
 		if err != nil {
-			r.release()
+			err = errors.Join(err, r.release())
 		}
 	}()
 	sps, pps := parts.video.ParameterSets()
@@ -236,17 +236,18 @@ func startPipeline(parts recordingParts, term func(reason string), open func([]m
 
 // release closes what startRecording acquired when it fails, the
 // empty output included.
-func (r *recording) release() {
+func (r *recording) release() error {
 	for _, c := range r.captures {
 		c.Close()
 	}
 	if r.p.cam != nil {
 		r.p.cam.Close()
 	}
-	r.p.video.Close()
+	err := r.p.video.Close()
 	if r.sink != nil {
 		r.sink.discard()
 	}
+	return err
 }
 
 // fail reports the first error that ends the recording on its own. The
@@ -409,7 +410,9 @@ func (r *recording) finish() error {
 	if err := r.writeVideo(pkts); err != nil {
 		errs = append(errs, err)
 	}
-	r.p.video.Close()
+	if err := r.p.video.Close(); err != nil {
+		errs = append(errs, err)
+	}
 	if err := r.sink.close(); err != nil {
 		errs = append(errs, err)
 	}

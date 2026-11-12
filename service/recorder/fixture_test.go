@@ -102,8 +102,9 @@ type fakeVideo struct {
 	flushes  int
 	closes   int
 	// failAt makes the nth Frame call fail with failErr.
-	failAt  int
-	failErr error
+	failAt   int
+	failErr  error
+	closeErr error
 }
 
 func (v *fakeVideo) ParameterSets() (sps, pps []byte) { return v.fx.sps, v.fx.pps }
@@ -143,10 +144,11 @@ func (v *fakeVideo) Flush() ([]gpu.Packet, error) {
 	return []gpu.Packet{p}, nil
 }
 
-func (v *fakeVideo) Close() {
+func (v *fakeVideo) Close() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.closes++
+	return v.closeErr
 }
 
 func (v *fakeVideo) frames() []time.Duration {
