@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stubbedev/lys-lib/dbustest"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/dnssd"
 	"github.com/stubbedev/lys-shell/service/dnssd/dnssdtest"
@@ -135,9 +136,63 @@ func TestBrowseFollowsEveryAddress(t *testing.T) {
 	}
 }
 
-// A browse reads Avahi's signals off a channel of its own and keeps
-// none of the descriptors one carries: each is closed once the signal
-// is handled.
+// A browse hears Avahi alone: another connection's word in its name,
+// at the browse's own browser, is ignored even on a connection whose
+// other rules let it in.
+func TestBrowseIgnoresAnotherConnection(t *testing.T) {
+	a := dnssdtest.Start(t)
+	a.Announce(t, printer)
+	conn := a.Bus.Conn(t)
+	if err := conn.AddMatchSignal(dbus.WithMatchInterface(dnssd.BrowserIface)); err != nil {
+		t.Fatal(err)
+	}
+	found := make(chan dnssd.Service, 4)
+	removed := make(chan string, 4)
+	b, err := dnssd.New(conn).Browse(context.Background(), []string{printer.Type},
+		func(s dnssd.Service) { found <- s }, func(k string) { removed <- k })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := b.Stop(); err != nil {
+			t.Error(err)
+		}
+	}()
+	select {
+	case <-found:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the announced printer was not found")
+	}
+	browsers := a.Browsing(printer.Type)
+	if len(browsers) != 1 {
+		t.Fatalf("browsers %v, want one", browsers)
+	}
+	impostor := a.Bus.Conn(t)
+	if err := impostor.Emit(browsers[0], dnssd.BrowserIface+".ItemRemove", int32(2), int32(0), printer.Name, printer.Type, printer.Domain, uint32(0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := impostor.BusObject().Call("org.freedesktop.DBus.GetId", 0).Err; err != nil {
+		t.Fatal(err)
+	}
+	later := dnssd.Service{Name: "Inkjet", Type: printer.Type, Domain: "local", Host: "ink.local", Address: netip.MustParseAddr("192.0.2.8"), Port: 631}
+	a.Announce(t, later)
+	select {
+	case s := <-found:
+		if s.Key() != later.Key() {
+			t.Errorf("found %+v, want the inkjet", s)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the later service was not found")
+	}
+	select {
+	case k := <-removed:
+		t.Errorf("%q removed on another connection's word", k)
+	default:
+	}
+}
+
+// A browse keeps none of the descriptors Avahi's signals carry: one
+// that does not decode as a browser item has them closed.
 func TestBrowseClosesTheDescriptorsOfTheSignalsItReads(t *testing.T) {
 	a := dnssdtest.Start(t)
 	b, err := dnssd.New(a.Bus.Conn(t)).Browse(context.Background(), []string{"_ipps._tcp"}, func(dnssd.Service) {}, func(string) {})

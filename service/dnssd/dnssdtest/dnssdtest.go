@@ -112,6 +112,13 @@ func (a *Avahi) Withdraw(t *testing.T, s dnssd.Service) {
 	}
 }
 
+// Browsing are the browsers of typ.
+func (a *Avahi) Browsing(typ string) []dbus.ObjectPath {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.browsing(typ)
+}
+
 // browsing are the browsers of typ, the lock held.
 func (a *Avahi) browsing(typ string) []dbus.ObjectPath {
 	var paths []dbus.ObjectPath

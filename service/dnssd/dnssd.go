@@ -63,17 +63,33 @@ func New(conn *dbus.Conn) *Client { return &Client{conn: conn} }
 type Browser struct {
 	conn     *dbus.Conn
 	paths    []dbus.ObjectPath
-	signals  chan *dbus.Signal
+	watch    *dbusx.Watch
 	done     chan struct{}
 	stopOnce sync.Once
-	wg       sync.WaitGroup
+	stopErr  error
 }
 
-// browserMatch is the signal rule a browse listens with, installed
-// before its browsers exist, so their first items are not lost.
-func browserMatch() []dbus.MatchOption {
-	return []dbus.MatchOption{dbus.WithMatchSender(BusName), dbus.WithMatchInterface(BrowserIface)}
+// browserItem is what a browser's ItemNew and ItemRemove carry: the
+// interface and protocol a service is announced on, and the service.
+type browserItem struct {
+	Interface int32  `dbus:"interface"`
+	Protocol  int32  `dbus:"protocol"`
+	Name      string `dbus:"name"`
+	Type      string `dbus:"type"`
+	Domain    string `dbus:"domain"`
+	Flags     uint32 `dbus:"flags"`
 }
+
+func (i browserItem) instance() instance { return instance{i.Interface, i.Protocol} }
+
+func (i browserItem) key() string {
+	return Service{Name: i.Name, Type: i.Type, Domain: i.Domain}.Key()
+}
+
+var (
+	itemNew    = dbusx.NewSignal[browserItem](BrowserIface, "ItemNew")
+	itemRemove = dbusx.NewSignal[browserItem](BrowserIface, "ItemRemove")
+)
 
 // Browse browses types, calling found with each service resolved and
 // removed with the key of each that went, from one goroutine, until
@@ -86,95 +102,82 @@ func (c *Client) Browse(ctx context.Context, types []string, found func(Service)
 	if !owned {
 		return nil, ErrNoAvahi
 	}
-	if err := c.conn.AddMatchSignal(browserMatch()...); err != nil {
+	b := &Browser{conn: c.conn, done: make(chan struct{})}
+	server := c.conn.Object(BusName, serverPath)
+	created := make(chan struct{})
+	watch, err := dbusx.WatchSignals(context.WithoutCancel(ctx), c.conn, dbusx.FromOwner(BusName),
+		func(err error) { log.Printf("dnssd: %v", err) },
+		b.routes(created, server, found, removed)...)
+	if err != nil {
 		return nil, fmt.Errorf("dnssd: watching browsers: %w", err)
 	}
-	b := &Browser{conn: c.conn, signals: make(chan *dbus.Signal, 64), done: make(chan struct{})}
-	c.conn.Signal(b.signals)
-	server := c.conn.Object(BusName, serverPath)
+	b.watch = watch
+	err = b.create(ctx, server, types)
+	close(created)
+	if err != nil {
+		return nil, errors.Join(err, b.Stop())
+	}
+	return b, nil
+}
+
+// create makes a browser of each type. Avahi names a browser
+// /Client<n>/ServiceBrowser<m>, n its own number for the connection,
+// so no namespace holds a browse's browsers before the first is made:
+// the watch hears every browser and takes the items of these alone.
+func (b *Browser) create(ctx context.Context, server dbus.BusObject, types []string) error {
 	for _, t := range types {
 		var path dbus.ObjectPath
 		if err := server.CallWithContext(ctx, ServerIface+".ServiceBrowserNew", 0, ifaceUnspec, protoUnspec, t, "", uint32(0)).Store(&path); err != nil {
-			return nil, errors.Join(fmt.Errorf("dnssd: browsing %s: %w", t, err), b.Stop())
+			return fmt.Errorf("dnssd: browsing %s: %w", t, err)
 		}
 		b.paths = append(b.paths, path)
 	}
-	b.wg.Go(func() { b.run(server, found, removed) })
-	return b, nil
+	return nil
 }
 
 // instance is one interface and protocol a service is announced on,
 // as Avahi's browser items name them.
 type instance struct{ iface, proto int32 }
 
-// instanceOf reads a browser item's (interface, protocol, name, type,
-// domain, flags) instance and the key of its service.
-func instanceOf(body []any) (instance, string, bool) {
-	if len(body) < 5 {
-		return instance{}, "", false
-	}
-	iface, ok1 := body[0].(int32)
-	proto, ok2 := body[1].(int32)
-	name, ok3 := body[2].(string)
-	typ, ok4 := body[3].(string)
-	domain, ok5 := body[4].(string)
-	if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 {
-		return instance{}, "", false
-	}
-	return instance{iface, proto}, Service{Name: name, Type: typ, Domain: domain}.Key(), true
-}
-
-// run hands over what the browsers announce until Stop, discarding each
-// signal once it is handled.
-func (b *Browser) run(server dbus.BusObject, found func(Service), removed func(string)) {
+// routes take what the browsers announce once created is closed. A
+// service is announced once per interface and protocol, each resolved
+// to its own address; found is told the best of them whenever one
+// comes or goes, and removed once the last went.
+func (b *Browser) routes(created <-chan struct{}, server dbus.BusObject, found func(Service), removed func(string)) []dbusx.Route {
 	services := map[string]map[instance]Service{}
-	for {
-		select {
-		case <-b.done:
-			return
-		case sig, ok := <-b.signals:
+	return []dbusx.Route{
+		dbusx.OnUnder(itemNew, "/", func(path dbus.ObjectPath, item browserItem, _ dbus.Sequence) error {
+			<-created
+			if !b.ours(path) {
+				return nil
+			}
+			s, ok := b.resolve(server, item)
 			if !ok {
-				return
+				return nil
 			}
-			b.announce(sig, services, server, found, removed)
-			if err := sig.CloseFDs(); err != nil {
-				log.Printf("dnssd: close the descriptors of %s from %s: %v", sig.Name, sig.Sender, err)
+			key := item.key()
+			if services[key] == nil {
+				services[key] = map[instance]Service{}
 			}
-		}
-	}
-}
-
-// announce takes one browser item into services. A service is
-// announced once per interface and protocol, each resolved to its own
-// address; found is told the best of them whenever one comes or goes,
-// and removed once the last went.
-func (b *Browser) announce(sig *dbus.Signal, services map[string]map[instance]Service, server dbus.BusObject, found func(Service), removed func(string)) {
-	if !b.ours(sig.Path) {
-		return
-	}
-	inst, key, ok := instanceOf(sig.Body)
-	if !ok {
-		return
-	}
-	switch sig.Name {
-	case BrowserIface + ".ItemNew":
-		s, ok := b.resolve(server, inst, sig.Body)
-		if !ok {
-			return
-		}
-		if services[key] == nil {
-			services[key] = map[instance]Service{}
-		}
-		services[key][inst] = s
-		found(best(services[key]))
-	case BrowserIface + ".ItemRemove":
-		delete(services[key], inst)
-		if len(services[key]) == 0 {
-			delete(services, key)
-			removed(key)
-			return
-		}
-		found(best(services[key]))
+			services[key][item.instance()] = s
+			found(best(services[key]))
+			return nil
+		}),
+		dbusx.OnUnder(itemRemove, "/", func(path dbus.ObjectPath, item browserItem, _ dbus.Sequence) error {
+			<-created
+			if !b.ours(path) {
+				return nil
+			}
+			key := item.key()
+			delete(services[key], item.instance())
+			if len(services[key]) == 0 {
+				delete(services, key)
+				removed(key)
+				return nil
+			}
+			found(best(services[key]))
+			return nil
+		}),
 	}
 }
 
@@ -202,7 +205,7 @@ func (b *Browser) ours(path dbus.ObjectPath) bool { return slices.Contains(b.pat
 // interface and protocol, to an address of that protocol: a link-local
 // IPv6 one carries its interface as its zone, without which it cannot
 // be reached.
-func (b *Browser) resolve(server dbus.BusObject, inst instance, body []any) (Service, bool) {
+func (b *Browser) resolve(server dbus.BusObject, item browserItem) (Service, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
 	defer cancel()
 	go func() {
@@ -220,7 +223,7 @@ func (b *Browser) resolve(server dbus.BusObject, inst instance, body []any) (Ser
 		txt                  [][]byte
 		flags                uint32
 	)
-	err := server.CallWithContext(ctx, ServerIface+".ResolveService", 0, inst.iface, inst.proto, body[2], body[3], body[4], inst.proto, uint32(0)).
+	err := server.CallWithContext(ctx, ServerIface+".ResolveService", 0, item.Interface, item.Protocol, item.Name, item.Type, item.Domain, item.Protocol, uint32(0)).
 		Store(&iface, &proto, &name, &typ, &domain, &host, &aproto, &address, &port, &txt, &flags)
 	if err != nil {
 		return Service{}, false
@@ -256,12 +259,15 @@ func txtRecord(txt [][]byte) map[string]string {
 }
 
 // Stop frees the browsers and waits for the last service handed over;
-// a browser Avahi would not free is the error.
+// a browser Avahi would not free is the error. Calling it again
+// reports the same.
 func (b *Browser) Stop() error {
-	var errs []error
 	b.stopOnce.Do(func() {
 		close(b.done)
-		b.wg.Wait()
+		var errs []error
+		if err := b.watch.Stop(); err != nil {
+			errs = append(errs, fmt.Errorf("dnssd: stop following browsers: %w", err))
+		}
 		for _, p := range b.paths {
 			ctx, cancel := context.WithTimeout(context.Background(), resolveTimeout)
 			if err := b.conn.Object(BusName, p).CallWithContext(ctx, BrowserIface+".Free", 0).Err; err != nil {
@@ -269,12 +275,7 @@ func (b *Browser) Stop() error {
 			}
 			cancel()
 		}
-		if err := b.conn.RemoveMatchSignal(browserMatch()...); err != nil {
-			errs = append(errs, fmt.Errorf("dnssd: unwatching browsers: %w", err))
-		}
-		if err := dbusx.RemoveSignal(b.conn, b.signals); err != nil {
-			errs = append(errs, fmt.Errorf("dnssd: stop following browsers: %w", err))
-		}
+		b.stopErr = errors.Join(errs...)
 	})
-	return errors.Join(errs...)
+	return b.stopErr
 }
