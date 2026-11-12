@@ -82,7 +82,6 @@ func TestMountMakesNoBlockingBusCallOnTheLoop(t *testing.T) {
 	t.Cleanup(func() { _ = session.Close() })
 	a := apptest.Run(t)
 	s := newShellStart(a, a.Session(), config.Defaults(), nil, session)
-	apptest.On(a, func() bool { s.releaseHold = a.Hold(); return true })
 	s.startServices(system)
 	t.Cleanup(func() {
 		apptest.On(a, func() bool { s.down.run(); return true })

@@ -136,10 +136,8 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	// as the Rust shell's revealers do; lys-ui's own surface fades would
 	// stack on top of them.
 	application.SetSurfaceMotion(false)
-	outputs := sess.Outputs()
-	if len(outputs) == 0 {
-		return errors.New("bar: no output to draw on")
-	}
+	application.Hold()
+	defer logOutputWait(sess)()
 	// Programmatic copies (the screenshot host) and the ctrl+c/v keys
 	// share one clipboard.
 	if application.Clipboard() == nil {
@@ -147,9 +145,8 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	}
 	s := newShellStart(application, sess, cfg, svc, session)
 	defer s.down.run()
-	s.releaseHold = application.Hold()
 	gate := newStartGate(s.mount)
-	wall, stopWallpaper := wallpapershell.Launch(application, outputs, cfg, session, sess, gate.done)
+	wall, stopWallpaper := wallpapershell.Launch(application, sess.Outputs(), cfg, session, sess, gate.done)
 	defer stopWallpaper()
 	s.wall = wall
 	servicesUp := make(chan struct{})
@@ -242,7 +239,6 @@ type shellStart struct {
 	customUpd    *customUpdates
 	wall         *wallpapershell.Shell
 	polls        *pollHub
-	releaseHold  func()
 	down         teardown
 	err          error
 }
@@ -866,7 +862,6 @@ func (s *shellStart) mount() {
 			}
 		}
 	})
-	s.releaseHold()
 }
 
 // barConfigFor shows one output's bar on lys-ui's bar window: anchored

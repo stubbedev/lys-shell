@@ -238,6 +238,22 @@ type outputSource interface {
 	WatchOutputs(added, removed func(*app.Output)) (stop func())
 }
 
+func logOutputWait(sess outputSource) (stop func()) {
+	waiting := false
+	check := func() {
+		none := len(sess.Outputs()) == 0
+		switch {
+		case none && !waiting:
+			log.Print("bar: the compositor has no output; the bar, wallpaper and OSD wait for one")
+		case !none && waiting:
+			log.Print("bar: an output appeared; the bar, wallpaper and OSD return")
+		}
+		waiting = none
+	}
+	check()
+	return sess.WatchOutputs(func(*app.Output) { check() }, func(*app.Output) { check() })
+}
+
 // restyler is a surface that takes a config's styling in place.
 type restyler interface{ Restyle(cfg *config.Config) }
 

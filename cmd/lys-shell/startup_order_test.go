@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"maps"
 	"net"
 	"os"
 	"os/exec"
@@ -23,11 +24,16 @@ import (
 	"github.com/stubbedev/lys-lib/dbustest"
 	"github.com/stubbedev/lys-lib/logind/logindtest"
 	"github.com/stubbedev/lys-lib/sockdir"
+	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 	"github.com/stubbedev/lys-lib/wmipc"
 
 	"github.com/stubbedev/lys-shell/service/mango"
 	"github.com/stubbedev/lys-shell/service/niri"
+	"github.com/stubbedev/lys-shell/service/notifications"
 	"github.com/stubbedev/lys-shell/service/sharepreview"
+	"github.com/stubbedev/lys-shell/service/shellipc"
+	"github.com/stubbedev/lys-shell/service/sni"
+	"github.com/stubbedev/lys-shell/shell/filechooser"
 )
 
 const startupBound = 30 * time.Second
@@ -343,5 +349,94 @@ func TestWallpaperDoesNotWaitForServices(t *testing.T) {
 	await(t, s, "the wallpaper to show while a service hangs", func() bool { return isRed(captureCenter(t)) })
 	if barMapped(t) {
 		t.Error("the bar mapped before the services it waits for")
+	}
+}
+
+const outputWaitLog = "the compositor has no output"
+
+func swayOutputNames(t *testing.T) []string {
+	t.Helper()
+	var outputs []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(swaytest.Msg(t, "-t", "get_outputs"), &outputs); err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(outputs))
+	for _, o := range outputs {
+		names = append(names, o.Name)
+	}
+	return names
+}
+
+func unplugEveryOutput(t *testing.T) {
+	t.Helper()
+	for _, name := range swayOutputNames(t) {
+		swaytest.Msg(t, "output", name, "unplug")
+	}
+	if left := swayOutputNames(t); len(left) != 0 {
+		t.Fatalf("sway still shows %q after unplugging every output", left)
+	}
+}
+
+var shellServices = []string{notifications.Interface, filechooser.ServiceName, sni.WatcherName, shellipc.ServiceName}
+
+func serviceOwners(bus *dbus.Conn) (map[string]string, error) {
+	owners := make(map[string]string, len(shellServices))
+	for _, name := range shellServices {
+		var owner string
+		if err := bus.BusObject().Call("org.freedesktop.DBus.GetNameOwner", 0, name).Store(&owner); err != nil {
+			return nil, fmt.Errorf("owner of %s: %w", name, err)
+		}
+		owners[name] = owner
+	}
+	return owners, nil
+}
+
+func requireSameServices(t *testing.T, s *startedShell, bus *dbus.Conn, want map[string]string, when string) {
+	t.Helper()
+	got, err := serviceOwners(bus)
+	if err != nil {
+		t.Fatalf("%s: %v\nshell log:\n%s", when, err, s.logs(t))
+	}
+	if !maps.Equal(got, want) {
+		t.Fatalf("%s: the services are owned by %v, want the shell's first %v", when, got, want)
+	}
+}
+
+func TestShellWithoutAnOutputWaitsForOneAndKeepsItsServices(t *testing.T) {
+	startBareSession(t)
+	unplugEveryOutput(t)
+	image := filepath.Join(t.TempDir(), "red.jpg")
+	if err := os.WriteFile(image, redJPEG(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := startShellProcess(t, image)
+	bus := dbustest.SessionConn(t)
+	var owners map[string]string
+	await(t, s, "the shell's services without an output", func() bool {
+		var err error
+		owners, err = serviceOwners(bus)
+		return err == nil
+	})
+	if n := strings.Count(s.logs(t), outputWaitLog); n != 1 {
+		t.Fatalf("the wait for an output was logged %d times, want once:\n%s", n, s.logs(t))
+	}
+
+	swaytest.Msg(t, "create_output")
+	awaitBar(t, s)
+	await(t, s, "the wallpaper on the first output", func() bool { return isRed(captureCenter(t)) })
+	requireSameServices(t, s, bus, owners, "after the first output appeared")
+
+	unplugEveryOutput(t)
+	await(t, s, "the shell to log the second wait", func() bool { return strings.Count(s.logs(t), outputWaitLog) == 2 })
+	requireSameServices(t, s, bus, owners, "with every output unplugged")
+
+	swaytest.Msg(t, "create_output")
+	awaitBar(t, s)
+	await(t, s, "the wallpaper on the returning output", func() bool { return isRed(captureCenter(t)) })
+	requireSameServices(t, s, bus, owners, "after an output came back")
+	if n := strings.Count(s.logs(t), outputWaitLog); n != 2 {
+		t.Errorf("the two waits for an output were logged %d times:\n%s", n, s.logs(t))
 	}
 }
