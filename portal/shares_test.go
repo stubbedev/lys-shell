@@ -6,29 +6,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stubbedev/lys-lib/dbustest"
 	dbus "github.com/stubbedev/lys-lib/third_party/godbus"
 
 	"github.com/stubbedev/lys-shell/service/screenshare"
 )
 
 // followShares follows the rig's shares as the shell's bar does.
-func followShares(t *testing.T, r *rig) (*screenshare.Shares, *dbustest.Var[int]) {
+func followShares(t *testing.T, r *rig) *screenshare.Shares {
 	t.Helper()
 	s, err := screenshare.Follow(r.bus.Conn(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Close)
-	ticks := &dbustest.Var[int]{}
-	ch, stop := s.Subscribe()
-	t.Cleanup(stop)
-	go func() {
-		for range ch {
-			ticks.Update(func(n int) int { return n + 1 })
-		}
-	}()
-	return s, ticks
+	return s
 }
 
 func awaitShares(t *testing.T, s *screenshare.Shares, want []screenshare.Share) {
@@ -50,7 +41,9 @@ func TestAStartedShareIsListedAndStopEndsItsSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	serveSharePicker(t, r, "/screen:DP-1")
-	shares, ticks := followShares(t, r)
+	shares := followShares(t, r)
+	ticks, stop := shares.Subscribe()
+	t.Cleanup(stop)
 	if got := shares.List(); len(got) != 0 {
 		t.Fatalf("shares before any session: %+v", got)
 	}
@@ -62,7 +55,9 @@ func TestAStartedShareIsListedAndStopEndsItsSession(t *testing.T) {
 		Session: sessA, App: "org.app", Kind: screenshare.KindScreenCast,
 		Targets: []screenshare.Target{{Kind: screenshare.TargetOutput, Name: "DP-1"}},
 	}})
-	if ticks.Load() == 0 {
+	select {
+	case <-ticks:
+	case <-time.After(5 * time.Second):
 		t.Error("no change was told")
 	}
 	if err := shares.Stop(context.Background(), sessA); err != nil {
@@ -82,7 +77,7 @@ func TestAWindowShareNamesItsWindow(t *testing.T) {
 		b.shares.titles = func() map[string]string { return map[string]string{"lys-wm-7": "Notes - Editor"} }
 	})
 	serveSharePicker(t, r, "/window:lys-wm-7")
-	shares, _ := followShares(t, r)
+	shares := followShares(t, r)
 	r.castSession(t, Vardict{"types": dbus.MakeVariant(sourceWindow)})
 	if code, _ := r.castStart(t); code != ResponseSuccess {
 		t.Fatalf("Start = %d", code)
@@ -95,7 +90,7 @@ func TestAWindowShareNamesItsWindow(t *testing.T) {
 
 func TestStopRefusesWhatIsNotAShare(t *testing.T) {
 	r, _ := castRig(t)
-	shares, _ := followShares(t, r)
+	shares := followShares(t, r)
 	r.castSession(t, Vardict{})
 	if err := shares.Stop(context.Background(), sessA); err == nil {
 		t.Error("a session that streams nothing stopped as a share")
@@ -111,7 +106,7 @@ func TestStopRefusesWhatIsNotAShare(t *testing.T) {
 func TestAShareWhoseSourceVanishesLeavesTheList(t *testing.T) {
 	r, f := castRig(t)
 	serveSharePicker(t, r, "/screen:DP-1")
-	shares, _ := followShares(t, r)
+	shares := followShares(t, r)
 	r.castSession(t, Vardict{})
 	if code, _ := r.castStart(t); code != ResponseSuccess {
 		t.Fatalf("Start = %d", code)
