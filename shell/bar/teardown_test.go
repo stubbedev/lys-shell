@@ -2,19 +2,6 @@ package bar
 
 import "testing"
 
-func TestStartGateOpensOnceBothHaveLanded(t *testing.T) {
-	opened := 0
-	g := newStartGate(func() { opened++ })
-	g.done()
-	if opened != 0 {
-		t.Fatal("the gate opened with one of two landed")
-	}
-	g.done()
-	if opened != 1 {
-		t.Fatalf("the gate opened %d times, want 1", opened)
-	}
-}
-
 func TestTeardownRunsLastAcquiredFirst(t *testing.T) {
 	var order []int
 	var down teardown

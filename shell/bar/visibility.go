@@ -22,6 +22,7 @@ import (
 // closes the layer and showing builds a fresh one with open.
 type surfaceSet[L any] struct {
 	open  func(*app.Output, L) (surfaceLayer[L], error)
+	await awaitFirstFrame
 	order []string
 	bars  map[string]*surfaceEntry[L]
 	// publish hears connectors() after each plug, unplug and reload;
@@ -43,13 +44,21 @@ type surfaceEntry[L any] struct {
 	layout L
 	// shows is whether the layout gives the output a bar; hidden is
 	// the Shell1 hide state. The layer is open exactly when shows and
-	// not hidden.
-	shows, hidden bool
-	layer         surfaceLayer[L]
+	// not hidden, once the output's wallpaper is ready.
+	shows, hidden, ready bool
+	cancelWait           func()
+	layer                surfaceLayer[L]
 }
 
-func newSurfaceSet[L any](open func(*app.Output, L) (surfaceLayer[L], error)) *surfaceSet[L] {
-	return &surfaceSet[L]{open: open, bars: map[string]*surfaceEntry[L]{}}
+type awaitFirstFrame func(out *app.Output, done func()) (cancel func())
+
+func noWallpaper(_ *app.Output, done func()) func() {
+	done()
+	return func() {}
+}
+
+func newSurfaceSet[L any](open func(*app.Output, L) (surfaceLayer[L], error), await awaitFirstFrame) *surfaceSet[L] {
+	return &surfaceSet[L]{open: open, await: await, bars: map[string]*surfaceEntry[L]{}}
 }
 
 // connectors names the outputs whose layout gives them a bar, in
@@ -107,9 +116,9 @@ func (b *surfaceSet[L]) reload(layoutFor func(connector string) (L, bool)) {
 	b.published()
 }
 
-// sync opens or closes the entry's layer to match shows and hidden.
+// sync opens or closes the entry's layer to match shows, hidden and ready.
 func (b *surfaceSet[L]) sync(name string, entry *surfaceEntry[L]) {
-	want := entry.shows && !entry.hidden
+	want := entry.shows && !entry.hidden && entry.ready
 	switch {
 	case !want && entry.layer != nil:
 		entry.layer.Close()
@@ -175,7 +184,10 @@ func (b *surfaceSet[L]) plug(output *app.Output, layout L, shows bool) {
 	entry := &surfaceEntry[L]{output: output, layout: layout, shows: shows}
 	b.order = append(b.order, output.Name)
 	b.bars[output.Name] = entry
-	b.sync(output.Name, entry)
+	entry.cancelWait = b.await(output, func() {
+		entry.ready = true
+		b.sync(output.Name, entry)
+	})
 	b.published()
 }
 
@@ -197,7 +209,9 @@ func (b *surfaceSet[L]) close() {
 }
 
 func (b *surfaceSet[L]) drop(name string) {
-	if entry := b.bars[name]; entry.layer != nil {
+	entry := b.bars[name]
+	entry.cancelWait()
+	if entry.layer != nil {
 		entry.layer.Close()
 	}
 	delete(b.bars, name)

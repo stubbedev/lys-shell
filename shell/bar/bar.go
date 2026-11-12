@@ -145,8 +145,7 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 	}
 	s := newShellStart(application, sess, cfg, svc, session)
 	defer s.down.run()
-	gate := newStartGate(s.mount)
-	wall, stopWallpaper := wallpapershell.Launch(application, sess.Outputs(), cfg, session, sess, gate.done)
+	wall, stopWallpaper := wallpapershell.Launch(application, sess.Outputs(), cfg, session, sess)
 	defer stopWallpaper()
 	s.wall = wall
 	servicesUp := make(chan struct{})
@@ -157,7 +156,7 @@ func run(cfg *config.Config, svc *config.Service, session *dbus.Conn) error {
 			log.Printf("bar: system bus: %v", err)
 		}
 		s.startServices(system)
-		application.Invoke(gate.done)
+		application.Invoke(s.mount)
 	}()
 	err = application.Run()
 	<-servicesUp
@@ -174,20 +173,6 @@ const (
 	configFlushTimeout = 5 * time.Second
 	pollIdleAfter      = 5 * time.Minute
 )
-
-type startGate struct {
-	pending int
-	open    func()
-}
-
-func newStartGate(open func()) *startGate { return &startGate{pending: 2, open: open} }
-
-func (g *startGate) done() {
-	g.pending--
-	if g.pending == 0 {
-		g.open()
-	}
-}
 
 type teardown []func()
 
@@ -648,8 +633,12 @@ func (s *shellStart) mount() {
 		s.down.add(followFocusInputs(application, s.notifSvc, s.ctx.ScreenShares, s.ctx.Recorder))
 	}
 	host := &barHost{app: application, rt: rt, holder: holder}
-	bars := newSurfaceSet(host.open)
-	docks := newSurfaceSet((&dockHost{app: application, rt: rt}).open)
+	awaitWallpaper := awaitFirstFrame(noWallpaper)
+	if s.wall != nil {
+		awaitWallpaper = s.wall.AwaitFirstFrame
+	}
+	bars := newSurfaceSet(host.open, awaitWallpaper)
+	docks := newSurfaceSet((&dockHost{app: application, rt: rt}).open, awaitWallpaper)
 	s.down.add(func() {
 		bars.close()
 		docks.close()

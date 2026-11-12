@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -67,15 +68,30 @@ func (s *startedShell) logs(t *testing.T) string {
 	return string(data)
 }
 
+type monitorWallpaper struct{ monitor, path string }
+
 func startShellProcess(t *testing.T, wallpaper string, env ...string) *startedShell {
+	t.Helper()
+	return startShellWithWallpapers(t, wallpaper, nil, env...)
+}
+
+func startShellWithWallpapers(t *testing.T, wallpaper string, monitors []monitorWallpaper, env ...string) *startedShell {
 	t.Helper()
 	dir := t.TempDir()
 	configDir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "lys-shell")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	config := fmt.Sprintf("wallpaper:\n  wallpaper: %s\nosd:\n  enabled: false\nmodules:\n  brightness:\n    enable-external: false\n", strconv.Quote(wallpaper))
-	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(config), 0o600); err != nil {
+	var config strings.Builder
+	fmt.Fprintf(&config, "wallpaper:\n  wallpaper: %s\n", strconv.Quote(wallpaper))
+	if len(monitors) > 0 {
+		config.WriteString("  monitors:\n")
+	}
+	for _, m := range monitors {
+		fmt.Fprintf(&config, "    - name: %s\n      wallpaper: %s\n", strconv.Quote(m.monitor), strconv.Quote(m.path))
+	}
+	config.WriteString("osd:\n  enabled: false\nmodules:\n  brightness:\n    enable-external: false\n")
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(config.String()), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	logPath := filepath.Join(dir, "shell.log")
@@ -116,7 +132,12 @@ func startShellProcess(t *testing.T, wallpaper string, env ...string) *startedSh
 	return s
 }
 
-func captureCenters(t *testing.T) []color.RGBA {
+type outputCenter struct {
+	output string
+	color  color.RGBA
+}
+
+func captureCenters(t *testing.T) []outputCenter {
 	t.Helper()
 	c, err := capture.Connect()
 	if err != nil {
@@ -127,41 +148,56 @@ func captureCenters(t *testing.T) []color.RGBA {
 	if len(outs) == 0 {
 		t.Fatal("the compositor has no output")
 	}
-	centers := make([]color.RGBA, 0, len(outs))
+	centers := make([]outputCenter, 0, len(outs))
 	for _, out := range outs {
 		f, err := c.CaptureOutput(out, capture.Options{})
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("capture %s: %v", out.Name, err)
 		}
 		img, err := sharepreview.FrameImage(f, out.Transform)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("frame of %s: %v", out.Name, err)
 		}
 		b := img.Bounds()
-		centers = append(centers, img.RGBAAt(b.Min.X+b.Dx()/2, b.Min.Y+b.Dy()/2))
+		centers = append(centers, outputCenter{output: out.Name, color: img.RGBAAt(b.Min.X+b.Dx()/2, b.Min.Y+b.Dy()/2)})
 	}
 	return centers
 }
 
 func captureCenter(t *testing.T) color.RGBA {
 	t.Helper()
-	return captureCenters(t)[0]
+	return captureCenters(t)[0].color
 }
 
-func swayUsableHeight(t *testing.T) (usable, whole int) {
+func captureCenterOf(t *testing.T, output string) color.RGBA {
 	t.Helper()
-	var workspaces []struct {
-		Rect struct {
-			Height int `json:"height"`
-		} `json:"rect"`
+	centers := captureCenters(t)
+	i := slices.IndexFunc(centers, func(c outputCenter) bool { return c.output == output })
+	if i < 0 {
+		t.Fatalf("no capture of %s among %v", output, centers)
 	}
+	return centers[i].color
+}
+
+type swayRect struct {
+	Height int `json:"height"`
+}
+
+type swayWorkspace struct {
+	Output  string   `json:"output"`
+	Visible bool     `json:"visible"`
+	Rect    swayRect `json:"rect"`
+}
+
+func barsMapped(t *testing.T) map[string]bool {
+	t.Helper()
+	var workspaces []swayWorkspace
 	if err := json.Unmarshal(swaytest.Msg(t, "-t", "get_workspaces"), &workspaces); err != nil {
 		t.Fatal(err)
 	}
 	var outputs []struct {
-		Rect struct {
-			Height int `json:"height"`
-		} `json:"rect"`
+		Name string   `json:"name"`
+		Rect swayRect `json:"rect"`
 	}
 	if err := json.Unmarshal(swaytest.Msg(t, "-t", "get_outputs"), &outputs); err != nil {
 		t.Fatal(err)
@@ -169,13 +205,27 @@ func swayUsableHeight(t *testing.T) (usable, whole int) {
 	if len(workspaces) == 0 || len(outputs) == 0 {
 		t.Fatal("sway reports no workspace or output")
 	}
-	return workspaces[0].Rect.Height, outputs[0].Rect.Height
+	mapped := make(map[string]bool, len(outputs))
+	for _, out := range outputs {
+		i := slices.IndexFunc(workspaces, func(ws swayWorkspace) bool { return ws.Output == out.Name && ws.Visible })
+		mapped[out.Name] = i >= 0 && workspaces[i].Rect.Height < out.Rect.Height
+	}
+	return mapped
 }
 
 func barMapped(t *testing.T) bool {
 	t.Helper()
-	usable, whole := swayUsableHeight(t)
-	return usable < whole
+	for _, mapped := range barsMapped(t) {
+		if mapped {
+			return true
+		}
+	}
+	return false
+}
+
+func barMappedOn(t *testing.T, output string) bool {
+	t.Helper()
+	return barsMapped(t)[output]
 }
 
 func awaitBar(t *testing.T, s *startedShell) {
@@ -262,14 +312,22 @@ func TestBarsLandOnAVisibleWallpaperOnEveryOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := startShellProcess(t, image)
-	awaitBar(t, s)
+	await(t, s, "a bar on every output", func() bool {
+		n := 0
+		for _, mapped := range barsMapped(t) {
+			if mapped {
+				n++
+			}
+		}
+		return n == 2
+	})
 	centers := captureCenters(t)
 	if len(centers) != 2 {
 		t.Fatalf("%d outputs, want 2", len(centers))
 	}
-	for i, got := range centers {
-		if !isRed(got) {
-			t.Errorf("output %d shows %v under the bar, want the red wallpaper", i, got)
+	for _, got := range centers {
+		if !isRed(got.color) {
+			t.Errorf("%s shows %v under the bar, want the red wallpaper", got.output, got.color)
 		}
 	}
 }
@@ -289,9 +347,7 @@ func TestDecodeThatHangsShowsTheBuiltinWallpaperUnderTheBar(t *testing.T) {
 	if !strings.Contains(s.logs(t), "is not ready after") {
 		t.Errorf("the slow image logged nothing:\n%s", s.logs(t))
 	}
-	if err := os.WriteFile(fifo, redJPEG(t), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	feed(t, fifo, redJPEG(t))
 	await(t, s, "the image to replace the built-in wallpaper", func() bool { return isRed(captureCenter(t)) })
 }
 
@@ -439,4 +495,84 @@ func TestShellWithoutAnOutputWaitsForOneAndKeepsItsServices(t *testing.T) {
 	if n := strings.Count(s.logs(t), outputWaitLog); n != 2 {
 		t.Errorf("the two waits for an output were logged %d times:\n%s", n, s.logs(t))
 	}
+}
+
+const pluggedOutput = "HEADLESS-2"
+
+func startShellAwaitingAPluggedOutput(t *testing.T) (s *startedShell, heldImage string) {
+	t.Helper()
+	startBareSession(t)
+	dir := t.TempDir()
+	image := filepath.Join(dir, "red.jpg")
+	if err := os.WriteFile(image, redJPEG(t), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	heldImage = filepath.Join(dir, "held.jpg")
+	if err := syscall.Mkfifo(heldImage, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s = startShellWithWallpapers(t, image, []monitorWallpaper{{monitor: pluggedOutput, path: heldImage}})
+	awaitBar(t, s)
+	swaytest.Msg(t, "create_output")
+	if names := swayOutputNames(t); !slices.Contains(names, pluggedOutput) {
+		t.Fatalf("sway added none of %q: %q", pluggedOutput, names)
+	}
+	return s, heldImage
+}
+
+func requireNoBarWhileTheImageIsHeld(t *testing.T, s *startedShell, hold time.Duration) {
+	t.Helper()
+	for until := time.Now().Add(hold); time.Now().Before(until); time.Sleep(10 * time.Millisecond) {
+		if barMappedOn(t, pluggedOutput) {
+			t.Fatalf("the bar mapped on %s while its wallpaper was still decoding; it shows %v\nshell log:\n%s", pluggedOutput, captureCenterOf(t, pluggedOutput), s.logs(t))
+		}
+	}
+}
+
+func awaitBarOverAWallpaper(t *testing.T, s *startedShell) {
+	t.Helper()
+	await(t, s, "the bar on "+pluggedOutput, func() bool {
+		if !barMappedOn(t, pluggedOutput) {
+			return false
+		}
+		if got := captureCenterOf(t, pluggedOutput); isBlack(got) {
+			t.Fatalf("the bar mapped on %s over a black desktop\nshell log:\n%s", pluggedOutput, s.logs(t))
+		}
+		return true
+	})
+}
+
+func feed(t *testing.T, fifo string, data []byte) {
+	t.Helper()
+	fed := make(chan error, 1)
+	go func() { fed <- os.WriteFile(fifo, data, 0o600) }()
+	t.Cleanup(func() {
+		select {
+		case err := <-fed:
+			if err != nil {
+				t.Errorf("feed %s: %v", fifo, err)
+			}
+		case <-time.After(startupBound):
+			t.Errorf("the shell never opened %s to read it in %v", fifo, startupBound)
+		}
+	})
+}
+
+func TestBarOnAPluggedOutputWaitsForItsWallpaper(t *testing.T) {
+	s, held := startShellAwaitingAPluggedOutput(t)
+	requireNoBarWhileTheImageIsHeld(t, s, 500*time.Millisecond)
+	feed(t, held, redJPEG(t))
+	awaitBarOverAWallpaper(t, s)
+	await(t, s, "the image on "+pluggedOutput, func() bool { return isRed(captureCenterOf(t, pluggedOutput)) })
+}
+
+func TestBarOnAPluggedOutputMapsOverTheBuiltinWallpaperWhenItsImageHangs(t *testing.T) {
+	s, held := startShellAwaitingAPluggedOutput(t)
+	requireNoBarWhileTheImageIsHeld(t, s, 500*time.Millisecond)
+	awaitBarOverAWallpaper(t, s)
+	if !strings.Contains(s.logs(t), pluggedOutput+": "+held+" is not ready after") {
+		t.Errorf("the hanging image on %s logged nothing:\n%s", pluggedOutput, s.logs(t))
+	}
+	feed(t, held, redJPEG(t))
+	await(t, s, "the image to replace the built-in wallpaper on "+pluggedOutput, func() bool { return isRed(captureCenterOf(t, pluggedOutput)) })
 }

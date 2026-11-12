@@ -50,7 +50,7 @@ func openHeadlessBar(t *testing.T, cfg *config.Config, layout config.BarLayout) 
 			h.bar = layer.(*barWindow)
 		}
 		return layer, err
-	})
+	}, noWallpaper)
 	outputs := sess.Outputs()
 	if len(outputs) == 0 || outputs[0].Name == "" {
 		t.Fatalf("the headless sway shows outputs %v", outputs)

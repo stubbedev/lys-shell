@@ -112,7 +112,7 @@ func TestBarReloadKeepsTheSurface(t *testing.T) {
 		w := layer.(*barWindow)
 		opened = append(opened, w)
 		return &probeLayer{barWindow: w, onClose: func() { closes++ }}, nil
-	})
+	}, noWallpaper)
 	outputs := sess.Outputs()
 	if len(outputs) == 0 || outputs[0].Name == "" {
 		t.Fatalf("the headless sway shows outputs %v", outputs)

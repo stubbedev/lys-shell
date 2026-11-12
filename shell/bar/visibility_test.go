@@ -51,7 +51,7 @@ func showClock(string) (config.BarLayout, bool) { return clockLayout, true }
 // the layer is rebuilt with the new layout.
 func TestBarSetReloadRebuildsInPlace(t *testing.T) {
 	o := &fakeOpener{}
-	set := newSurfaceSet(o.open)
+	set := newSurfaceSet(o.open, noWallpaper)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	set.reload(showClock)
 	set.reload(showClock)
@@ -68,7 +68,7 @@ func TestBarSetReloadRebuildsInPlace(t *testing.T) {
 // apply retries it.
 func TestBarSetReloadReopensARefusingSurface(t *testing.T) {
 	o := &fakeOpener{}
-	set := newSurfaceSet(o.open)
+	set := newSurfaceSet(o.open, noWallpaper)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	o.layers[0].refuse = errors.New("gone")
 	set.reload(showClock)
@@ -91,7 +91,7 @@ func TestBarSetReloadReopensARefusingSurface(t *testing.T) {
 // A hidden bar or one the new layout drops is not rebuilt.
 func TestBarSetReloadLeavesHiddenAndDroppedBars(t *testing.T) {
 	o := &fakeOpener{}
-	set := newSurfaceSet(o.open)
+	set := newSurfaceSet(o.open, noWallpaper)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	set.plug(&app.Output{Name: "DP-2"}, config.BarLayout{}, true)
 	set.apply(map[string]bool{"DP-2": true})
@@ -115,7 +115,7 @@ func TestBarSetClosesHiddenAndReopensShown(t *testing.T) {
 		opened[o.Name]++
 		layers[o.Name] = &fakeLayer{}
 		return layers[o.Name], nil
-	})
+	}, noWallpaper)
 	set.plug(&app.Output{Name: "DP-1"}, config.BarLayout{}, true)
 	set.plug(&app.Output{Name: "DP-2"}, config.BarLayout{}, true)
 	dp1, dp2 := layers["DP-1"], layers["DP-2"]
@@ -154,7 +154,7 @@ func TestBarSetFollowsHotplug(t *testing.T) {
 		l := &fakeLayer{}
 		layers = append(layers, l)
 		return l, nil
-	})
+	}, noWallpaper)
 	dp1 := &app.Output{Name: "DP-1"}
 	set.plug(dp1, config.BarLayout{}, true)
 	if len(layers) != 1 || !slices.Equal(set.connectors(), []string{"DP-1"}) {
@@ -204,7 +204,7 @@ func TestAccessibilityTogglesRestyleTheBarsInPlace(t *testing.T) {
 		l := &restylingLayer{}
 		layers = append(layers, l)
 		return l, nil
-	})
+	}, noWallpaper)
 	set.plug(&app.Output{Name: "DP-1"}, clockLayout, true)
 	set.plug(&app.Output{Name: "DP-2"}, clockLayout, true)
 	base := config.Defaults()

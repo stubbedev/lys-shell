@@ -119,8 +119,15 @@ type harness struct {
 	closed       map[string]int
 	onClosed     map[string]func()
 	ticks        map[string]func()
-	limit        func()
+	now          time.Duration
+	timers       []*fakeTimer
 	ended        atomic.Bool
+}
+
+type fakeTimer struct {
+	at      time.Duration
+	fn      func()
+	stopped bool
 }
 
 // newHarness starts a shell on monitors, all showing a.png, with the
@@ -165,9 +172,10 @@ func newHarness(t *testing.T, kind config.AnimationType, monitors ...string) *ha
 			h.ticks[name] = fn
 			return func() { delete(h.ticks, name) }
 		},
-		after: func(_ time.Duration, fn func()) func() {
-			h.limit = fn
-			return func() { h.limit = nil }
+		after: func(d time.Duration, fn func()) func() {
+			tm := &fakeTimer{at: h.now + d, fn: fn}
+			h.timers = append(h.timers, tm)
+			return func() { tm.stopped = true }
 		},
 	}
 	h.s = newShell(ui, svc, cfg, rasterDeps{
@@ -218,6 +226,33 @@ func (h *harness) plug(name string, w, ht int) *app.Output {
 	out := testOutput(name, w, ht)
 	h.s.AddOutput(out)
 	return out
+}
+
+func (h *harness) advance(d time.Duration) {
+	h.now += d
+	for {
+		var next *fakeTimer
+		for _, tm := range h.timers {
+			if !tm.stopped && tm.at <= h.now && (next == nil || tm.at < next.at) {
+				next = tm
+			}
+		}
+		if next == nil {
+			return
+		}
+		next.stopped = true
+		next.fn()
+	}
+}
+
+func (h *harness) pendingTimers() int {
+	n := 0
+	for _, tm := range h.timers {
+		if !tm.stopped {
+			n++
+		}
+	}
+	return n
 }
 
 // run does the queued work off the loop until none is left.

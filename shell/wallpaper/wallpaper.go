@@ -9,6 +9,7 @@ package wallpaper
 import (
 	"context"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/stubbedev/lys-desktop/config"
@@ -28,20 +29,27 @@ const frameInterval = 16 * time.Millisecond
 
 const firstFrameLimit = time.Second
 
+const firstFrameBound = 2 * firstFrameLimit
+
 // Shell owns the wallpaper service and its surfaces. Its methods run
 // on the lys-ui loop goroutine.
 type Shell struct {
-	ui          loop
-	svc         *wallpaper.Service
-	cfg         config.WallpaperConfig
-	anims       config.AnimationsConfig
-	outputs     map[string]*app.Output
-	surfaces    map[string]*surface
-	rasters     *rasters
-	firstFrame  func()
-	unpresented map[*surface]struct{}
-	cancelLimit func()
+	ui       loop
+	svc      *wallpaper.Service
+	cfg      config.WallpaperConfig
+	anims    config.AnimationsConfig
+	outputs  map[string]*app.Output
+	surfaces map[string]*surface
+	rasters  *rasters
+	waits    map[*app.Output]*frameWait
 }
+
+type frameWait struct {
+	waiters     []*frameWaiter
+	cancelBound func()
+}
+
+type frameWaiter struct{ done func() }
 
 // loop is what the shell does through the application: open a
 // surface (handing back its close), and run a ticker on the loop.
@@ -77,7 +85,7 @@ func newShell(ui loop, svc *wallpaper.Service, cfg *config.Config, d rasterDeps)
 	return &Shell{
 		ui: ui, svc: svc, cfg: cfg.Wallpaper, anims: cfg.Animations,
 		outputs: map[string]*app.Output{}, surfaces: map[string]*surface{},
-		rasters: newRasters(d), unpresented: map[*surface]struct{}{},
+		rasters: newRasters(d), waits: map[*app.Output]*frameWait{},
 	}
 }
 
@@ -86,11 +94,9 @@ func newShell(ui loop, svc *wallpaper.Service, cfg *config.Config, d rasterDeps)
 // dev.stubbe.lys.Wallpaper1 on conn, and starts the cycling and extraction
 // loops and the surfaces. It fails like the Rust service init when
 // the D-Bus name is taken (another shell is running): no wallpaper is
-// drawn then. firstFrame runs on the loop once the outputs show a
-// wallpaper, or firstFrameLimit gave up waiting for them. The returned
-// stop function ends the loops, releases the name, and lets go of the
-// wallpapers once the loop has ended.
-func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, firstFrame func()) (*Shell, func(), error) {
+// drawn then. The returned stop function ends the loops, releases the
+// name, and lets go of the wallpapers once the loop has ended.
+func Start(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn) (*Shell, func(), error) {
 	var s *Shell
 	svc := wallpaper.New(wallpaper.Options{
 		Extractor:      extract.FromConfig(cfg.Styling.ColorExtractor),
@@ -130,7 +136,7 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 			}
 		}
 	}()
-	s.awaitFirstFrame(firstFrame)
+	s.reconcile()
 	return s, func() {
 		cancel()
 		unsubscribe()
@@ -143,6 +149,10 @@ func Start(application *app.Application, outputs []*app.Output, cfg *config.Conf
 // nothing draws them any more, so their rasters are freed, and so are
 // those a decode or resample still running makes.
 func (s *Shell) shutdown() {
+	for out, w := range s.waits {
+		w.cancelBound()
+		delete(s.waits, out)
+	}
 	for name, surf := range s.surfaces {
 		surf.drop()
 		delete(s.surfaces, name)
@@ -158,18 +168,16 @@ type OutputWatcher interface {
 }
 
 // Launch is Start on the shell's session connection, following
-// hotplugged outputs through watch. A failure is logged, runs firstFrame,
-// and leaves the shell without wallpapers (nil).
-func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, watch OutputWatcher, firstFrame func()) (*Shell, func()) {
+// hotplugged outputs through watch. A failure is logged and leaves the
+// shell without wallpapers (nil).
+func Launch(application *app.Application, outputs []*app.Output, cfg *config.Config, conn *dbus.Conn, watch OutputWatcher) (*Shell, func()) {
 	if conn == nil {
 		log.Print("wallpaper: cannot initialize wallpaper service: no session bus")
-		firstFrame()
 		return nil, func() {}
 	}
-	s, stop, err := Start(application, outputs, cfg, conn, firstFrame)
+	s, stop, err := Start(application, outputs, cfg, conn)
 	if err != nil {
 		log.Printf("wallpaper: cannot initialize wallpaper service: %v", err)
-		firstFrame()
 		return nil, func() {}
 	}
 	stopIdentity := watch.WatchOutputIdentity(s.AddOutput)
@@ -303,8 +311,8 @@ func (s *Shell) reconcile() {
 		_, registered := monitors[name]
 		if out, ok := s.outputs[name]; !registered || !ok || surf.out != out {
 			surf.close()
-			s.presented(surf)
 			delete(s.surfaces, name)
+			s.release(surf.out)
 		}
 	}
 	for name, st := range monitors {
@@ -322,47 +330,54 @@ func (s *Shell) reconcile() {
 	}
 }
 
-func (s *Shell) awaitFirstFrame(done func()) {
-	s.firstFrame = done
-	s.reconcile()
-	s.cancelLimit = s.ui.after(firstFrameLimit, func() {
-		for surf := range s.unpresented {
-			log.Printf("wallpaper: %s: %s is not ready after %v; showing the built-in wallpaper until it is", surf.name, surf.path, firstFrameLimit)
-			surf.fallback()
-		}
-		if s.firstFrame == nil {
-			return
-		}
-		s.cancelLimit = s.ui.after(firstFrameLimit, func() {
-			log.Printf("wallpaper: %d outputs have shown no frame after %v; the shell starts without waiting for them", len(s.unpresented), 2*firstFrameLimit)
-			s.finishFirstFrame()
+// AwaitFirstFrame runs done on the loop once out's wallpaper has
+// presented a frame: at once when it has, when out is left with no
+// wallpaper to wait for, or, logged, after firstFrameBound. cancel
+// drops done unrun.
+func (s *Shell) AwaitFirstFrame(out *app.Output, done func()) (cancel func()) {
+	if surf, ok := s.surfaces[out.Name]; ok && surf.out == out && surf.shown {
+		done()
+		return func() {}
+	}
+	w, ok := s.waits[out]
+	if !ok {
+		w = &frameWait{}
+		w.cancelBound = s.ui.after(firstFrameBound, func() {
+			log.Printf("wallpaper: %s has shown no frame after %v; the surfaces waiting for it map without it", out.Name, firstFrameBound)
+			s.release(out)
 		})
-	})
-	s.settleFirstFrame()
+		s.waits[out] = w
+	}
+	waiter := &frameWaiter{done: done}
+	w.waiters = append(w.waiters, waiter)
+	return func() {
+		w.waiters = slices.DeleteFunc(w.waiters, func(x *frameWaiter) bool { return x == waiter })
+		if len(w.waiters) == 0 && s.waits[out] == w {
+			delete(s.waits, out)
+			w.cancelBound()
+		}
+	}
+}
+
+func (s *Shell) release(out *app.Output) {
+	w, ok := s.waits[out]
+	if !ok {
+		return
+	}
+	delete(s.waits, out)
+	w.cancelBound()
+	for _, waiter := range w.waiters {
+		waiter.done()
+	}
 }
 
 func (s *Shell) presented(surf *surface) {
-	delete(s.unpresented, surf)
-	s.settleFirstFrame()
-}
-
-func (s *Shell) settleFirstFrame() {
-	if len(s.unpresented) == 0 {
-		s.finishFirstFrame()
-	}
-}
-
-func (s *Shell) finishFirstFrame() {
-	if s.firstFrame == nil {
+	if surf.dropped {
 		return
 	}
-	done := s.firstFrame
-	s.firstFrame = nil
-	clear(s.unpresented)
-	if s.cancelLimit != nil {
-		s.cancelLimit()
-	}
-	done()
+	surf.shown = true
+	surf.stopLimit()
+	s.release(surf.out)
 }
 
 // surface is one output's Background layer.
@@ -375,20 +390,31 @@ type surface struct {
 	view       *view
 	// path and fit are what was last asked for; gen invalidates a
 	// decode that a newer request overtook.
-	path     string
-	fit      wallpaper.FitMode
-	gen      uint64
-	stopAnim func()
-	falling  bool
-	dropped  bool
+	path        string
+	fit         wallpaper.FitMode
+	gen         uint64
+	stopAnim    func()
+	falling     bool
+	dropped     bool
+	shown       bool
+	cancelLimit func()
 }
 
 func (s *Shell) newSurface(name string, out *app.Output) *surface {
 	surf := &surface{shell: s, name: name, out: out, view: newView()}
-	if s.firstFrame != nil {
-		s.unpresented[surf] = struct{}{}
-	}
+	surf.cancelLimit = s.ui.after(firstFrameLimit, func() {
+		surf.cancelLimit = nil
+		log.Printf("wallpaper: %s: %s is not ready after %v; showing the built-in wallpaper until it is", surf.name, surf.path, firstFrameLimit)
+		surf.fallback()
+	})
 	return surf
+}
+
+func (surf *surface) stopLimit() {
+	if surf.cancelLimit != nil {
+		surf.cancelLimit()
+		surf.cancelLimit = nil
+	}
 }
 
 func (surf *surface) openLayer() {
@@ -410,7 +436,7 @@ func (surf *surface) openLayer() {
 			if s.surfaces[surf.name] == surf {
 				delete(s.surfaces, surf.name)
 			}
-			s.presented(surf)
+			s.release(surf.out)
 		},
 	})
 	if err != nil {
@@ -419,7 +445,7 @@ func (surf *surface) openLayer() {
 		if s.surfaces[surf.name] == surf {
 			delete(s.surfaces, surf.name)
 		}
-		s.presented(surf)
+		s.release(surf.out)
 		return
 	}
 	surf.closeLayer = closeLayer
@@ -435,6 +461,7 @@ func (surf *surface) close() {
 // drop stops what the surface has in flight and lets go of its
 // wallpapers: a decode still running lands nowhere.
 func (surf *surface) drop() {
+	surf.stopLimit()
 	if surf.stopAnim != nil {
 		surf.stopAnim()
 		surf.stopAnim = nil

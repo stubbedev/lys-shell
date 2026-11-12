@@ -59,7 +59,7 @@ func TestShell1ConnectorsFollowHotplug(t *testing.T) {
 	signals, _ := bussignaltest.Signals(t, client, 16, dbus.WithMatchObjectPath(shellipc.ServicePath), dbus.WithMatchInterface("org.freedesktop.DBus.Properties"), dbus.WithMatchMember("PropertiesChanged"))
 
 	o := &fakeOpener{}
-	set := newSurfaceSet(o.open)
+	set := newSurfaceSet(o.open, noWallpaper)
 	first := apptest.On(a, func() string {
 		t.Cleanup(set.followOutputs(a.Session(), showClock, func(*app.Output) {}))
 		set.publishTo(state.SetConnectors)
