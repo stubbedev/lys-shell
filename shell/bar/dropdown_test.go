@@ -1,8 +1,6 @@
 package bar
 
 import (
-	"bytes"
-	"log"
 	"strings"
 	"testing"
 
@@ -152,11 +150,7 @@ func TestPopoverHookFocusesOnAttachAndLogsARefusal(t *testing.T) {
 	if pop.focused != entry {
 		t.Errorf("the pending focus landed on %v, want the entry", pop.focused)
 	}
-	var buf bytes.Buffer
-	prev, flags := log.Writer(), log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	t.Cleanup(func() { log.SetOutput(prev); log.SetFlags(flags) })
+	buf := captureLog(t)
 	hook.attachPopover(&fakePopover{refuse: widget.ErrNotInTree})
 	hook.focus(entry)
 	if got := buf.String(); !strings.Contains(got, "cannot focus") || !strings.Contains(got, widget.ErrNotInTree.Error()) {

@@ -1,10 +1,8 @@
 package bar
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"log"
 	"slices"
 	"strings"
 	"sync"
@@ -106,10 +104,7 @@ func TestOffLoopReadWaitsForTheLoop(t *testing.T) {
 }
 
 func TestOffLoopReadLogsAFailureAndGoesOn(t *testing.T) {
-	var buf bytes.Buffer
-	prev := log.Writer()
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(prev) })
+	buf := captureLog(t)
 	ctx := newTestContext(t, config.Defaults())
 	var fail atomic.Bool
 	fail.Store(true)

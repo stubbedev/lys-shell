@@ -1,10 +1,8 @@
 package bar
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"log"
 	"strings"
 	"testing"
 
@@ -91,10 +89,7 @@ func TestAudioModulesFollowTheDefaultDevice(t *testing.T) {
 }
 
 func TestAudioModulesStayHiddenOnOtherErrors(t *testing.T) {
-	var buf bytes.Buffer
-	prev := log.Writer()
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(prev) })
+	buf := captureLog(t)
 	source := &fakePulseSource{err: errors.New("broken pipe"), ticks: make(chan struct{})}
 	ctx := newTestContext(t, config.Defaults())
 	ctx.Pulse = source

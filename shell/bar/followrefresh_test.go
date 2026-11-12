@@ -1,10 +1,8 @@
 package bar
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"log"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -20,10 +18,7 @@ func tickSource(ticks chan struct{}) sourceSubscription {
 }
 
 func TestFollowReadsFailedFirstReadStaysHiddenAndNamesTheModule(t *testing.T) {
-	var buf bytes.Buffer
-	prev := log.Writer()
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(prev) })
+	buf := captureLog(t)
 	ctx := newTestContext(t, config.Defaults())
 	var broken atomic.Bool
 	broken.Store(true)
@@ -50,10 +45,7 @@ func TestFollowReadsFailedFirstReadStaysHiddenAndNamesTheModule(t *testing.T) {
 }
 
 func TestFollowReadsLogsALaterFailure(t *testing.T) {
-	var buf bytes.Buffer
-	prev := log.Writer()
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(prev) })
+	buf := captureLog(t)
 	logged := func() string { return onHeadlessLoop(buf.String) }
 
 	ctx := newTestContext(t, config.Defaults())
@@ -88,10 +80,7 @@ func TestFollowReadsLogsALaterFailure(t *testing.T) {
 }
 
 func TestFollowReadsLogsWhatStoppingMetAndNothingElse(t *testing.T) {
-	var buf bytes.Buffer
-	prev := log.Writer()
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(prev) })
+	buf := captureLog(t)
 	ctx := newTestContext(t, config.Defaults())
 	read := func(context.Context) (int, error) { return 1, nil }
 	var stops atomic.Int32

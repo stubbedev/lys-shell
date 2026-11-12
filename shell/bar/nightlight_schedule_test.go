@@ -1,10 +1,8 @@
 package bar
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -140,15 +138,6 @@ func mustLocation(t *testing.T, latitude, longitude float64) nightschedule.Locat
 }
 
 // captureLog collects the log for the rest of the test.
-func captureLog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	var buf bytes.Buffer
-	prev := log.Writer()
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(prev) })
-	return &buf
-}
-
 // duskEase is when Copenhagen's dusk transition starts on sunsetDay's
 // date, per cfg, and how long it runs.
 func duskEase(t *testing.T, cfg *config.Config) (time.Time, time.Duration) {
@@ -1044,10 +1033,7 @@ func TestNightlightClockWatchLivesWithTheSchedule(t *testing.T) {
 // A kernel that refuses the watch costs the prompt wake and nothing else:
 // the schedule runs on its timer, and the log says why.
 func TestNightlightWithoutAClockWatchStillSchedulesAndSaysSo(t *testing.T) {
-	logged := &lockedLog{}
-	prev := log.Writer()
-	log.SetOutput(logged)
-	t.Cleanup(func() { log.SetOutput(prev) })
+	logged := captureLog(t)
 	fake := &fakeSunset{clock: sunsetNight}
 	env := fake.env(t)
 	env.clockJumps = func(context.Context, func()) error { return errors.New("timerfd refused") }
@@ -1065,23 +1051,6 @@ func TestNightlightWithoutAClockWatchStillSchedulesAndSaysSo(t *testing.T) {
 }
 
 // lockedLog is a log sink a test can read while goroutines write to it.
-type lockedLog struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-func (l *lockedLog) Write(p []byte) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.buf.Write(p)
-}
-
-func (l *lockedLog) String() string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.buf.String()
-}
-
 // The shell's real environment watches the kernel's clock, and lets go
 // with the module.
 func TestNightlightLiveEnvWatchesTheClock(t *testing.T) {
