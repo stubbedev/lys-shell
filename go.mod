@@ -5,10 +5,10 @@ go 1.27.4
 require (
 	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/rivo/uniseg v0.4.7
-	github.com/stubbedev/lys-desktop v0.0.8-0.20261113173428-211ff08227fc
-	github.com/stubbedev/lys-lib v0.3.22-0.20261113172706-c588c8a0edf8
-	github.com/stubbedev/lys-secrets v0.3.22-0.20261113172824-76456a8bba8b
-	github.com/stubbedev/lys-ui v0.2.25-0.20261113172909-f52f63e28ea0
+	github.com/stubbedev/lys-desktop v0.0.8-0.20261113180321-5c20c840d9ce
+	github.com/stubbedev/lys-lib v0.3.22-0.20261113175459-3b11f791780d
+	github.com/stubbedev/lys-secrets v0.3.22-0.20261113175612-e7f9b9a33a85
+	github.com/stubbedev/lys-ui v0.2.25-0.20261113175659-885d28f48262
 	github.com/stubbedev/memory-go v0.5.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/image v0.47.0
