@@ -45,6 +45,7 @@ let
       enabled = true;
       pam-service = "lys-shell";
     };
+    animations.indicators = false;
     osd.duration = 8000;
     wallpaper.wallpaper = "${flatWallpaper}";
     bar.layout = [
@@ -204,6 +205,14 @@ pkgs.testers.nixosTest {
     def region(x, y, w, h):
         return run(f"grim -t ppm -g \"{x},{y} {w}x{h}\" - | tail -n +4 | sha256sum").split()[0]
 
+    def settled(rect):
+        shown = [region(*rect)]
+        def still():
+            shown.append(region(*rect))
+            return shown[-1] == shown[-2]
+        wait(f"{rect} to stop changing", still, tries=20, pause=0.25)
+        return shown[-1]
+
     def colors(x, y, w, h):
         return int(run(f"grim -t ppm -g \"{x},{y} {w}x{h}\" - | tail -n +4 | od -An -v -tx1 -w3 | sort -u | wc -l"))
 
@@ -350,11 +359,11 @@ pkgs.testers.nixosTest {
     closed = region(*below_clock)
     click(centre, bar_y)
     wait("the clock's dropdown to open", lambda: region(*below_clock) != closed, tries=20)
-    time.sleep(1)
+    settled(below_clock)
     seconds = int(machine.succeed("date +%S"))
     if seconds > 40:
         time.sleep(61 - seconds)
-    opened = region(*below_clock)
+    opened = settled(below_clock)
     shot("06a-dropdown-open")
     typed_reaches_foot("key-beside-dropdown")
     if region(*below_clock) != opened:
@@ -369,8 +378,7 @@ pkgs.testers.nixosTest {
 
     click(centre, bar_y)
     wait("the dropdown to reopen for Esc beside it", lambda: region(*below_clock) != closed, tries=20)
-    time.sleep(1)
-    reopened = region(*below_clock)
+    reopened = settled(below_clock)
     machine.send_key("esc")
     # Not compared with closed: the pointer still rests on the clock, whose
     # tooltip then shows there.
@@ -382,7 +390,7 @@ pkgs.testers.nixosTest {
 
     click(centre, bar_y)
     wait("the dropdown to reopen", lambda: region(*below_clock) != closed, tries=20)
-    time.sleep(1)
+    settled(below_clock)
     click(centre, below_clock[1] + 20)
     time.sleep(0.5)
     machine.send_key("esc")
